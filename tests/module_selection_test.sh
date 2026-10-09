@@ -172,6 +172,7 @@ reset_fixture() {
   ADDITIONALS[BCR]="true"
   ADDITIONALS[OEMUNLOCKONBOOT]="true"
   ADDITIONALS[ALTERINSTALLER]="true"
+  ADDITIONALS[DISABLE_SYSTEM_UPDATER]="false"
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
   ADDITIONALS[DEBUG]="false"
@@ -315,6 +316,16 @@ test_special_cases_remain_available() {
   assert_contains "--module-debug-sig" "debug"
   assert_contains "${WORKDIR}/modules/dummy.zip.sig" "debug"
   assert_contains "--patch-arg=--rootless" "debug"
+}
+
+test_disable_system_updater_module_is_optional() {
+  reset_fixture disable-system-updater-enabled
+  ADDITIONALS[DISABLE_SYSTEM_UPDATER]="true"
+  prepare_disable_system_updater_module() { :; }
+
+  run_patch
+  assert_pair     "--module-disable-system-updater"     "${WORKDIR}/modules/disable-system-updater.zip"     "disable system updater"
+  assert_pair     "--module-disable-system-updater-sig"     "${WORKDIR}/signatures/disable-system-updater.zip.sig"     "disable system updater"
 }
 
 test_boot_animation_module_is_optional_and_ordered() {
@@ -552,6 +563,7 @@ test_default_arguments
 test_each_module_can_be_disabled
 test_all_modules_can_be_disabled
 test_special_cases_remain_available
+test_disable_system_updater_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_fdroid_locked_preparation_and_arguments
 test_fdroid_missing_or_untracked_inputs_fail_closed

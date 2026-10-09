@@ -37,6 +37,11 @@ on:
         required: false
         type: boolean
         default: false
+      disable-system-updater:
+        description: Remove the stock ROM updater app (use with Custota)
+        required: false
+        type: boolean
+        default: false
       boot-animation:
         description: Include the local custom boot animation
         required: false
@@ -74,6 +79,7 @@ jobs:
       custota: ${{ steps.definition.outputs.custota }}
       msd: ${{ steps.definition.outputs.msd }}
       oemunlockonboot: ${{ steps.definition.outputs.oemunlockonboot }}
+      disable_system_updater: ${{ steps.definition.outputs.disable_system_updater }}
       fdroid_privileged_extension: ${{ steps.definition.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
@@ -106,6 +112,7 @@ jobs:
       custota: ${{ needs.schedule_config.outputs.custota == 'true' }}
       msd: ${{ needs.schedule_config.outputs.msd == 'true' }}
       oemunlockonboot: ${{ needs.schedule_config.outputs.oemunlockonboot == 'true' }}
+      disable-system-updater: ${{ needs.schedule_config.outputs.disable_system_updater == 'true' }}
       fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
       allow-unauthorized-adb: false
@@ -126,6 +133,7 @@ jobs:
       update-channel: ${{ inputs.update-channel }}
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
+      disable-system-updater: ${{ inputs.disable-system-updater }}
       boot-animation: ${{ inputs.boot-animation }}
       release-type: ${{ inputs.release-type }}
       publish: ${{ inputs.release-type != 'build-only' }}

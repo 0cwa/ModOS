@@ -44,6 +44,10 @@ on:
         required: false
         type: boolean
         default: true
+      disable-system-updater:
+        required: false
+        type: boolean
+        default: false
       fdroid-privileged-extension:
         required: false
         type: boolean
@@ -98,6 +102,7 @@ env:
   ADDITIONALS_CUSTOTA: ${{ inputs.custota }}
   ADDITIONALS_MSD: ${{ inputs.msd }}
   ADDITIONALS_OEMUNLOCKONBOOT: ${{ inputs.oemunlockonboot }}
+  ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ inputs.disable-system-updater }}
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 

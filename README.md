@@ -243,7 +243,7 @@ Updates can be done by patching (or re-patching) the OTA using `adb sideload`:
 
 PixeneOS leverages Custota:
 
-1. Disable the [system updater app](https://github.com/chenxiaolong/avbroot#ota-updates).
+1. For builds with `ADDITIONALS[DISABLE_SYSTEM_UPDATER] = true`, PixeneOS removes the stock ROM updater from the patched system image, so there is no separate manual disable step. The checked-in scheduled `shiba` and `pdx235` definitions enable this option. If you leave the option disabled, disable the stock updater manually before relying on Custota.
 2. Open Custota and set the OTA server URL to the repository's GitHub Pages publication URL, using the form `https://<owner>.github.io/<repository>/<rootless/magisk>`.
 
 For more info, refer to the current repository's [server](../../tree/gh-pages) branch.
@@ -272,6 +272,12 @@ before patching, and its exact SHA-256 is included in the module-selection
 fingerprint. The payload is not read or required while the option is disabled.
 
 ### Release URL and source overrides
+
+### Disable the stock ROM updater
+
+Set `'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true` under `[build]` to remove the stock OTA updater from the patched ROM. For the supported profiles, PixeneOS removes GrapheneOS's `app.seamlessupdate.client` updater from the system partition or LineageOS's `org.lineageos.updater` from `system_ext`, along with updater-specific permission/default-permission configuration files when present.
+
+The updater APK itself is required to match the reviewed ROM-specific path; if it has moved or the unpacked filesystem metadata disagrees with the tree, the build fails instead of silently producing an OTA that still contains the updater. Only enable this when another update path such as Custota is configured and maintained.
 
 By default, generated Custota metadata points patched OTA downloads at GitHub Releases for the current repository. These environment variables can override that behavior:
 

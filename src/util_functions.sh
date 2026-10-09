@@ -218,6 +218,7 @@ function append_enabled_module_arguments() {
     "bcr:BCR"
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "alterinstaller:ALTERINSTALLER"
+    "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "boot-animation:BOOT_ANIMATION"
   )
 
@@ -314,6 +315,75 @@ function prepare_boot_animation_module() {
   : >"${WORKDIR}/signatures/boot-animation.zip.sig"
   export PIXENEOS_BOOT_ANIMATION_PATH="${payload_path}"
   export PIXENEOS_BOOT_ANIMATION_DARK_PATH="${dark_payload_path}"
+}
+
+# Register the local system-updater removal module in the pinned helper.
+# This mirrors the existing boot-animation registration and deliberately avoids
+# carrying a fork-only adapter inside my-avbroot-setup.
+function prepare_disable_system_updater_module() {
+  local helper_root="${1}"
+  local init_file registry_file module_source
+
+  if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" != 'true' ]]; then
+    return 0
+  fi
+
+  case "${ROM_FAMILY}" in
+    grapheneos|lineageos) ;;
+    *)
+      echo "Error: stock updater removal is unsupported for ROM family: ${ROM_FAMILY}" >&2
+      return 1
+      ;;
+  esac
+
+  init_file="${helper_root}/lib/modules/__init__.py"
+  registry_file="${helper_root}/lib/modules/registry.py"
+  module_source="${helper_root}/lib/modules/disable_system_updater.py"
+
+  if [[ ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ]]; then
+    echo "Error: pinned patch helper lacks a safe module registry." >&2
+    return 1
+  fi
+  if [[ -L "${module_source}" ]]; then
+    echo "Error: pinned patch helper has an unsafe updater module path." >&2
+    return 1
+  fi
+
+  cp -- src/disable_system_updater.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+
+  if ! grep -Fq 'from lib.modules.disable_system_updater import DisableSystemUpdaterMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.disable_system_updater import DisableSystemUpdaterMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(DisableSystemUpdaterMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(DisableSystemUpdaterMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
+  : >"${WORKDIR}/modules/disable-system-updater.zip"
+  : >"${WORKDIR}/signatures/disable-system-updater.zip.sig"
+  export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
 }
 
 # Resolve and acquire the locked F-Droid inputs before exposing them to the
@@ -553,6 +623,10 @@ function patch_ota() {
     # Modules and their signatures
     if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]] &&
       ! prepare_boot_animation_module "${my_avbroot_setup}"; then
+      return 1
+    fi
+    if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" == 'true' ]] &&
+      ! prepare_disable_system_updater_module "${my_avbroot_setup}"; then
       return 1
     fi
     append_enabled_module_arguments args

@@ -40,6 +40,10 @@ on:
         required: false
         type: boolean
         default: true
+      disable-system-updater:
+        required: false
+        type: boolean
+        default: false
       fdroid-privileged-extension:
         required: false
         type: boolean
@@ -130,6 +134,11 @@ on:
         required: false
         type: boolean
         default: true
+      disable-system-updater:
+        description: Remove the stock ROM updater app (use with Custota)
+        required: false
+        type: boolean
+        default: false
       fdroid-privileged-extension:
         description: Include the locked F-Droid Privileged Extension module
         required: false
@@ -191,6 +200,7 @@ jobs:
       custota: ${{ steps.scheduled_config.outputs.custota }}
       msd: ${{ steps.scheduled_config.outputs.msd }}
       oemunlockonboot: ${{ steps.scheduled_config.outputs.oemunlockonboot }}
+      disable_system_updater: ${{ steps.scheduled_config.outputs.disable_system_updater }}
       fdroid_privileged_extension: ${{ steps.scheduled_config.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.scheduled_config.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.scheduled_config.outputs.compatible_sepolicy_patching }}
@@ -252,6 +262,7 @@ jobs:
           ADDITIONALS_CUSTOTA: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.custota == 'true' || inputs.custota }}
           ADDITIONALS_MSD: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.msd == 'true' || inputs.msd }}
           ADDITIONALS_OEMUNLOCKONBOOT: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}
+          ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.disable_system_updater == 'true' || inputs.disable-system-updater }}
           ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
           ADDITIONALS_DEBUG: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
@@ -343,6 +354,7 @@ jobs:
       custota: ${{ github.event_name == 'schedule' && needs.preflight.outputs.custota == 'true' || inputs.custota }}
       msd: ${{ github.event_name == 'schedule' && needs.preflight.outputs.msd == 'true' || inputs.msd }}
       oemunlockonboot: ${{ github.event_name == 'schedule' && needs.preflight.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}
+      disable-system-updater: ${{ github.event_name == 'schedule' && needs.preflight.outputs.disable_system_updater == 'true' || inputs.disable-system-updater }}
       fdroid-privileged-extension: ${{ github.event_name == 'schedule' && needs.preflight.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
       compatible-sepolicy-patching: ${{ github.event_name == 'schedule' && needs.preflight.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
       allow-unauthorized-adb: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}

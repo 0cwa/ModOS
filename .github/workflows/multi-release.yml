@@ -46,6 +46,11 @@ on:
         required: false
         type: boolean
         default: true
+      disable-system-updater:
+        description: Remove the stock ROM updater app (use with Custota)
+        required: false
+        type: boolean
+        default: false
       fdroid-privileged-extension:
         description: Include the locked F-Droid Privileged Extension
         required: false
@@ -163,6 +168,7 @@ jobs:
       custota: ${{ inputs.custota }}
       msd: ${{ inputs.msd }}
       oemunlockonboot: ${{ inputs.oemunlockonboot }}
+      disable-system-updater: ${{ inputs.disable-system-updater }}
       fdroid-privileged-extension: ${{ inputs.fdroid-privileged-extension }}
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
