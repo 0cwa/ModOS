@@ -63,7 +63,7 @@ on:
       boot-animation:
         required: false
         type: boolean
-        default: false
+        default: true
       release-type:
         required: false
         type: string
@@ -157,7 +157,7 @@ on:
         description: Include the local custom boot animation
         required: false
         type: boolean
-        default: false
+        default: true
       release-type:
         description: Release behavior
         required: true
@@ -255,7 +255,7 @@ jobs:
           ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
           ADDITIONALS_DEBUG: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
-          ADDITIONALS_BOOT_ANIMATION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.boot_animation || inputs.boot-animation || false }}
+          ADDITIONALS_BOOT_ANIMATION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.boot_animation == 'true' || github.event_name != 'schedule' && inputs.boot-animation }}
           ROOT_MODE_SCHEDULE: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.root_mode || '' }}
         run: |
           set -euo pipefail
@@ -346,7 +346,7 @@ jobs:
       fdroid-privileged-extension: ${{ github.event_name == 'schedule' && needs.preflight.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
       compatible-sepolicy-patching: ${{ github.event_name == 'schedule' && needs.preflight.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
       allow-unauthorized-adb: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
-      boot-animation: ${{ github.event_name == 'schedule' && needs.preflight.outputs.boot_animation == 'true' || inputs.boot-animation || false }}
+      boot-animation: ${{ github.event_name == 'schedule' && needs.preflight.outputs.boot_animation == 'true' || github.event_name != 'schedule' && inputs.boot-animation }}
       release-type: ${{ github.event_name == 'schedule' && 'default' || inputs.release-type }}
       publish: ${{ github.event_name == 'schedule' || inputs.release-type != 'build-only' }}
     secrets: inherit

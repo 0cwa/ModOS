@@ -41,7 +41,7 @@ on:
         description: Include the local custom boot animation
         required: false
         type: boolean
-        default: false
+        default: true
       release-type:
         description: Release behavior
         required: true
