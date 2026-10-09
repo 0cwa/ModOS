@@ -119,25 +119,6 @@ assert_workflow_input_contract() {
     fail "${file}: ${input} input expected ${expected_type}|${expected_default}, got ${actual:-missing}"
 }
 
-find_manual_acceptance_workflow() {
-  local file
-
-  for file in "${WORKFLOW_DIR}"/*.yml "${WORKFLOW_DIR}"/*.yaml; do
-    [[ -f "${file}" ]] || continue
-    [[ "${file}" == "${REUSABLE}" ]] && continue
-    [[ "${file}" == "${WORKFLOW_DIR}/release.yml" ]] && continue
-    [[ "${file}" == "${WORKFLOW_DIR}/release-lineage.yml" ]] && continue
-    if grep -Eq 'workflow_dispatch:' "${file}" &&
-      grep -Eq 'uses:[[:space:]]*\./\.github/workflows/build-rom\.yml' "${file}" &&
-      grep -Eqi 'build-only|publish:[[:space:]]*false' "${file}"; then
-      printf '%s\n' "${file}"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
 test_reusable_workflow() {
   [[ -f "${REUSABLE}" ]] || fail "missing reusable ROM workflow: ${REUSABLE}"
   assert_contains \
@@ -204,6 +185,14 @@ test_reusable_workflow() {
     "${REUSABLE}" \
     'enforce_publication_evidence' \
     "shared workflow must enforce publication evidence"
+  assert_contains \
+    "${REUSABLE}" \
+    'MODULE_SELECTION_FINGERPRINT="\$\{MODULE_SELECTION_FINGERPRINT_ROOTLESS\}"' \
+    "paired rootless cleanup must bind the rootless fingerprint"
+  assert_contains \
+    "${REUSABLE}" \
+    'MODULE_SELECTION_FINGERPRINT="\$\{MODULE_SELECTION_FINGERPRINT_MAGISK\}"' \
+    "paired Magisk cleanup must bind the Magisk fingerprint"
   assert_not_contains \
     "${REUSABLE}" \
     'actions/upload-artifact@' \
@@ -224,6 +213,8 @@ test_release_triggers() {
   assert_contains "${lineage}" 'uses:[[:space:]]*\./\.github/workflows/build-rom\.yml'     "LineageOS release must call the shared workflow"
   assert_contains "${lineage}" 'rom-family:[[:space:]]*lineageos'     "LineageOS manual build must select the LineageOS profile"
   assert_contains "${lineage}" 'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
+  assert_contains "${RELEASE}" '^[[:space:]]+- build-only[[:space:]]*$'     "GrapheneOS manual release must expose build-only mode"
+  assert_contains "${lineage}" '^[[:space:]]+- build-only[[:space:]]*$'     "LineageOS manual release must expose build-only mode"
 
   assert_dispatch_default "${RELEASE}" device-id shiba
   assert_dispatch_default "${RELEASE}" root true
@@ -243,15 +234,12 @@ test_release_triggers() {
   assert_dispatch_default "${lineage}" boot-animation false
 }
 
-test_config_loading_isolated_to_grapheneos_schedule() {
+test_config_loading_isolated_to_scheduled_releases() {
   local lineage="${WORKFLOW_DIR}/release-lineage.yml"
-  local build_only="${WORKFLOW_DIR}/phase3-build-only.yml"
 
   assert_contains "${RELEASE}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/grapheneos-shiba\.toml'     "GrapheneOS schedule must use the shiba definition"
   assert_contains "${lineage}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
   assert_not_contains "${lineage}" 'env\.toml'     "LineageOS schedule must not inherit repository-wide local env.toml"
-  assert_not_contains "${build_only}" 'env\.toml|check_toml_env'     "build-only acceptance must keep its declared defaults"
-  assert_contains "${build_only}" 'publish:[[:space:]]*false'     "build-only acceptance must remain local-unpublished"
 }
 
 test_release_configuration_forwarding() {
@@ -346,20 +334,26 @@ test_publication_identity_is_step_scoped() {
     "publication must not interpolate the email secret in shell source"
 }
 
-test_manual_build_only_acceptance() {
-  local acceptance
+test_workflow_inventory_is_intentional() (
+  local expected actual
 
-  acceptance="$(find_manual_acceptance_workflow)" ||
-    fail "missing manual build-only workflow that calls build-rom.yml"
-  assert_contains \
-    "${acceptance}" \
-    'workflow_dispatch:' \
-    "acceptance workflow must be manually dispatched"
-  assert_contains \
-    "${acceptance}" \
-    '^[[:space:]]*contents:[[:space:]]*write[[:space:]]*$' \
-    "acceptance workflow must grant contents write permission"
-}
+  expected="$(printf '%s\n' \
+    build-rom.yml \
+    ci.yml \
+    multi-release.yml \
+    release-lineage.yml \
+    release.yml \
+    renovate.yml)"
+
+  actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
+
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'unexpected workflow inventory\nexpected:\n%s\nactual:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    exit 1
+  }
+)
 
 test_no_lineage_checkout_anywhere() {
   local file
@@ -375,11 +369,11 @@ test_no_lineage_checkout_anywhere() {
 
 test_reusable_workflow
 test_release_triggers
-test_config_loading_isolated_to_grapheneos_schedule
+test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding
 test_module_forwarding_contract
 test_publication_identity_is_step_scoped
-test_manual_build_only_acceptance
+test_workflow_inventory_is_intentional
 test_no_lineage_checkout_anywhere
 
-echo "Phase 3 workflow tests passed"
+echo "Workflow contract tests passed"

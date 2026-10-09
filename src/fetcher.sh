@@ -8,17 +8,21 @@ source src/declarations.sh
 source src/rom_profiles.sh
 source src/ota_providers.sh
 
-# Fetch the latest version of GrapheneOS and Magisk and sets up the OTA URL
+# Resolve the ROM version plus the configured Magisk compatibility version
 function get_latest_version() {
-  local latest_magisk_version=$(
-    git ls-remote --tags "${DOMAIN}/${MAGISK[REPOSITORY]}.git" |
-      awk -F'\t' '{print $2}' |
-      grep -E 'refs/tags/' |
-      grep -v '\^{}$' |
-      sed 's/refs\/tags\///' |
-      sort -V |
-      tail -n1
-  )
+  local selected_magisk_version="${VERSION[MAGISK]:-}"
+
+  if [[ -z "${selected_magisk_version}" ]]; then
+    selected_magisk_version=$(
+      git ls-remote --tags "${DOMAIN}/${MAGISK[REPOSITORY]}.git" |
+        awk -F'\t' '{print $2}' |
+        grep -E 'refs/tags/' |
+        grep -v '\^{}$' |
+        sed 's/refs\/tags\///' |
+        sort -V |
+        tail -n1
+    )
+  fi
 
   resolve_rom_profile || return 1
 
@@ -30,12 +34,16 @@ function get_latest_version() {
   fetch_rom_ota_metadata || return 1
   echo -e "${ROM_FAMILY} OTA target: \`${GRAPHENEOS[OTA_TARGET]}\`\nOTA URL: ${GRAPHENEOS[OTA_URL]}\n"
 
-  if [[ -z "${latest_magisk_version}" ]]; then
-    echo -e "Failed to get the latest Magisk version."
+  if [[ -z "${selected_magisk_version}" ]]; then
+    echo -e "Failed to resolve the Magisk version."
     exit 1
-  else
-    VERSION[MAGISK]="${latest_magisk_version}"
   fi
+  if [[ ! "${selected_magisk_version}" =~ ^v[0-9]+([.][0-9A-Za-z_-]+)*$ ]]; then
+    echo -e "Invalid Magisk version tag: ${selected_magisk_version}"
+    exit 1
+  fi
+
+  VERSION[MAGISK]="${selected_magisk_version}"
 }
 
 # Getter function to download the magisk, modules, signatures and tools

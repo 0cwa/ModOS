@@ -7,6 +7,8 @@
 # this helper owns the byte-for-byte representation that is hashed by both the
 # build and release preflight paths.
 
+BOOT_ANIMATION_SELECTION_CONTRACT="product-image-root-theme-context-deterministic-stored-v7"
+
 function selection_variant_manifest() {
   local field value
   local -a required_fields=(
@@ -16,6 +18,8 @@ function selection_variant_manifest() {
     SELECTION_OUTPUT_SCOPE
     SELECTION_ROOT
     SELECTION_MAGISK_PREINIT
+    SELECTION_MAGISK_REPOSITORY
+    SELECTION_MAGISK_VERSION
     SELECTION_DEBUG
     SELECTION_COMPATIBLE_SEPOLICY
     SELECTION_CLEAR_VBMETA_FLAGS
@@ -100,9 +104,24 @@ function selection_variant_manifest() {
     "module.oemunlockonboot=${SELECTION_MODULE_OEMUNLOCKONBOOT}" \
     "disable_system_updater=${SELECTION_DISABLE_SYSTEM_UPDATER}"
 
+  if [[ "${SELECTION_ROOT}" == 'true' ]]; then
+    if [[ ! "${SELECTION_MAGISK_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+      echo "Error: rooted selection identity has an invalid Magisk repository." >&2
+      return 1
+    fi
+    if [[ ! "${SELECTION_MAGISK_VERSION}" =~ ^v[0-9]+([.][0-9A-Za-z_-]+)*$ ]]; then
+      echo "Error: rooted selection identity has an invalid Magisk version." >&2
+      return 1
+    fi
+    printf '%s\n' \
+      "magisk_repository=${SELECTION_MAGISK_REPOSITORY}" \
+      "magisk_version=${SELECTION_MAGISK_VERSION}"
+  fi
+
   if [[ "${SELECTION_BOOT_ANIMATION}" == 'true' ]]; then
     printf '%s\n' \
       'boot_animation=true' \
+      "boot_animation_contract=${BOOT_ANIMATION_SELECTION_CONTRACT}" \
       "boot_animation_sha256=${SELECTION_BOOT_ANIMATION_SHA256}"
   fi
 }

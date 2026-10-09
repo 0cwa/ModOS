@@ -245,15 +245,18 @@ function append_enabled_module_arguments() {
 # API used by src/debugmod.py at the pinned helper revision.
 function prepare_boot_animation_module() {
   local helper_root="${1}"
-  local repository_root payload_path init_file registry_file module_source
-  repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || return 1
-  payload_path="${repository_root}/custom/boot-animation/bootanimation.zip"
+  local payload_path dark_payload_path init_file registry_file module_source
 
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" != 'true' ]]; then
     return 0
   fi
 
-  if ! python3 src/boot_animation.py validate "${payload_path}" >/dev/null; then
+  _resolve_boot_animation_payloads || return 1
+  payload_path="${BOOT_ANIMATION_LIGHT_PAYLOAD}"
+  dark_payload_path="${BOOT_ANIMATION_DARK_PAYLOAD}"
+
+  if ! python3 src/boot_animation.py validate "${payload_path}" >/dev/null ||
+    ! python3 src/boot_animation.py validate "${dark_payload_path}" >/dev/null; then
     echo "Error: boot animation validation failed; refusing to patch." >&2
     return 1
   fi
@@ -311,6 +314,7 @@ function prepare_boot_animation_module() {
   : >"${WORKDIR}/modules/boot-animation.zip"
   : >"${WORKDIR}/signatures/boot-animation.zip.sig"
   export PIXENEOS_BOOT_ANIMATION_PATH="${payload_path}"
+  export PIXENEOS_BOOT_ANIMATION_DARK_PATH="${dark_payload_path}"
 }
 
 # Register the local system-updater removal module in the pinned helper.
@@ -682,6 +686,13 @@ function patch_ota() {
     # Python command to run the patch script
     python "${my_avbroot_setup}/patch.py" "${args[@]}" || return 1
 
+    # A Magisk label is publication metadata, not proof of a working runtime
+    # root environment. Static CI can verify the Magisk boot patch and paired
+    # output separation, but /data/adb/magisk is provisioned on-device by
+    # Magisk's additional-setup/environment-fix flow.
+    verify_requested_root_outputs || return 1
+    verify_requested_boot_animation_outputs || return 1
+
     if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
       generate_custota_variant_sidecars         "${OUTPUTS[PATCHED_OTA_ROOTLESS]}"         "${OUTPUTS[OTA_METADATA_ROOTLESS]}" || return 1
       generate_custota_variant_sidecars         "${OUTPUTS[PATCHED_OTA_MAGISK]}"         "${OUTPUTS[OTA_METADATA_MAGISK]}" || return 1
@@ -690,6 +701,270 @@ function patch_ota() {
 
   # Deactivate the virtual environment after patching the OTA
   deactivate
+}
+
+function extract_ota_boot_target() {
+  local ota_path="${1}"
+  local directory="${2}"
+  local partitions target image_path
+
+  [[ -f "${ota_path}" ]] || {
+    echo "Error: missing OTA for boot-target inspection: ${ota_path}" >&2
+    return 1
+  }
+
+  partitions="$(run_executable_tool avbroot ota list --input "${ota_path}")" ||
+    return 1
+  if grep -Fxq -- 'init_boot' <<<"${partitions}"; then
+    target='init_boot'
+  elif grep -Fxq -- 'boot' <<<"${partitions}"; then
+    target='boot'
+  else
+    echo "Error: OTA has no boot or init_boot partition: ${ota_path}" >&2
+    return 1
+  fi
+
+  mkdir -p -- "${directory}" || return 1
+  if ! run_executable_tool avbroot ota extract \
+    --input "${ota_path}" \
+    --directory "${directory}" \
+    --partition "${target}" >/dev/null; then
+    return 1
+  fi
+
+  image_path="${directory}/${target}.img"
+  [[ -s "${image_path}" ]] || {
+    echo "Error: boot-target inspection did not extract ${target}.img." >&2
+    return 1
+  }
+
+  printf '%s\n' "${target}"
+}
+
+function verify_boot_animation_ota() {
+  local ota_path="${1}"
+  local temp_dir payload_path dark_payload_path avbroot_bin afsr_bin ota_abs
+  local extract_dir unpack_dir image_path raw_image
+
+  [[ -f "${ota_path}" ]] || {
+    echo "Error: missing OTA for boot-animation inspection: ${ota_path}" >&2
+    return 1
+  }
+
+  _resolve_boot_animation_payloads || return 1
+  payload_path="${BOOT_ANIMATION_LIGHT_PAYLOAD}"
+  dark_payload_path="${BOOT_ANIMATION_DARK_PAYLOAD}"
+  temp_dir="$(mktemp -d "${WORKDIR}/boot-animation-verify.XXXXXX")" || return 1
+  temp_dir="$(realpath -- "${temp_dir}")" || return 1
+  ota_abs="$(realpath -- "${ota_path}")" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+  avbroot_bin="$(resolve_executable_tool avbroot)" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+  afsr_bin="$(resolve_executable_tool afsr)" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+  avbroot_bin="$(realpath -- "${avbroot_bin}")" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+  afsr_bin="$(realpath -- "${afsr_bin}")" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+
+  extract_dir="${temp_dir}/extract-product"
+  unpack_dir="${temp_dir}/unpack-product"
+  mkdir -p -- "${extract_dir}" "${unpack_dir}" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+
+  if ! "${avbroot_bin}" ota extract \
+    --input "${ota_abs}" \
+    --directory "${extract_dir}" \
+    --partition product >/dev/null; then
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+
+  image_path="${extract_dir}/product.img"
+  [[ -s "${image_path}" ]] || {
+    echo "Error: boot-animation verification did not extract product.img." >&2
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+  image_path="$(realpath -- "${image_path}")" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+
+  if ! (
+    cd -- "${unpack_dir}" &&
+      "${avbroot_bin}" avb unpack --quiet --input "${image_path}" &&
+      raw_image="$(realpath -- raw.img)" &&
+      "${afsr_bin}" unpack --input "${raw_image}"
+  ); then
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+
+  if ! python3 src/boot_animation.py verify-runtime \
+    "${payload_path}" \
+    "${dark_payload_path}" \
+    "${unpack_dir}/fs_tree/media/bootanimation.zip" \
+    "${unpack_dir}/fs_tree/media/bootanimation-dark.zip"; then
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+
+  rm -rf -- "${temp_dir}"
+  echo "Verified custom boot animation in finished OTA product image: ${ota_path}"
+}
+
+function verify_requested_boot_animation_outputs() {
+  local -a ota_paths=()
+  local ota_path
+
+  [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]] || return 0
+
+  case "${RESOLVED_ROOT_MODE}" in
+    rootless|magisk)
+      ota_paths=("${OUTPUTS[PATCHED_OTA]}")
+      ;;
+    both)
+      ota_paths=(
+        "${OUTPUTS[PATCHED_OTA_ROOTLESS]}"
+        "${OUTPUTS[PATCHED_OTA_MAGISK]}"
+      )
+      ;;
+    *)
+      echo "Error: cannot verify boot animation for root mode: ${RESOLVED_ROOT_MODE}" >&2
+      return 1
+      ;;
+  esac
+
+  for ota_path in "${ota_paths[@]}"; do
+    if ! verify_boot_animation_ota "${ota_path}"; then
+      rm -f -- "${ota_path}" "${ota_path}.csig"
+      echo "Error: refusing to keep or publish an OTA without verified custom boot animation." >&2
+      return 1
+    fi
+  done
+}
+
+
+function verify_magisk_ota() {
+  local ota_path="${1}"
+  local expected_preinit="${2}"
+  local temp_dir target image_path magisk_info
+
+  temp_dir="$(mktemp -d "${WORKDIR}/magisk-verify.XXXXXX")" || return 1
+  target="$(extract_ota_boot_target "${ota_path}" "${temp_dir}")" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+  image_path="${temp_dir}/${target}.img"
+
+  if ! magisk_info="$(run_executable_tool avbroot boot magisk-info \
+    --image "${image_path}" 2>&1)"; then
+    echo "Error: OTA labeled as Magisk has no detectable Magisk boot patch." >&2
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+  rm -rf -- "${temp_dir}"
+
+  if ! grep -Fxq -- "PREINITDEVICE=${expected_preinit}" <<<"${magisk_info}"; then
+    echo "Error: Magisk OTA does not contain the expected PREINITDEVICE=${expected_preinit}." >&2
+    return 1
+  fi
+
+  echo "Verified Magisk boot-patch evidence in ${ota_path} (${target}, PREINITDEVICE=${expected_preinit})."
+}
+
+function verify_paired_root_outputs() {
+  local rootless_ota="${1}"
+  local magisk_ota="${2}"
+  local temp_dir rootless_dir magisk_dir
+  local rootless_target magisk_target rootless_image magisk_image
+  local rootless_digest magisk_digest
+
+  temp_dir="$(mktemp -d "${WORKDIR}/root-pair-verify.XXXXXX")" || return 1
+  rootless_dir="${temp_dir}/rootless"
+  magisk_dir="${temp_dir}/magisk"
+
+  rootless_target="$(extract_ota_boot_target "${rootless_ota}" "${rootless_dir}")" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+  magisk_target="$(extract_ota_boot_target "${magisk_ota}" "${magisk_dir}")" || {
+    rm -rf -- "${temp_dir}"
+    return 1
+  }
+
+  if [[ "${rootless_target}" != "${magisk_target}" ]]; then
+    echo "Error: paired outputs selected different Magisk boot targets: rootless=${rootless_target}, magisk=${magisk_target}." >&2
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+
+  rootless_image="${rootless_dir}/${rootless_target}.img"
+  magisk_image="${magisk_dir}/${magisk_target}.img"
+  rootless_digest="$(sha256sum -- "${rootless_image}" | awk '{print $1}')"
+  magisk_digest="$(sha256sum -- "${magisk_image}" | awk '{print $1}')"
+
+  if [[ "${rootless_digest}" == "${magisk_digest}" ]]; then
+    echo "Error: paired rootless and Magisk outputs have identical ${magisk_target} images." >&2
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+
+  if run_executable_tool avbroot boot magisk-info \
+    --image "${rootless_image}" >/dev/null 2>&1; then
+    echo "Error: paired rootless output unexpectedly contains Magisk boot evidence." >&2
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+
+  rm -rf -- "${temp_dir}"
+  echo "Verified paired boot targets differ and the rootless ${rootless_target} has no Magisk evidence."
+}
+
+function verify_requested_root_outputs() {
+  local magisk_ota
+
+  case "${RESOLVED_ROOT_MODE}" in
+    rootless)
+      return 0
+      ;;
+    magisk)
+      magisk_ota="${OUTPUTS[PATCHED_OTA]}"
+      ;;
+    both)
+      magisk_ota="${OUTPUTS[PATCHED_OTA_MAGISK]}"
+      ;;
+    *)
+      echo "Error: cannot verify unknown resolved root mode: ${RESOLVED_ROOT_MODE}" >&2
+      return 1
+      ;;
+  esac
+
+  if ! verify_magisk_ota "${magisk_ota}" "${MAGISK[PREINIT]}"; then
+    rm -f -- "${magisk_ota}" "${magisk_ota}.csig"
+    echo "Error: refusing to keep or publish an OTA without verified Magisk boot-patch evidence." >&2
+    return 1
+  fi
+
+  if [[ "${RESOLVED_ROOT_MODE}" == both ]] &&
+    ! verify_paired_root_outputs "${OUTPUTS[PATCHED_OTA_ROOTLESS]}" "${magisk_ota}"; then
+    rm -f -- "${magisk_ota}" "${magisk_ota}.csig"
+    echo "Error: refusing to keep or publish an invalid rootless/Magisk output pair." >&2
+    return 1
+  fi
 }
 
 function release_location_for_output() {

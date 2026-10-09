@@ -88,14 +88,11 @@ on:
         required: false
 
 env:
-  CARGO_INCREMENTAL: 1
   DEVICE_NAME: ${{ inputs.device-id }}
   INTERACTIVE_MODE: false
   ROM_FAMILY: ${{ inputs.rom-family }}
   GRAPHENEOS_UPDATE_CHANNEL: ${{ inputs.update-channel }}
   OUTPUT_SCOPE: ${{ inputs.publish && inputs.release-type != 'build-only' && 'published' || 'local-unpublished' }}
-  RUST_BACKTRACE: short
-  RUSTUP_MAX_RETRIES: 10
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   RELEASE_TYPE: ${{ inputs.release-type }}
   ROOT_MODE: ${{ inputs.root-mode }}
@@ -168,14 +165,6 @@ jobs:
           resolve_rom_profile
           enforce_output_policy "${OUTPUT_SCOPE}"
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        with:
-          toolchain: stable 2 weeks ago
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2.9.2
-
       - name: Install Python
         uses: actions/setup-python@v7
         with:
@@ -216,6 +205,8 @@ jobs:
           {
             echo "GRAPHENEOS_OTA_TARGET=${GRAPHENEOS[OTA_TARGET]}"
             echo "GRAPHENEOS_VERSION=${VERSION[GRAPHENEOS]}"
+            echo "MAGISK_REPOSITORY=${MAGISK[REPOSITORY]}"
+            echo "MAGISK_VERSION=${VERSION[MAGISK]}"
             echo "MODULE_SELECTION_FINGERPRINT=${MODULE_SELECTION_FINGERPRINT}"
             echo "MODULE_SELECTION_FINGERPRINT_ROOTLESS=${MODULE_SELECTION_FINGERPRINT_ROOTLESS}"
             echo "MODULE_SELECTION_FINGERPRINT_MAGISK=${MODULE_SELECTION_FINGERPRINT_MAGISK}"
@@ -329,6 +320,12 @@ jobs:
             else
               echo "Module-selection fingerprint: ${MODULE_SELECTION_FINGERPRINT}"
             fi
+            if [[ "${ROOT_MODE_RESOLVED}" == magisk || "${ROOT_MODE_RESOLVED}" == both ]]; then
+              echo
+              echo "Magisk boot patch: statically verified during the build."
+              echo "Runtime root bootstrap: install/open the matching ${MAGISK_REPOSITORY} ${MAGISK_VERSION} manager, complete Additional setup / Environment fix when prompted, then reboot."
+              echo "Runtime verification: adb shell su -c id"
+            fi
           } > "${GITHUB_WORKSPACE}-CHANGELOG.txt"
 
       - name: Publish GitHub release
@@ -373,9 +370,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          MODULE_SELECTION_FINGERPRINT="${MODULE_SELECTION_FINGERPRINT_ROOTLESS}" \
           OTA_ARTIFACT_PATH="${OUTPUTS_PATCHED_OTA_ROOTLESS}" \
           SELECTION_METADATA_PATH="${SELECTION_METADATA_ROOTLESS}" \
             bash src/ci/remove_superseded_assets.sh
+          MODULE_SELECTION_FINGERPRINT="${MODULE_SELECTION_FINGERPRINT_MAGISK}" \
           OTA_ARTIFACT_PATH="${OUTPUTS_PATCHED_OTA_MAGISK}" \
           SELECTION_METADATA_PATH="${SELECTION_METADATA_MAGISK}" \
             bash src/ci/remove_superseded_assets.sh
