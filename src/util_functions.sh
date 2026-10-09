@@ -1270,37 +1270,34 @@ function download_dependencies() {
   fi
 }
 
-# Function to extract the official GrapheneOS keys from the OTA
+# Extract the OTA's embedded verification certificate and root vbmeta AVB
+# public key. Use avbroot's structured extractor: the old "avb info | sed"
+# pipeline also matched chained-partition public_key fields, concatenating
+# multiple independent keys into one invalid AVB key file.
 function extract_official_keys() {
-  # https://github.com/chenxiaolong/my-avbroot-setup/issues/1#issuecomment-2270286453
-  # AVB: Extract vbmeta.img, run avbroot avb info -i vbmeta.img.
-  #   The public_key field is avb_pkmd.bin encoded as hex.
-  #   Verify that the key is official by comparing its sha256 checksum with grapheneos.org/articles/attestation-compatibility-guide.
-  # OTA: Extract META-INF/com/android/otacert from the OTA.
-  #   (Or from otacerts.zip inside system.img or vendor_boot.img. All 3 files are identical.)
   local ota_zip="${WORKDIR}/${GRAPHENEOS[OTA_TARGET]}.zip"
-  local avb_info
+  local public_key="${WORKDIR}/extracted/avb_pkmd.bin"
 
-  # Extract OTA
+  mkdir -p -- "${WORKDIR}/extracted" "${WORKDIR}/extracted/extracts" || return 1
+  rm -f -- "${public_key}" || return 1
+
+  # The pinned avbroot 3.34.1 extracts only the root vbmeta header's key;
+  # chained descriptors are never included. Retain the existing --all image
+  # extraction for compatibility with downstream consumers.
   run_executable_tool avbroot ota extract \
     --input "${ota_zip}" \
     --directory "${WORKDIR}/extracted/extracts" \
-    --all || return 1
+    --all \
+    --public-key-avb "${public_key}" || return 1
 
-  # Extract vbmeta.img
-  # To verify, execute sha256sum avb_pkmd.bin in terminal
-  # compare the output with base16-encoded verified boot key fingerprints
-  # mentioned at https://grapheneos.org/articles/attestation-compatibility-guide for the respective device
-  avb_info="$(run_executable_tool avbroot avb info \
-    -i "${WORKDIR}/extracted/extracts/vbmeta.img")" || return 1
-  local public_key_hex
-  public_key_hex="$(printf '%s\n' "${avb_info}" | sed -n 's/.*public_key: "\(.*\)".*/\1/p' | tr -d '[:space:]')" || return 1
-  [[ -n "${public_key_hex}" ]] || return 1
-  printf '%s' "${public_key_hex}" | xxd -r -p >"${WORKDIR}/extracted/avb_pkmd.bin" || return 1
-  [[ -s "${WORKDIR}/extracted/avb_pkmd.bin" ]] || return 1
+  if [[ ! -s "${public_key}" ]]; then
+    echo "Error: the source OTA has no root vbmeta AVB public key; refusing to patch without verification." >&2
+    return 1
+  fi
 
-  # Extract META-INF/com/android/otacert from OTA or otacerts.zip from either vendor_boot.img or system.img
-  unzip "${ota_zip}" -d "${WORKDIR}/extracted/ota"
+  # Preserve the existing OTA certificate extraction path. The helper uses
+  # this certificate to validate the source OTA and recovery consistency.
+  unzip "${ota_zip}" -d "${WORKDIR}/extracted/ota" || return 1
 }
 
 function dirty_suffix() {
