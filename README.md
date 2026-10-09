@@ -1,8 +1,14 @@
-# PixeneOS
+# ModOS (based off PixeneOS)
 
 ## Description
 
-PixeneOS patches supported Android ROM OTA images with a selected set of modules while preserving AVB/OTA signing and update metadata. The maintained ROM profiles currently cover GrapheneOS and LineageOS. The project relies on upstream components from chenxiaolong and other projects, but keeps fork-specific release, trust, and compatibility policy in this repository.
+ModOS patches supported Android ROM OTA images with a selected set of modules while preserving AVB/OTA signing and update metadata. The maintained ROM profiles currently cover GrapheneOS and LineageOS. The project relies on upstream components from chenxiaolong and other projects, but keeps fork-specific release, trust, and compatibility policy in this repository.
+
+## Soft-fork maintenance
+
+ModOS is maintained as a soft fork of `pixincreate/PixeneOS`: upstream structure and fixes are preferred unless a fork-specific requirement needs a small, isolated extension. Fork-specific behavior should live behind typed configuration, ROM profiles, pinned helper contracts, or thin workflow triggers rather than copied build pipelines.
+
+The Actions inventory is intentionally small: the upstream-style CI, release, multi-device release, and Renovate workflows, plus the reusable shared ROM build and the thin LineageOS release trigger. CI enforces this inventory so temporary acceptance or one-shot workflows cannot be committed accidentally.
 
 ## Features
 
@@ -17,7 +23,7 @@ PixeneOS patches supported Android ROM OTA images with a selected set of modules
 
 > [!NOTE]
 >
-> 1. PixeneOS is not affiliated with GrapheneOS, LineageOS, or the upstream projects it integrates.
+> 1. ModOS is not affiliated with GrapheneOS, LineageOS, or the upstream projects it integrates.
 > 2. Linux is the supported host platform for the complete patching workflow.
 
 ## Requirements
@@ -171,7 +177,21 @@ It is easier to use the web installer to flash GrapheneOS. However, it is recomm
 
 Root changes the device security model and can introduce compatibility breakage across ROM updates. Use it only when you understand the trade-offs for your device and selected ROM.
 
-PixeneOS defaults to the GrapheneOS-oriented `pixincreate/Magisk` fork. The repository is configurable through `MAGISK[REPOSITORY]` in `env.toml`; use another source only after confirming compatibility with the selected ROM. Magisk/Zygisk behavior can change across releases, so rooted builds should be revalidated after ROM or Magisk updates.
+ModOS defaults to the official `topjohnwu/Magisk` repository. The source remains configurable through `MAGISK[REPOSITORY]` in `env.toml`, but alternate Magisk forks are opt-in rather than part of the GrapheneOS build contract. If you use Zygisk Next for GrapheneOS compatibility, install and manage it separately from the OTA build. Magisk/Zygisk behavior can change across releases, so rooted builds should be revalidated after ROM, Magisk, or Zygisk changes.
+
+ModOS currently pins **official Magisk v30.7** as its avbroot compatibility baseline. This mirrors the current rooted-GrapheneOS reference pairing with avbroot 3.34.1. avbroot 3.34.0 and newer explicitly recognize Magisk 31000, but parser/patch-format support is not the same as target-device runtime validation, so ModOS does not automatically advance to the highest Magisk tag. Override `MAGISK_VERSION` only for an intentional compatibility test.
+
+With avbroot, Magisk is not updated using the app's normal **Direct install** path. Magisk version changes must be made by repatching/re-signing the OTA and installing that OTA. The manager's **Additional setup / Environment fix** is a separate runtime-environment step and does not replace OTA repatching.
+
+A Magisk-patched OTA is only the boot-image half of a working Magisk installation. On a clean install, after a data wipe, or whenever Magisk reports that additional setup is required, install/open the **matching Magisk manager APK**, accept **Additional setup / Environment fix**, and allow the device to reboot. That step provisions the runtime binaries (including `su`) under `/data/adb/magisk`; those files are device state and cannot be embedded in or verified from an OTA image.
+
+After that reboot, verify runtime root on the actual device:
+
+```shell
+adb shell su -c id
+```
+
+A working setup should report `uid=0(root)`. ModOS CI verifies that the Magisk OTA has a distinct Magisk-patched boot target with the configured preinit device; it deliberately does **not** call that static check proof of runtime root.
 
 For one build flavor, the existing boolean `ROOT` remains supported (`false` = rootless, `true` = Magisk). `ROOT_MODE` is an optional string override with `rootless`, `magisk`, or `both`. `both` prepares the OTA and shared modules once, then emits the normal rootless and Magisk variants from the same prepared image set. Each output keeps its own module-selection fingerprint, Custota signature, update metadata, and `/rootless/` or `/magisk/` publication pointer.
 

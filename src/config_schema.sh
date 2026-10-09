@@ -77,7 +77,9 @@ _config_schema_define magisk_preinit MAGISK_PREINIT build string \
 _config_schema_define update_channel 'GRAPHENEOS[UPDATE_CHANNEL]' device string \
   GRAPHENEOS array UPDATE_CHANNEL GRAPHENEOS_UPDATE_CHANNEL '' true existing-or-default
 _config_schema_define magisk_repository 'MAGISK[REPOSITORY]' device string \
-  MAGISK array REPOSITORY '' pixincreate/Magisk false caller-or-default
+  MAGISK array REPOSITORY '' topjohnwu/Magisk false caller-or-default
+_config_schema_define magisk_version MAGISK_VERSION build string \
+  VERSION array MAGISK MAGISK_VERSION v30.7 true caller-or-existing-or-default
 _config_schema_define afsr 'ADDITIONALS[AFSR]' build boolean \
   ADDITIONALS array AFSR ADDITIONALS_AFSR true true caller-or-existing-or-default
 _config_schema_define alterinstaller 'ADDITIONALS[ALTERINSTALLER]' build boolean \

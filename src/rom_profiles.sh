@@ -134,22 +134,48 @@ function _locked_input_digest() {
   printf '%s\n' "${digest}"
 }
 
-function _boot_animation_payload_path() {
+function _resolve_boot_animation_payloads() {
   local repository_root
   repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || return 1
-  printf '%s\n' "${repository_root}/custom/boot-animation/bootanimation.zip"
+
+  BOOT_ANIMATION_LIGHT_PAYLOAD="${repository_root}/custom/boot-animation/bootanimation.zip"
+  BOOT_ANIMATION_DARK_PAYLOAD="${repository_root}/custom/boot-animation/bootanimation-dark.zip"
+
+  if [[ ! -e "${BOOT_ANIMATION_LIGHT_PAYLOAD}" && ! -L "${BOOT_ANIMATION_LIGHT_PAYLOAD}" ]]; then
+    BOOT_ANIMATION_LIGHT_PAYLOAD=''
+  fi
+  if [[ ! -e "${BOOT_ANIMATION_DARK_PAYLOAD}" && ! -L "${BOOT_ANIMATION_DARK_PAYLOAD}" ]]; then
+    BOOT_ANIMATION_DARK_PAYLOAD=''
+  fi
+  if [[ -z "${BOOT_ANIMATION_LIGHT_PAYLOAD}" && -z "${BOOT_ANIMATION_DARK_PAYLOAD}" ]]; then
+    echo "Error: enabled boot animation requires bootanimation.zip or bootanimation-dark.zip." >&2
+    return 1
+  fi
+
+  BOOT_ANIMATION_LIGHT_PAYLOAD="${BOOT_ANIMATION_LIGHT_PAYLOAD:-${BOOT_ANIMATION_DARK_PAYLOAD}}"
+  BOOT_ANIMATION_DARK_PAYLOAD="${BOOT_ANIMATION_DARK_PAYLOAD:-${BOOT_ANIMATION_LIGHT_PAYLOAD}}"
+}
+
+function _boot_animation_payload_path() {
+  _resolve_boot_animation_payloads || return 1
+  printf '%s\n' "${BOOT_ANIMATION_LIGHT_PAYLOAD}"
 }
 
 function _boot_animation_payload_digest() {
-  local payload_path
-  payload_path="$(_boot_animation_payload_path)" || return 1
-  python3 src/boot_animation.py digest "${payload_path}"
+  local light_digest dark_digest
+  _resolve_boot_animation_payloads || return 1
+  light_digest="$(python3 src/boot_animation.py digest "${BOOT_ANIMATION_LIGHT_PAYLOAD}")" || return 1
+  dark_digest="$(python3 src/boot_animation.py digest "${BOOT_ANIMATION_DARK_PAYLOAD}")" || return 1
+  printf 'light=%s\ndark=%s\n' "${light_digest}" "${dark_digest}" |
+    sha256sum | awk '{print $1}'
 }
 
 function module_selection_fingerprint() {
   local lock_digest="disabled"
   local profile_digest="disabled"
   local magisk_preinit="disabled"
+  local magisk_repository="disabled"
+  local magisk_version="disabled"
   local boot_animation_digest="disabled"
   local entry
   local -a module_entries=(
@@ -185,8 +211,18 @@ function module_selection_fingerprint() {
 
   if [[ "${ADDITIONALS[ROOT]}" == 'true' ]]; then
     magisk_preinit="${MAGISK[PREINIT]}"
+    magisk_repository="${MAGISK[REPOSITORY]}"
+    magisk_version="${VERSION[MAGISK]}"
     if [[ ! "${magisk_preinit}" =~ ^[A-Za-z0-9._-]+$ ]]; then
       echo "Error: rooted profiles require a canonical Magisk preinit device." >&2
+      return 1
+    fi
+    if [[ ! "${magisk_repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+      echo "Error: rooted profiles require a canonical Magisk repository." >&2
+      return 1
+    fi
+    if [[ ! "${magisk_version}" =~ ^v[0-9]+([.][0-9A-Za-z_-]+)*$ ]]; then
+      echo "Error: rooted profiles require a canonical Magisk version tag." >&2
       return 1
     fi
   fi
@@ -220,6 +256,8 @@ function module_selection_fingerprint() {
   SELECTION_OUTPUT_SCOPE="${OUTPUT_SCOPE}"
   SELECTION_ROOT="${ADDITIONALS[ROOT]}"
   SELECTION_MAGISK_PREINIT="${magisk_preinit}"
+  SELECTION_MAGISK_REPOSITORY="${magisk_repository}"
+  SELECTION_MAGISK_VERSION="${magisk_version}"
   SELECTION_DEBUG="${ADDITIONALS[DEBUG]}"
   SELECTION_COMPATIBLE_SEPOLICY="${ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]}"
   SELECTION_CLEAR_VBMETA_FLAGS="${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}"

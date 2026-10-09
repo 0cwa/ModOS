@@ -16,6 +16,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run fallback secrets scanner
+        env:
+          PIXENEOS_SKIP_GITLEAKS: "true"
+        run: src/scan_secrets.sh --all
 
       - name: Configure Android APK verification tools
         shell: bash
@@ -53,15 +65,16 @@ jobs:
           bash tests/upstream_integration_test.sh
           bash tests/scheduled_build_definitions_test.sh
           bash tests/root_mode_both_test.sh
+          bash tests/magisk_output_verification_test.sh
           bash tests/release_url_config_test.sh
           bash tests/release_existing_build_test.sh
           bash tests/release_existing_pair_test.sh
-          bash tests/phase3_provider_acquisition_test.sh
+          bash tests/provider_acquisition_test.sh
           bash tests/executable_tool_lock_test.sh
           bash tests/executable_tool_bootstrap_test.sh
           bash tests/executable_tool_routing_test.sh
-          bash tests/phase3_workflows_test.sh
-          bash tests/phase3_rom_contract_test.sh
+          bash tests/workflow_contract_test.sh
+          bash tests/rom_contract_test.sh
           bash tests/module_selection_test.sh
           bash tests/boot_animation_config_test.sh
           bash tests/boot_animation_registration_test.sh
