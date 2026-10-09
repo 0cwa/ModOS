@@ -64,26 +64,7 @@ assert_dispatch_default() {
 
   if [[ -z "${trigger}" ]]; then
     trigger='workflow_call'
-    if grep -Eq '^[[:space:]]{2}workflow_dispatch:[[:space:]]*
-
-  actual="$(awk -v input="${input}" -v trigger="${trigger}" '
-    $0 ~ "^[[:space:]]{2}" trigger ":[[:space:]]*$" { in_trigger = 1; next }
-    in_trigger && $0 ~ "^[[:space:]]{2}[A-Za-z0-9_-]+:[[:space:]]*$" { exit }
-    in_trigger && $0 ~ "^[[:space:]]{6}" input ":[[:space:]]*$" { in_input = 1; next }
-    in_input && $0 ~ "^[[:space:]]{6}[A-Za-z0-9_-]+:[[:space:]]*$" { exit }
-    in_input && $0 ~ "^[[:space:]]+default:[[:space:]]*" {
-      sub(/^.*default:[[:space:]]*/, "")
-      gsub(/[[:space:]\047"]/, "")
-      print
-      exit
-    }
-  ' "${file}")"
-
-  [[ "${actual}" == "${expected}" ]] ||
-    fail "${file}: ${input} default expected ${expected}, got ${actual:-missing}"
-}
-
- "${file}"; then
+    if grep -Eq '^[[:space:]]{2}workflow_dispatch:[[:space:]]*$' "${file}"; then
       trigger='workflow_dispatch'
     fi
   fi
