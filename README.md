@@ -273,6 +273,28 @@ fingerprint. The payload is not read or required while the option is disabled.
 
 ### Release URL and source overrides
 
+### microG on LineageOS
+
+Set `'ADDITIONALS[MICROG]' = true` for an opt-in LineageOS build. The pinned
+helper supplies the reviewed microG `v0.3.15.250932` lock and adapter: Services
+(`com.google.android.gms`, versionCode `250932030`) plus Companion
+(`com.android.vending`, versionCode `84022630`).
+
+Before OTA unpacking, the helper's generic locked-artifact path verifies exact
+size, SHA-256, package/version identity, and the official microG APK signer.
+The adapter installs the APKs as privileged `product` apps with the reviewed
+permission/default-permission/sysconfig integration. No microG installer,
+framework patch, unrestricted signature spoofing, or Magisk/LSPosed hook runs.
+
+This relies on current LineageOS API 36 restricted microG signature spoofing.
+GrapheneOS is intentionally rejected. GsfProxy, F-Droid, Aurora Store, and
+opinionated microG preference defaults are not bundled.
+
+microG remains default-off, including scheduled pdx235 builds, until physical
+pdx235 first-boot, self-check/account, FCM, location, and Custota OTA-persistence
+validation is complete. The same prepared microG product image works for both
+rootless and Magisk outputs when explicitly selected.
+
 By default, generated Custota metadata points patched OTA downloads at GitHub Releases for the current repository. These environment variables can override that behavior:
 
 - `PIXENEOS_RELEASE_OWNER`: GitHub release asset owner. Defaults to the owner from `GITHUB_REPOSITORY`, then `0cwa`.

@@ -69,6 +69,7 @@ test_section_semantics() (
     '[build]' \
     'ROOT = false' \
     'ROOT_MODE = "both"' \
+    "'ADDITIONALS[MICROG]' = true" \
     "'ADDITIONALS[AFSR]' = false" \
     'MAGISK_PREINIT = "sda10"' \
     'FORCE_UPDATE = true' \
@@ -85,6 +86,7 @@ test_section_semantics() (
     assert_equals beta "${GRAPHENEOS[UPDATE_CHANNEL]}" "device channel"
     assert_equals false "${ADDITIONALS[ROOT]}" "build root"
     assert_equals both "${ROOT_MODE}" "build root mode"
+    assert_equals true "${ADDITIONALS[MICROG]}" "build microG"
     assert_equals false "${ADDITIONALS[AFSR]}" "build AFSR"
     assert_equals true "${FORCE_UPDATE}" "build force update"
     assert_equals '' "${PIXENEOS_RELEASE_OWNER}" "explicit empty GitHub value"

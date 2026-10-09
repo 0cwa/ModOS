@@ -29,6 +29,10 @@ jobs:
           PIXENEOS_SKIP_GITLEAKS: "true"
         run: src/scan_secrets.sh --all
 
+      - name: Configure Android APK verification tools
+        shell: bash
+        run: bash src/ci/configure_android_apk_tools.sh
+
       - name: Check shell syntax
         shell: bash
         run: |

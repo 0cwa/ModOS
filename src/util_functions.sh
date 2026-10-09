@@ -371,6 +371,71 @@ function prepare_fdroid_privileged_extension() {
   )
 }
 
+function write_microg_resolution_profile() {
+  local profile_path="${1}"
+  local root_mode='rootless'
+
+  resolve_root_mode >/dev/null || return 1
+  [[ "${RESOLVED_ROOT_MODE}" != 'magisk' ]] || root_mode='rooted'
+
+  mkdir -p -- "$(dirname -- "${profile_path}")" || return 1
+  cat >"${profile_path}" <<EOF
+schema_version = 1
+id = 'lineageos-microg-${root_mode}'
+rom_family = 'lineageos'
+root_mode = '${root_mode}'
+abi = 'arm64-v8a'
+api_level = 36
+output_scope = '${OUTPUT_SCOPE}'
+enabled_modules = ['microg']
+acknowledgements = []
+experimental_acknowledgements = []
+
+[capabilities]
+root_providers = []
+zygisk_providers = []
+selective_signature_spoofing = true
+product_priv_app = true
+custom_init_selinux = false
+EOF
+}
+
+function prepare_microg() {
+  local args_name="${1}"
+  local helper_root="${2}"
+  local -n args_ref="${args_name}"
+  local lock_path="${helper_root}/locks/microg-v0.3.15.250932.json"
+  local cache_path="${WORKDIR}/locked-artifacts"
+  local profile_path="${WORKDIR}/locked-profiles/microg.toml"
+  local report_path="${OUTPUTS[PATCHED_OTA]}.microg-patch-report.json"
+  local module_tool="${helper_root}/module-tool.py"
+
+  if [[ "${ADDITIONALS[MICROG]}" != 'true' ]]; then
+    return 0
+  fi
+  if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
+    echo "Error: microG is supported only for LineageOS." >&2
+    return 1
+  fi
+  if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
+    ! -f "${module_tool}" || -L "${module_tool}" ]]; then
+    echo "Error: pinned helper lacks the reviewed microG lock/module tool." >&2
+    return 1
+  fi
+  write_microg_resolution_profile "${profile_path}" || return 1
+  python "${module_tool}" artifacts fetch \
+    --lock "${lock_path}" \
+    --cache "${cache_path}" \
+    --module microg >/dev/null || return 1
+
+  args_ref+=(
+    "--module-lock" "${lock_path}"
+    "--module-profile" "${profile_path}"
+    "--module-cache" "${cache_path}"
+    "--patch-report" "${report_path}"
+  )
+}
+
 # Function to create and make the release called by main script
 function create_and_make_release() {
   if [[ ! -d $WORKDIR ]]; then
@@ -486,6 +551,12 @@ function patch_ota() {
     enable_venv || return 1
   fi
 
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
+    "${ADDITIONALS[MICROG]}" == 'true' ]]; then
+    echo "Error: multiple locked module bundles are not supported in one build." >&2
+    return 1
+  fi
+
   # Locked module artifacts must be resolved, fetched, and verified before any
   # OTA contents are unpacked. Keep the disabled path on its legacy ordering.
   if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
@@ -558,6 +629,8 @@ function patch_ota() {
     append_enabled_module_arguments args
     if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
       args+=("${locked_module_args[@]}")
+    elif [[ "${ADDITIONALS[MICROG]}" == 'true' ]]; then
+      prepare_microg args "${my_avbroot_setup}" || return 1
     elif ! prepare_fdroid_privileged_extension args "${my_avbroot_setup}"; then
       return 1
     fi

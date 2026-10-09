@@ -147,6 +147,7 @@ test_reusable_workflow() {
     'custota:boolean:true' \
     'msd:boolean:true' \
     'oemunlockonboot:boolean:true' \
+    'microg:boolean:false' \
     'fdroid-privileged-extension:boolean:false'; do
     IFS=: read -r input expected_type expected_default <<<"${contract}"
     assert_workflow_input_contract \
@@ -228,6 +229,7 @@ test_release_triggers() {
   assert_dispatch_default "${lineage}" device-id pdx235
   assert_dispatch_default "${lineage}" root true
   assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
+  assert_dispatch_default "${lineage}" microg false
   assert_dispatch_default "${lineage}" boot-animation false
 }
 
@@ -262,6 +264,14 @@ test_release_configuration_forwarding() {
   assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
   assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"
   assert_contains "${RELEASE}"     'update-channel:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.update_channel'     "scheduled update channel must be forwarded"
+}
+
+test_microg_lineage_forwarding() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
+  assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
+  assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
 }
 
 test_module_forwarding_contract() {
@@ -365,6 +375,7 @@ test_reusable_workflow
 test_release_triggers
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding
+test_microg_lineage_forwarding
 test_module_forwarding_contract
 test_publication_identity_is_step_scoped
 test_workflow_inventory_is_intentional

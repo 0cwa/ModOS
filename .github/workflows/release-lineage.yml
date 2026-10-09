@@ -37,6 +37,11 @@ on:
         required: false
         type: boolean
         default: false
+      microg:
+        description: Include locked official microG Services and Companion
+        required: false
+        type: boolean
+        default: false
       boot-animation:
         description: Include the local custom boot animation
         required: false
@@ -126,6 +131,7 @@ jobs:
       update-channel: ${{ inputs.update-channel }}
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
+      microg: ${{ inputs.microg }}
       boot-animation: ${{ inputs.boot-animation }}
       release-type: ${{ inputs.release-type }}
       publish: ${{ inputs.release-type != 'build-only' }}

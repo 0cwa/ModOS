@@ -115,6 +115,7 @@ set_selection_fixture() {
   ADDITIONALS[ALTERINSTALLER]="true"
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
+  ADDITIONALS[MICROG]="false"
   resolve_rom_profile
 }
 
@@ -132,7 +133,7 @@ fingerprint() {
 }
 
 test_selection_fingerprint() (
-  local baseline repeated afsr_on afsr_off root_changed rom_changed module_changed
+  local baseline repeated afsr_on afsr_off root_changed rom_changed microg_changed module_changed
   local boot_changed second_boot_changed fingerprint_input
   local rootless_repo_changed rooted_repo_changed rooted_version_changed
 
@@ -201,8 +202,19 @@ test_selection_fingerprint() (
   [[ "${rom_changed}" != "${baseline}" ]] ||
     fail "ROM family did not change the fingerprint"
 
+  ADDITIONALS[MICROG]="true"
+  microg_changed="$(fingerprint)"
+  [[ "${microg_changed}" != "${rom_changed}" ]] ||
+    fail "microG selection did not change the fingerprint"
+  ADDITIONALS[MICROG]="false"
+
   ROM_FAMILY="grapheneos"
   resolve_rom_profile
+  ADDITIONALS[MICROG]="true"
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "GrapheneOS unexpectedly accepted microG"
+  fi
+  ADDITIONALS[MICROG]="false"
   ADDITIONALS[BCR]="false"
   module_changed="$(fingerprint)"
   [[ "${module_changed}" != "${baseline}" ]] ||

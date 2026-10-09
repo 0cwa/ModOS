@@ -174,6 +174,7 @@ reset_fixture() {
   ADDITIONALS[ALTERINSTALLER]="true"
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
+  ADDITIONALS[MICROG]="false"
   ADDITIONALS[DEBUG]="false"
   ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]="false"
   ADDITIONALS[ROOT]="false"
@@ -341,6 +342,45 @@ test_boot_animation_module_is_optional_and_ordered() {
   EXPECTED_ARGS=("${ordered[@]}")
   run_patch
   assert_array_equals EXPECTED_ARGS CAPTURED_ARGS "boot-animation module ordering"
+}
+
+enable_microg_fixture() {
+  ADDITIONALS[MICROG]="true"
+  ROM_FAMILY="lineageos"
+  OUTPUT_SCOPE="local-unpublished"
+  ROOT_MODE=""
+  RESOLVED_ROOT_MODE=""
+  mkdir -p "${WORKDIR}/tools/my-avbroot-setup/locks"
+  touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-v0.3.15.250932.json"
+}
+
+test_microg_locked_preparation_and_arguments() {
+  reset_fixture microg-enabled
+  enable_microg_fixture
+
+  run_patch
+
+  assert_pair "--module-lock" "${WORKDIR}/tools/my-avbroot-setup/locks/microg-v0.3.15.250932.json" "microG"
+  assert_pair     "--module-profile"     "${WORKDIR}/locked-profiles/microg.toml"     "microG"
+  assert_pair "--module-cache" "${WORKDIR}/locked-artifacts" "microG"
+  assert_pair     "--patch-report"     "${WORKDIR}/patched.zip.microg-patch-report.json"     "microG"
+  assert_not_contains "--module-microg" "microG legacy module"
+  assert_prepare_stages "microG preparation" artifacts-fetch
+
+  grep -Fxq "rom_family = 'lineageos'"     "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile did not bind LineageOS"
+  grep -Fxq "selective_signature_spoofing = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile lacks restricted spoofing capability"
+  grep -Fxq "product_priv_app = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile lacks product priv-app capability"
+}
+
+test_microg_and_fdroid_locked_modes_conflict() {
+  reset_fixture microg-fdroid-conflict
+  enable_microg_fixture
+  enable_fdroid_fixture
+
+  assert_patch_fails_before_execution "microG/F-Droid locked bundle conflict"
 }
 
 enable_fdroid_fixture() {
@@ -553,6 +593,8 @@ test_each_module_can_be_disabled
 test_all_modules_can_be_disabled
 test_special_cases_remain_available
 test_boot_animation_module_is_optional_and_ordered
+test_microg_locked_preparation_and_arguments
+test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments
 test_fdroid_missing_or_untracked_inputs_fail_closed
 test_fdroid_preparation_precedes_ota_extraction

@@ -44,6 +44,10 @@ on:
         required: false
         type: boolean
         default: true
+      microg:
+        required: false
+        type: boolean
+        default: false
       fdroid-privileged-extension:
         required: false
         type: boolean
@@ -98,6 +102,7 @@ env:
   ADDITIONALS_CUSTOTA: ${{ inputs.custota }}
   ADDITIONALS_MSD: ${{ inputs.msd }}
   ADDITIONALS_OEMUNLOCKONBOOT: ${{ inputs.oemunlockonboot }}
+  ADDITIONALS_MICROG: ${{ inputs.microg }}
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 
@@ -159,6 +164,11 @@ jobs:
           source src/rom_profiles.sh
           resolve_rom_profile
           enforce_output_policy "${OUTPUT_SCOPE}"
+
+      - name: Configure Android APK verification tools
+        if: inputs.microg || inputs.fdroid-privileged-extension
+        shell: bash
+        run: bash src/ci/configure_android_apk_tools.sh
 
       - name: Install Python
         uses: actions/setup-python@v7
