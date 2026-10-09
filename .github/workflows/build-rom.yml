@@ -60,7 +60,7 @@ on:
       boot-animation:
         required: false
         type: boolean
-        default: false
+        default: true
       release-type:
         required: true
         type: string

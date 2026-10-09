@@ -58,7 +58,7 @@ test_metadata_rows() {
     'custota|ADDITIONALS[CUSTOTA]|build|boolean|ADDITIONALS|array|CUSTOTA|ADDITIONALS_CUSTOTA|true|true|caller-or-existing-or-default'
     'msd|ADDITIONALS[MSD]|build|boolean|ADDITIONALS|array|MSD|ADDITIONALS_MSD|true|true|caller-or-existing-or-default'
     'oemunlockonboot|ADDITIONALS[OEMUNLOCKONBOOT]|build|boolean|ADDITIONALS|array|OEMUNLOCKONBOOT|ADDITIONALS_OEMUNLOCKONBOOT|true|true|caller-or-existing-or-default'
-    'boot_animation|ADDITIONALS[BOOT_ANIMATION]|build|boolean|ADDITIONALS|array|BOOT_ANIMATION|ADDITIONALS_BOOT_ANIMATION|false|true|caller-or-existing-or-default'
+    'boot_animation|ADDITIONALS[BOOT_ANIMATION]|build|boolean|ADDITIONALS|array|BOOT_ANIMATION|ADDITIONALS_BOOT_ANIMATION|true|true|caller-or-existing-or-default'
     'fdroid_privileged_extension|ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]|build|boolean|ADDITIONALS|array|FDROID_PRIVILEGED_EXTENSION|ADDITIONALS_FDROID_PRIVILEGED_EXTENSION|false|true|caller-or-existing-or-default'
     'release_owner|PIXENEOS_RELEASE_OWNER|github|string|PIXENEOS_RELEASE_OWNER|scalar||PIXENEOS_RELEASE_OWNER||false|caller-or-default'
     'release_repository|PIXENEOS_RELEASE_REPOSITORY|github|string|PIXENEOS_RELEASE_REPOSITORY|scalar||PIXENEOS_RELEASE_REPOSITORY||false|caller-or-default'

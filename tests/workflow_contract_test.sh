@@ -60,10 +60,13 @@ assert_dispatch_default() {
   local input="${2}"
   local expected="${3}"
   local actual
-  local trigger='workflow_call'
+  local trigger="${4:-}"
 
-  if grep -Eq '^[[:space:]]{2}workflow_dispatch:[[:space:]]*$' "${file}"; then
-    trigger='workflow_dispatch'
+  if [[ -z "${trigger}" ]]; then
+    trigger='workflow_call'
+    if grep -Eq '^[[:space:]]{2}workflow_dispatch:[[:space:]]*$' "${file}"; then
+      trigger='workflow_dispatch'
+    fi
   fi
 
   actual="$(awk -v input="${input}" -v trigger="${trigger}" '
@@ -129,7 +132,8 @@ test_reusable_workflow() {
     "${REUSABLE}" \
     'rom-family:' \
     "shared ROM workflow must accept a ROM family"
-  assert_dispatch_default "${REUSABLE}" boot-animation false
+  assert_dispatch_default "${REUSABLE}" boot-animation true
+  assert_dispatch_default "${WORKFLOW_DIR}/multi-release.yml" boot-animation true
   assert_dispatch_default "${REUSABLE}" afsr true
   assert_contains \
     "${REUSABLE}" \
@@ -223,12 +227,14 @@ test_release_triggers() {
   assert_dispatch_default "${RELEASE}" msd true
   assert_dispatch_default "${RELEASE}" oemunlockonboot true
   assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
-  assert_dispatch_default "${RELEASE}" boot-animation false
+  assert_dispatch_default "${RELEASE}" boot-animation true
+  assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
   assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
   assert_dispatch_default "${lineage}" device-id pdx235
   assert_dispatch_default "${lineage}" root true
   assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
-  assert_dispatch_default "${lineage}" boot-animation false
+  assert_dispatch_default "${lineage}" boot-animation true
+  assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
 }
 
 test_config_loading_isolated_to_scheduled_releases() {
@@ -257,7 +263,8 @@ test_release_configuration_forwarding() {
   assert_contains "${RELEASE}"     'force_update:[[:space:]]*\$\{\{ steps\.scheduled_config\.outputs\.force_update \}\}'     "preflight must expose scheduled FORCE_UPDATE as a job output"
   assert_contains "${RELEASE}"     'FORCE_UPDATE:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.force_update \|\| false \}\}'     "existing-build preflight must receive scheduled FORCE_UPDATE"
   assert_contains "${RELEASE}"     'device-id:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.device_id \|\| inputs\.device-id \}\}'     "manual device input must remain authoritative"
-  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| inputs\.boot-animation \|\| false \}\}'     "boot animation must be forwarded from scheduled definition or manual input"
+  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "boot animation must respect scheduled and manual explicit false values"
+  assert_contains "${RELEASE}"     'ADDITIONALS_BOOT_ANIMATION:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "preflight identity must respect scheduled and manual boot animation opt-outs"
   assert_contains "${RELEASE}"     'compatible-sepolicy-patching:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.compatible_sepolicy_patching == .true.'     "compatible SEPolicy must be forwarded from the scheduled definition"
   assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
   assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"

@@ -18,7 +18,7 @@ The Actions inventory is intentionally small: the upstream-style CI, release, mu
 - [OEMUnlockOnBoot](https://github.com/chenxiaolong/OEMUnlockOnBoot)
 - [AlterInstaller](https://github.com/chenxiaolong/AlterInstaller)
 - Optional Magisk using the repository selected by the build
-- Optional local boot animation
+- Custom boot animation enabled by default (opt-out available)
 - Optional locked F-Droid Privileged Extension integration (default-off)
 
 > [!NOTE]
@@ -262,14 +262,20 @@ PixeneOS can be run locally on Linux.
 
 Local runs generate the patched OTA but do not publish release assets or update `gh-pages`. Configuration precedence is: declaration defaults, then `env.toml`, then explicit caller/workflow inputs. Invalid or unknown TOML keys fail closed.
 
-### Optional custom boot animation
+### Custom boot animation (enabled by default)
 
-To use a local Android boot animation, place the ZIP at exactly
-`custom/boot-animation/bootanimation.zip`. Builds remain unchanged by default;
-enable the feature explicitly with `ADDITIONALS_BOOT_ANIMATION=true`, or add
-`'ADDITIONALS[BOOT_ANIMATION]' = true` to `env.toml`. The archive is validated
-before patching, and its exact SHA-256 is included in the module-selection
-fingerprint. The payload is not read or required while the option is disabled.
+All builds use the checked-in `custom/boot-animation/bootanimation.zip` by
+default, including local, manual, reusable, and scheduled builds. To keep the
+ROM's stock animation instead, set `ADDITIONALS_BOOT_ANIMATION=false`, add
+`'ADDITIONALS[BOOT_ANIMATION]' = false` under `[build]` in `env.toml`, or
+uncheck the `boot-animation` input in GitHub Actions. Explicit opt-outs take
+precedence over the default (including in scheduled build definitions).
+
+When enabled, the animation is validated before patching, and its exact payload
+digest participates in the module-selection fingerprint. A separate
+`custom/boot-animation/bootanimation-dark.zip` is optional; when absent, the
+light payload is installed for both themes. The payload is not read or
+required while the option is disabled.
 
 ### Release URL and source overrides
 
