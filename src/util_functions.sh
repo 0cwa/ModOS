@@ -605,6 +605,16 @@ function patch_ota() {
     args+=("--verify-public-key-avb" "${grapheneos_pkmd}")
     args+=("--verify-cert-ota" "${grapheneos_otacert}")
 
+    # The current pdx235 official LineageOS care_map.pb uses AOSP's sparse
+    # ranges and Sony build.prop fingerprints, which avbroot 3.34.1 compares
+    # against AVB-derived contiguous ranges and Lineage fingerprints. Permit
+    # only that one signed-source mismatch after all other verification checks
+    # pass, then require each regenerated output to pass strict verification.
+    # Never change the GrapheneOS verification path or other Lineage devices.
+    if [[ "${ROM_FAMILY}" == 'lineageos' && "${DEVICE_NAME:-}" == 'pdx235' ]]; then
+      args+=("--allow-source-care-map-mismatch")
+    fi
+
     # PixeneOS decoded keys and certificates
     args+=("--sign-key-avb" "${KEYS[AVB]}")
     args+=("--sign-key-ota" "${KEYS[OTA]}")
