@@ -4,7 +4,7 @@
   "revision": "08921d82f58e23a9940ab54791f7ceb8a6f447e9",
   "targets": {
     "patch.py": {
-      "sha256": "4c4ce92797451af712bde53253c438972d36cce4952f1fbe380da7109dd7c015",
+      "sha256": "14b3cfc4d90010443fc8e330cb8bcfc79dcf13615be68ea781d097c15a9d5a4a",
       "replacement": {
         "kind": "qualified_call_argument",
         "qualified_name": "external.generate_update_info",
