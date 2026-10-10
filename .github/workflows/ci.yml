@@ -76,6 +76,7 @@ jobs:
           bash tests/workflow_contract_test.sh
           bash tests/rom_contract_test.sh
           bash tests/module_selection_test.sh
+          bash tests/source_care_map_policy_test.sh
           bash tests/boot_animation_config_test.sh
           bash tests/boot_animation_registration_test.sh
           python3 tests/boot_animation_test.py
