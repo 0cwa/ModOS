@@ -9,7 +9,7 @@ on:
       - .github/workflows/verify-microg-pdx235-once.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
