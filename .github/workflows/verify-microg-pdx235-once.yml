@@ -1,5 +1,5 @@
 # One-time CI and microG end-to-end validation; removed after execution.
-# Trigger after paired Magisk vbmeta flag forwarding fix.
+# Trigger after paired vbmeta regression fixture isolation.
 name: Verify microG pdx235 care map fix
 
 on:
