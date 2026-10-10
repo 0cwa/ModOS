@@ -10,7 +10,7 @@ grep -Fq "Remove superseded release assets" .github/workflows/build-rom.yml || f
 grep -Fq 'MODULE_SELECTION_FINGERPRINT' src/ci/remove_superseded_assets.sh || fail "asset cleanup is not selection-aware"
 grep -Fq 'VERSION[BCR]="${VERSION[BCR]:-3.9}"' src/declarations.sh || fail "BCR pin is not 3.9"
 grep -Fq 'VERSION[CUSTOTA]="${VERSION[CUSTOTA]:-6.5}"' src/declarations.sh || fail "Custota pin is not 6.5"
-grep -Fq 'VERSION[AVBROOT_SETUP]="08921d82f58e23a9940ab54791f7ceb8a6f447e9"' src/declarations.sh || fail "maintained helper pin is unexpected"
+grep -Fq 'VERSION[AVBROOT_SETUP]="202547191489f8c366d8196cb6077b1f8c7ebf8a"' src/declarations.sh || fail "maintained helper pin is unexpected"
 grep -Fq '"version": "2.0.0"' locks/executable-tools-v1.json || fail "AFSR 2.0 lock entry is missing"
 grep -Fq "topjohnwu/Magisk" src/config_schema.sh || fail "official Magisk default is missing"
 grep -Fq "VERSION array MAGISK MAGISK_VERSION v30.7" src/config_schema.sh || fail "Magisk v30.7 compatibility pin is missing"
