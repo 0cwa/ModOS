@@ -379,6 +379,33 @@ test_microg_locked_preparation_and_arguments() {
     fail "microG profile lacks product priv-app capability"
 }
 
+test_lineage_both_modes_clear_vbmeta_flags() {
+  reset_fixture lineage-paired-clear-flags
+  ROM_FAMILY="lineageos"
+  DEVICE_NAME="pdx235"
+  ROOT_MODE="both"
+  RESOLVED_ROOT_MODE=""
+  MAGISK[PREINIT]="sda47"
+  ROM_PROFILE[CLEAR_VBMETA_FLAGS]="true"
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  run_patch
+  assert_contains "--patch-arg=--clear-vbmeta-flags" "Lineage rootless vbmeta flags"
+  assert_contains "--secondary-patch-arg=--clear-vbmeta-flags" "Lineage Magisk vbmeta flags"
+  assert_pair "--secondary-output" "${OUTPUTS[PATCHED_OTA_MAGISK]}" "paired Lineage output"
+
+  reset_fixture graphene-paired-no-clear
+  ROM_FAMILY="grapheneos"
+  DEVICE_NAME="shiba"
+  ROOT_MODE="both"
+  RESOLVED_ROOT_MODE=""
+  MAGISK[PREINIT]="sda47"
+  ROM_PROFILE[CLEAR_VBMETA_FLAGS]="false"
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  run_patch
+  assert_not_contains "--patch-arg=--clear-vbmeta-flags" "Graphene rootless vbmeta flags"
+  assert_not_contains "--secondary-patch-arg=--clear-vbmeta-flags" "Graphene Magisk vbmeta flags"
+}
+
 test_care_map_compatibility_scope() {
   reset_fixture lineage-non-pdx235
   ROM_FAMILY="lineageos"
@@ -612,6 +639,7 @@ test_all_modules_can_be_disabled
 test_special_cases_remain_available
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
+test_lineage_both_modes_clear_vbmeta_flags
 test_care_map_compatibility_scope
 test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments
