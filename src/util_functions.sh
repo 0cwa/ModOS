@@ -689,6 +689,12 @@ function patch_ota() {
         args+=("--secondary-patch-arg" "${magisk_path}")
         args+=("--secondary-patch-arg=--magisk-preinit-device")
         args+=("--secondary-patch-arg" "${MAGISK[PREINIT]}")
+        # LineageOS vbmeta commonly ships with verification-disabled flags.
+        # The rootless plan already clears them; the Magisk secondary plan
+        # must receive the same profile-wide requirement independently.
+        if [[ "${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}" == 'true' ]]; then
+          args+=("--secondary-patch-arg=--clear-vbmeta-flags")
+        fi
         ;;
     esac
 
