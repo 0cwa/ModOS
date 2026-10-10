@@ -157,6 +157,8 @@ reset_fixture() {
     "${WORKDIR}/extracted/ota/META-INF/com/android/otacert" \
     "${WORKDIR}/tools/my-avbroot-setup/module-tool.py"
 
+  ROM_FAMILY="grapheneos"
+  DEVICE_NAME="shiba"
   GRAPHENEOS[OTA_TARGET]="fixture-ota"
   OUTPUTS[PATCHED_OTA]="${WORKDIR}/patched.zip"
   KEYS[AVB]="${WORKDIR}/keys/avb.key"
