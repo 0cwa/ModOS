@@ -1,5 +1,5 @@
 # One-time CI and microG end-to-end validation; removed after execution.
-# Trigger after real product.img root-path fix.
+# Trigger after product-image mounted SELinux context fix.
 name: Verify microG pdx235 care map fix
 
 on:
