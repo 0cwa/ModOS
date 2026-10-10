@@ -60,6 +60,10 @@ verify_requested_boot_animation_outputs() {
   :
 }
 
+generate_custota_variant_sidecars() {
+  : # Capture patch argv without requiring signed OTA fixtures in paired tests.
+}
+
 fail() {
   echo "$*" >&2
   exit 1
