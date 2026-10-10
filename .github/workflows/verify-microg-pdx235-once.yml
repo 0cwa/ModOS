@@ -1,5 +1,5 @@
 # One-time CI and microG end-to-end validation; removed after execution.
-# Trigger after product-image mounted SELinux context fix.
+# Trigger after paired Magisk vbmeta flag forwarding fix.
 name: Verify microG pdx235 care map fix
 
 on:
