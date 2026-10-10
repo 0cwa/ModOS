@@ -617,7 +617,8 @@ function patch_ota() {
       if active_avbroot_version="$(run_executable_tool avbroot --version)" &&
         source_care_map_exception_allowed \
           "${ROM_FAMILY}" "${DEVICE_NAME}" "${GRAPHENEOS[OTA_TARGET]}" \
-          "${ota_zip}.zip" "${active_avbroot_version}"; then
+          "${ota_zip}.zip" "${active_avbroot_version}" \
+          "${grapheneos_otacert}"; then
         args+=("--allow-source-care-map-mismatch")
       fi
     fi
