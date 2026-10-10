@@ -1,4 +1,5 @@
 # One-time CI and microG end-to-end validation; removed after execution.
+# Trigger after fixture isolation fix.
 name: Verify microG pdx235 care map fix
 
 on:
