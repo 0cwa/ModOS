@@ -77,6 +77,8 @@ jobs:
           bash tests/rom_contract_test.sh
           bash tests/module_selection_test.sh
           bash tests/source_care_map_policy_test.sh
+          bash tests/pdx235_release_quarantine_test.sh
+          python3 tests/pdx235_integration_contract_test.py
           bash tests/boot_animation_config_test.sh
           bash tests/boot_animation_registration_test.sh
           python3 tests/boot_animation_test.py
