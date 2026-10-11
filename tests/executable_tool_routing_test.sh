@@ -271,8 +271,9 @@ test_pixene_avbroot_calls_preserve_exact_arguments() (
 
   run_executable_tool() {
     printf '%s\n' "$*" >>"${root}/runner-args"
-    if [[ "${1} ${2} ${3}" == "avbroot avb info" ]]; then
-      echo 'public_key: "aa"'
+    if [[ "${1} ${2} ${3}" == "avbroot ota extract" ]]; then
+      # The current structured extractor writes the root vbmeta key directly.
+      printf 'fixture-root-vbmeta-public-key' >"${WORKDIR}/extracted/avb_pkmd.bin"
     fi
   }
   base64_encode() { :; }
@@ -288,8 +289,7 @@ test_pixene_avbroot_calls_preserve_exact_arguments() (
       "avbroot key generate-key -o ${KEYS[OTA]}" \
       "avbroot key extract-avb -k ${KEYS[AVB]} -o ${KEYS[PKMD]}" \
       "avbroot key generate-cert -k ${KEYS[OTA]} -o ${KEYS[CERT_OTA]}" \
-      "avbroot ota extract --input ${WORKDIR}/official.zip --directory ${WORKDIR}/extracted/extracts --all" \
-      "avbroot avb info -i ${WORKDIR}/extracted/extracts/vbmeta.img")" \
+      "avbroot ota extract --input ${WORKDIR}/official.zip --directory ${WORKDIR}/extracted/extracts --all --public-key-avb ${WORKDIR}/extracted/avb_pkmd.bin")" \
     "${root}/runner-args"
 )
 

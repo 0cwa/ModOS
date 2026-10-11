@@ -7,6 +7,7 @@
 source src/declarations.sh
 _util_functions_source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_util_functions_source_dir}/config_schema.sh"
+source "${_util_functions_source_dir}/source_care_map_policy.sh"
 unset _util_functions_source_dir
 source src/exchange.sh
 source src/fetcher.sh
@@ -605,14 +606,21 @@ function patch_ota() {
     args+=("--verify-public-key-avb" "${grapheneos_pkmd}")
     args+=("--verify-cert-ota" "${grapheneos_otacert}")
 
-    # The current pdx235 official LineageOS care_map.pb uses AOSP's sparse
-    # ranges and Sony build.prop fingerprints, which avbroot 3.34.1 compares
-    # against AVB-derived contiguous ranges and Lineage fingerprints. Permit
-    # only that one signed-source mismatch after all other verification checks
-    # pass, then require each regenerated output to pass strict verification.
-    # Never change the GrapheneOS verification path or other Lineage devices.
-    if [[ "${ROM_FAMILY}" == 'lineageos' && "${DEVICE_NAME:-}" == 'pdx235' ]]; then
-      args+=("--allow-source-care-map-mismatch")
+    # Never enable the exception just because this is LineageOS/pdx235.
+    # The October 9 source's independent publisher/fingerprint provenance is
+    # unresolved; the checked-in pin is intentionally empty (strict default).
+    # If a source is ever independently reviewed and pinned, also require the
+    # exact source bytes, release filename, device and avbroot version.
+    if [[ -n "${_SOURCE_CARE_MAP_PDX235_20261009_SHA256}" &&
+      "${ROM_FAMILY}" == 'lineageos' && "${DEVICE_NAME:-}" == 'pdx235' ]]; then
+      local active_avbroot_version
+      if active_avbroot_version="$(run_executable_tool avbroot --version)" &&
+        source_care_map_exception_allowed \
+          "${ROM_FAMILY}" "${DEVICE_NAME}" "${GRAPHENEOS[OTA_TARGET]}" \
+          "${ota_zip}.zip" "${active_avbroot_version}" \
+          "${grapheneos_otacert}"; then
+        args+=("--allow-source-care-map-mismatch")
+      fi
     fi
 
     # PixeneOS decoded keys and certificates

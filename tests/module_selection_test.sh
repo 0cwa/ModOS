@@ -371,7 +371,7 @@ test_microg_locked_preparation_and_arguments() {
   assert_pair     "--module-profile"     "${WORKDIR}/locked-profiles/microg.toml"     "microG"
   assert_pair "--module-cache" "${WORKDIR}/locked-artifacts" "microG"
   assert_pair     "--patch-report"     "${WORKDIR}/patched.zip.microg-patch-report.json"     "microG"
-  assert_contains "--allow-source-care-map-mismatch" "pdx235 signed source care map"
+  assert_not_contains "--allow-source-care-map-mismatch" "pdx235 microG cannot authorize unreviewed source"
   assert_not_contains "--module-microg" "microG legacy module"
   assert_prepare_stages "microG preparation" artifacts-fetch
 
@@ -411,6 +411,14 @@ test_lineage_both_modes_clear_vbmeta_flags() {
 }
 
 test_care_map_compatibility_scope() {
+  # The exception is a SOURCE policy, not a microG capability. Neither
+  # pdx235 rootless nor microG builds have a reviewed source pin yet.
+  reset_fixture lineage-pdx235-no-microg
+  ROM_FAMILY="lineageos"
+  DEVICE_NAME="pdx235"
+  run_patch
+  assert_not_contains "--allow-source-care-map-mismatch" "unreviewed pdx235 source (microG off)"
+
   reset_fixture lineage-non-pdx235
   ROM_FAMILY="lineageos"
   DEVICE_NAME="other_device"
