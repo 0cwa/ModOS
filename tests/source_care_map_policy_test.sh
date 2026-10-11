@@ -20,7 +20,10 @@ openssl req -new -x509 -nodes -newkey rsa:2048 \
 openssl req -new -x509 -nodes -newkey rsa:2048 \
   -keyout "$tmp/other.key" -out "$tmp/other.der" -outform DER \
   -subj '/CN=untrusted-signing-fixture' -days 1 >/dev/null 2>&1
-cert_digest="$(openssl x509 -inform DER -in "$tmp/signer.der" -pubkey -noout |
+# Real LineageOS META-INF/com/android/otacert is PEM, not DER.
+openssl x509 -inform DER -in "$tmp/signer.der" -outform PEM -out "$tmp/signer.pem" >/dev/null 2>&1
+openssl x509 -inform DER -in "$tmp/other.der" -outform PEM -out "$tmp/other.pem" >/dev/null 2>&1
+cert_digest="$(openssl x509 -inform PEM -in "$tmp/signer.pem" -pubkey -noout |
   openssl pkey -pubin -outform DER | sha256sum)"
 cert_digest="${cert_digest%% *}"
 
@@ -65,48 +68,55 @@ expect_reject lineageos pdx235 "${args[2]}" "$tmp/link.zip" "${args[4]}" "$sha"
 
 # No workflow/environment variable may become an unreviewed production pin.
 export PIXENEOS_PDX235_CARE_MAP_SHA256="$sha"
-expect_production_reject "${args[@]:0:5}" "$tmp/signer.der"
-expect_production_reject lineageos pdx235 lineage-23.2-20261016-nightly-pdx235-signed "$tmp/future.zip" 'avbroot 3.34.1' "$tmp/signer.der"
+expect_production_reject "${args[@]:0:5}" "$tmp/signer.pem"
+expect_production_reject lineageos pdx235 lineage-23.2-20261016-nightly-pdx235-signed "$tmp/future.zip" 'avbroot 3.34.1' "$tmp/signer.pem"
 
 # Mutation after prior SHA calculation must be rejected by pure predicate.
 printf 'modified after digest\n' >>"$tmp/source.zip"
 expect_reject "${args[@]}"
-expect_production_reject "${args[@]:0:5}" "$tmp/signer.der"
+expect_production_reject "${args[@]:0:5}" "$tmp/signer.pem"
 
 # A key copied out of a ZIP is NOT a publisher trust root. Explicit key
-# identity matching must reject any other certificate or corrupt DER.
+# identity matching must reject any other certificate or corrupt PEM.
 ((cases+=1))
-source_care_map_certificate_has_public_key_digest "$tmp/signer.der" "$cert_digest" ||
+source_care_map_certificate_has_public_key_digest "$tmp/signer.pem" "$cert_digest" ||
   { echo "FAIL: expected synthetic certificate identity to match" >&2; exit 1; }
+# The real source extractor preserves PEM. A DER input must not activate
+# this specifically PEM-only source policy gate.
 ((cases+=1))
-if source_care_map_certificate_has_public_key_digest "$tmp/other.der" "$cert_digest"; then
+if source_care_map_certificate_has_public_key_digest "$tmp/signer.der" "$cert_digest"; then
+  echo "FAIL: unexpected DER certificate accepted as OTA PEM certificate" >&2
+  exit 1
+fi
+((cases+=1))
+if source_care_map_certificate_has_public_key_digest "$tmp/other.pem" "$cert_digest"; then
   echo "FAIL: untrusted certificate matched different pinned identity" >&2
   exit 1
 fi
 ((cases+=1))
-if source_care_map_certificate_has_public_key_digest "$tmp/missing.der" "$cert_digest"; then
+if source_care_map_certificate_has_public_key_digest "$tmp/missing.pem" "$cert_digest"; then
   echo "FAIL: missing cert accepted" >&2
   exit 1
 fi
-printf 'corrupt DER' >"$tmp/corrupt.der"
+printf 'corrupt PEM' >"$tmp/corrupt.pem"
 ((cases+=1))
-if source_care_map_certificate_has_public_key_digest "$tmp/corrupt.der" "$cert_digest"; then
+if source_care_map_certificate_has_public_key_digest "$tmp/corrupt.pem" "$cert_digest"; then
   echo "FAIL: malformed cert accepted" >&2
   exit 1
 fi
-ln -s "$tmp/signer.der" "$tmp/cert-link.der"
+ln -s "$tmp/signer.pem" "$tmp/cert-link.pem"
 ((cases+=1))
-if source_care_map_certificate_has_public_key_digest "$tmp/cert-link.der" "$cert_digest"; then
+if source_care_map_certificate_has_public_key_digest "$tmp/cert-link.pem" "$cert_digest"; then
   echo "FAIL: symlinked cert accepted" >&2
   exit 1
 fi
 ((cases+=1))
-if source_care_map_certificate_has_public_key_digest "$tmp/signer.der" 'not-a-digest'; then
+if source_care_map_certificate_has_public_key_digest "$tmp/signer.pem" 'not-a-digest'; then
   echo "FAIL: malformed public key pin accepted" >&2
   exit 1
 fi
 ((cases+=1))
-if source_care_map_certificate_has_public_key_digest "$tmp/signer.der" \
+if source_care_map_certificate_has_public_key_digest "$tmp/signer.pem" \
   "$_LINEAGEOS_OFFICIAL_OTA_PUBKEY_SPKI_SHA256"; then
   echo "FAIL: synthetic signer masqueraded as the official LineageOS key" >&2
   exit 1
