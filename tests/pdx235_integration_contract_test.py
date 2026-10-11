@@ -78,7 +78,7 @@ class ModOSCareMapIntegrationContractTests(unittest.TestCase):
         declarations = read("src/declarations.sh")
         self.assertRegex(
             declarations,
-            rf'(?m)^VERSION\[AVBROOT_SETUP\]="{HELPER_COMMIT}"\b',
+            rf'(?m)^VERSION\[AVBROOT_SETUP\]="{HELPER_COMMIT}"(?:\s|$)',
         )
         compat = json.loads(read("tools/compat/avbroot_setup_compat.json"))
         self.assertEqual(compat["repository"], "https://github.com/0cwa/my-avbroot-setup")
