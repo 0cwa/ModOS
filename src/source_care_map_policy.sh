@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 PixeneOS contributors
 
-# No publisher-authenticated SHA-256 of the original October 9 source OTA has
-# been reviewed. Leave this pin empty and use strict verification by default.
-# Never fill this from a workflow input or environment variable. A release
-# digest does not replace independent verification of the source publisher.
+# The October 9 archive's SHA-256 and official LineageOS publisher signature
+# were independently verified in read-only forensic run 38180526270.
+# Runtime care-map fingerprints and regenerated-output safety remain unproven.
+# Keep this production exception pin EMPTY until those safety gates pass.
+# Never fill it from a workflow input or environment variable.
 readonly _SOURCE_CARE_MAP_PDX235_20261009_SHA256=''
 
 # Official LineageOS ZIP signing public key from the independently maintained
@@ -34,16 +35,17 @@ source_care_map_known_exception() {
   [[ "$actual_sha256" == "$reviewed_sha256" ]]
 }
 
-# Verify the public key in a DER-encoded OTA X.509 certificate against an
-# independently pinned signing key. The embedded certificate is not by itself
-# a trust anchor; avbroot still verifies the actual OTA's whole-file signature.
+# The LineageOS OTA's META-INF/com/android/otacert is a PEM certificate,
+# extracted unchanged by unzip in extract_official_keys(). Check its public
+# key against the independent publisher pin. This does NOT make an embedded
+# certificate a trust anchor; avbroot also verifies the actual OTA signature.
 source_care_map_certificate_has_public_key_digest() (
   [[ "$#" -eq 2 ]] || return 1
   local cert="$1" expected="$2" actual
   [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || return 1
   [[ -s "$cert" && -f "$cert" && ! -L "$cert" ]] || return 1
   set -o pipefail
-  actual="$(openssl x509 -inform DER -in "$cert" -pubkey -noout 2>/dev/null |
+  actual="$(openssl x509 -inform PEM -in "$cert" -pubkey -noout 2>/dev/null |
     openssl pkey -pubin -outform DER 2>/dev/null |
     sha256sum)" || return 1
   [[ "${actual%% *}" == "$expected" ]]
