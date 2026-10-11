@@ -93,7 +93,9 @@ env:
   ROM_FAMILY: ${{ inputs.rom-family }}
   GRAPHENEOS_UPDATE_CHANNEL: ${{ inputs.update-channel }}
   OUTPUT_SCOPE: ${{ inputs.publish && inputs.release-type != 'build-only' && 'published' || 'local-unpublished' }}
-  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  # Build-only runs must not receive the separate release-API credential.
+  # The job-scoped GITHUB_TOKEN permission remains a further hardening task.
+  GH_TOKEN: ${{ inputs.publish && inputs.release-type != 'build-only' && secrets.GH_TOKEN || '' }}
   RELEASE_TYPE: ${{ inputs.release-type }}
   ROOT_MODE: ${{ inputs.root-mode }}
   ADDITIONALS_AFSR: ${{ inputs.afsr }}
