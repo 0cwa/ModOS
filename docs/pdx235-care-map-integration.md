@@ -79,6 +79,20 @@ exception. If the original source requires a narrowly scoped waiver, review
 the precise meaning and residual first-boot risk in a **separate** security
 change. No catch-all mismatch ignore is acceptable.
 
+Another existing integration boundary needs explicit remediation before
+promotion: `src/util_functions.sh:patch_ota` has a local
+`outputs_ready` fast path that skips helper patching and post-patch root
+checks when the requested artifacts already exist. The publication helpers
+also validate asset names, sidecars and selection identity rather than
+independently re-reading every signed output's care map and AVB chain.
+**File existence or previously generated sidecars must never become
+evidence of successful verification.** Before removing this quarantine,
+invalidate/reject untrusted cached outputs or require fresh strict
+verification of **every** rootless and Magisk ZIP, signing key/certificate,
+care-map semantics and receipts immediately before any publication action.
+A verifier failure in either flavor must invalidate the whole pair and
+must not leave a publishable stale-output marker.
+
 Existing `.github/workflows/build-rom.yml` uses a `local-unpublished`
 output scope for `release-type=build-only`, and release steps are conditioned
 on `publish && release-type != 'build-only'`. The dedicated `GH_TOKEN`
