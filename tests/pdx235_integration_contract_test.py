@@ -160,6 +160,11 @@ class ModOSCareMapIntegrationContractTests(unittest.TestCase):
             "OUTPUT_SCOPE: ${{ inputs.publish && inputs.release-type != 'build-only' && 'published' || 'local-unpublished' }}",
             build,
         )
+        self.assertIn(
+            "GH_TOKEN: ${{ inputs.publish && inputs.release-type != 'build-only' && secrets.GH_TOKEN || '' }}",
+            build,
+        )
+        self.assertNotIn("GH_TOKEN: ${{ secrets.GH_TOKEN }}", build)
         self.assertIn("enforce_output_policy \"${OUTPUT_SCOPE}\"", build)
         self.assertIn("enforce_publication_evidence \"${OUTPUT_SCOPE}\"", build)
         self.assertLess(
