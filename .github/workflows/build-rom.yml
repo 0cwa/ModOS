@@ -74,12 +74,12 @@ on:
         required: true
         type: string
       export-device-candidate:
-        description: Encrypt the explicit device candidate for private acceptance delivery
+        description: Export the explicit device candidate as OTA ZIPs; optionally encrypt for a recipient
         required: false
         type: boolean
         default: false
       device-candidate-recipient-base64:
-        description: Base64 public PEM recipient certificate (never a private key)
+        description: Optional base64 public PEM certificate; leave empty for normal OTA ZIP artifacts
         required: false
         type: string
         default: ""
@@ -162,8 +162,8 @@ jobs:
           if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
             [[ "${DEVELOPMENT_PROFILE}" == care-map-pdx235 &&
               "${SIGNING_MODE}" == repository && "${RELEASE_TYPE}" == build-only &&
-              "${PUBLISH_REQUEST}" == false && -n "${DEVICE_CANDIDATE_RECIPIENT_BASE64}" ]] || {
-              echo '::error::Encrypted export requires an explicit nonpublishing repository-signed development candidate and public recipient certificate'
+              "${PUBLISH_REQUEST}" == false ]] || {
+              echo '::error::Candidate export requires an explicit nonpublishing repository-signed development candidate'
               exit 1
             }
           fi
@@ -380,9 +380,9 @@ jobs:
             echo "Output scope: ${OUTPUT_SCOPE}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Encrypt private device candidate
+      - name: Stage device candidate
         if: inputs.export-device-candidate
-        id: encrypted_candidate
+        id: candidate_export
         shell: bash
         env:
           SIGNING_MODE: ${{ inputs.signing-mode }}
@@ -390,7 +390,7 @@ jobs:
           DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
         run: |
           stage_parent="$(mktemp -d "${RUNNER_TEMP}/device-candidate-export.XXXXXX")"
-          stage="${stage_parent}/encrypted"
+          stage="${stage_parent}/payload"
           candidate_args=(--workspace "${GITHUB_WORKSPACE}" --stage "${stage}" \
             --public-key "${DEVICE_CANDIDATE_PKMD}")
           if [[ "${ROOT_MODE_RESOLVED}" == both ]]; then
@@ -403,13 +403,18 @@ jobs:
           fi
           python3 src/ci/encrypt_device_candidate.py "${candidate_args[@]}"
           echo "stage=${stage}" >> "${GITHUB_OUTPUT}"
+          if [[ -n "${DEVICE_CANDIDATE_RECIPIENT_BASE64}" ]]; then
+            echo 'artifact-name=encrypted-device-candidate' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'artifact-name=device-candidate' >> "${GITHUB_OUTPUT}"
+          fi
 
-      - name: Upload encrypted private device candidate
+      - name: Upload device candidate
         if: inputs.export-device-candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: encrypted-device-candidate
-          path: ${{ steps.encrypted_candidate.outputs.stage }}
+          name: ${{ steps.candidate_export.outputs.artifact-name }}
+          path: ${{ steps.candidate_export.outputs.stage }}
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

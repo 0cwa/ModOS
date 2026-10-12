@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Behavioral tests for the explicit encrypted device handoff."""
+"""Behavioral tests for the explicit normal and encrypted device handoff."""
 import base64
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -92,6 +94,39 @@ class EncryptedCandidateTest(unittest.TestCase):
                          secondary.name + '.selection.json', self.public.name})
         self.assertEqual(merged[secondary.name], secondary.read_bytes())
 
+    def test_plaintext_pair_preserves_actual_ota_bytes_and_allowlist(self):
+        secondary = self.root / 'secondary.zip'
+        secondary.write_bytes(b'secondary OTA')
+        Path(str(secondary) + '.selection.json').write_text('{}')
+        (self.root / 'unrelated-secret').write_bytes(b'never export')
+        env = {**os.environ, 'PIXENEOS_DEVELOPMENT_PROFILE': 'care-map-pdx235',
+               'SIGNING_MODE': 'repository', 'RELEASE_TYPE': 'build-only', 'PUBLISH': 'false',
+               'OUTPUT_SCOPE': 'local-unpublished', 'ROM_FAMILY': 'lineageos', 'DEVICE_NAME': 'pdx235',
+               'DEVICE_CANDIDATE_RECIPIENT_BASE64': ''}
+        subprocess.run([sys.executable, 'src/ci/encrypt_device_candidate.py',
+                        '--workspace', str(self.root), '--stage', str(self.stage),
+                        '--ota', str(self.ota), '--ota', str(secondary),
+                        '--public-key', str(self.public), '--microg'], env=env, check=True)
+        expected = {self.ota.name, self.ota.name + '.selection.json',
+                    self.ota.name + '.microg-patch-report.json', secondary.name,
+                    secondary.name + '.selection.json', self.public.name}
+        self.assertEqual({p.name for p in self.stage.iterdir()}, expected)
+        for name in expected:
+            self.assertEqual((self.stage / name).read_bytes(), (self.root / name).read_bytes())
+        self.assertFalse((self.stage / 'manifest.json').exists())
+
+    def test_plaintext_rejects_private_and_linked_inputs(self):
+        private = self.root / '.keys'
+        private.mkdir()
+        (private / 'secret.zip').write_bytes(b'secret')
+        link = self.root / 'linked.zip'
+        link.symlink_to(self.ota)
+        for unsafe in (private / 'secret.zip', link):
+            with self.subTest(path=unsafe):
+                with self.assertRaises((ValueError, OSError)):
+                    export.stage_plaintext_candidate(self.root, self.stage, [unsafe], self.public)
+                self.assertFalse(self.stage.exists())
+
     def test_wrong_recipient_and_tamper_refused(self):
         self.encrypt()
         self.assertNotEqual(self.decrypt(1).returncode, 0)
@@ -128,9 +163,9 @@ class EncryptedCandidateTest(unittest.TestCase):
                 export.validate_recipient(base64.b64encode(unsafe).decode())
 
     def test_export_requires_explicit_repository_candidate(self):
-        good = ['care-map-pdx235', 'repository', 'build-only', False, self.recipient]
+        good = ['care-map-pdx235', 'repository', 'build-only', False]
         export.require_candidate(*good)
-        for index, forbidden in enumerate(['none', 'disposable', 'default', True, '']):
+        for index, forbidden in enumerate(['none', 'disposable', 'default', True]):
             bad = good.copy()
             bad[index] = forbidden
             with self.assertRaises(ValueError):

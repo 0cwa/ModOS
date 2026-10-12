@@ -229,14 +229,22 @@ This development path assumes a trusted compiler/host/dependency cache and is
 repository-reviewed source authorization, not a chenxiaolong-signed executable
 release. Historical measured binary digests are evidence, not mutable replacement
 trust pins. afsr and Custota continue through the official executable lock. The pdx235 publication quarantine
-remains unchanged. Plaintext outputs stay local. A separate, default-off `export-device-candidate` request permits opaque,
-authenticated encryption for private device acceptance only with this profile,
-`signing-mode=repository`, `release-type=build-only`, and no publication. The
-public recipient certificate is validated before signing. The sole artifact
-upload contains one CMS AES-256-GCM envelope per OTA and one nonsecret transport
-manifest. Each plaintext archive allowlist consists of its final OTA output, its selection
-metadata, the microG report when enabled, and the designated public AVB key.
-Private signing material and raw working directories are never exported.
+remains unchanged. A separate, default-off `export-device-candidate` request
+permits device-acceptance artifacts only with this profile,
+`signing-mode=repository`, `release-type=build-only`, and no publication.
+With an empty `device-candidate-recipient-base64`, the `device-candidate`
+artifact contains normal signed OTA ZIPs, their selection metadata, the primary
+microG report when enabled, and the designated public AVB key. GitHub wraps
+these files in an artifact ZIP: extract that outer ZIP once, then pass the
+selected OTA ZIP to `adb sideload` without extracting the OTA itself.
+These artifacts follow the repository's normal artifact visibility.
+
+Supplying a public recipient certificate selects `encrypted-device-candidate`
+instead. The certificate is validated before signing; this artifact contains
+one CMS AES-256-GCM envelope per OTA and one nonsecret transport manifest.
+Both modes use the same final-output allowlist. Private signing material and
+raw working directories are never exported. Candidate artifact delivery does
+not publish a GitHub release or lift the Custota publication quarantine.
 
 Separate envelopes keep the paired output out of OpenSSL's combined-object
 ASN.1 size limit; the public AVB key appears identically in both, and the microG

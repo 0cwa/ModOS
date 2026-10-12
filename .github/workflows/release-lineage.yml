@@ -61,12 +61,12 @@ on:
         type: boolean
         default: true
       export-device-candidate:
-        description: Export only an encrypted repository-signed development candidate
+        description: Export repository-signed development OTA ZIPs; optionally encrypt for a recipient
         required: false
         type: boolean
         default: false
       device-candidate-recipient-base64:
-        description: Base64 public PEM recipient certificate for encrypted device handoff
+        description: Optional base64 public PEM certificate; leave empty for normal OTA ZIP artifacts
         required: false
         default: ""
       development-profile:

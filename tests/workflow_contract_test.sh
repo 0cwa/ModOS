@@ -207,11 +207,11 @@ test_reusable_workflow() {
   assert_not_contains "${REUSABLE}" \
     'GH_TOKEN:[[:space:]]*\$\{\{ secrets\.GH_TOKEN \}\}' \
     "release credential must not be unconditional"
-  # Plaintext stays local. The sole upload is the explicitly encrypted
-  # device-acceptance stage, verified behaviorally below.
+  # The sole upload uses the explicitly allowlisted device-acceptance stage,
+  # verified behaviorally below.
   assert_contains "${REUSABLE}" \
-    'path:.*steps\.encrypted_candidate\.outputs\.stage' \
-    "device-acceptance upload must use only the encrypted staging output"
+    'path:.*steps\.candidate_export\.outputs\.stage' \
+    "device-acceptance upload must use only the allowlisted staging output"
   assert_not_contains \
     "${REUSABLE}" \
     '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
@@ -377,18 +377,20 @@ base = {**os.environ, 'EXPORT_DEVICE_CANDIDATE': 'true',
 with tempfile.TemporaryDirectory() as scratch:
     base['GITHUB_ENV'] = str(Path(scratch) / 'env')
     assert subprocess.run(['bash', '-euc', script], env=base, capture_output=True).returncode == 0
+    assert subprocess.run(['bash', '-euc', script], env={**base, 'DEVICE_CANDIDATE_RECIPIENT_BASE64': ''},
+                          capture_output=True).returncode == 0
     for name, forbidden in [('DEVELOPMENT_PROFILE', 'none'), ('SIGNING_MODE', 'disposable'),
-                            ('RELEASE_TYPE', 'default'), ('PUBLISH_REQUEST', 'true'),
-                            ('DEVICE_CANDIDATE_RECIPIENT_BASE64', '')]:
+                            ('RELEASE_TYPE', 'default'), ('PUBLISH_REQUEST', 'true')]:
         assert subprocess.run(['bash', '-euc', script], env={**base, name: forbidden},
                               capture_output=True).returncode != 0, name
-# The one artifact destination is the export script's fresh encrypted stage,
-# after normal patch/postflight and metadata steps; no plaintext path/glob.
-upload = workflow.split('      - name: Upload encrypted private device candidate\n', 1)[1].split('      - name:', 1)[0]
+# The one artifact destination is the export script's fresh allowlisted stage,
+# after normal patch/postflight and metadata steps; no working-directory glob.
+upload = workflow.split('      - name: Upload device candidate\n', 1)[1].split('      - name:', 1)[0]
 assert workflow.count('uses: actions/upload-artifact@') == 1
+assert 'name: ${{ steps.candidate_export.outputs.artifact-name }}' in upload
 assert 'if: inputs.export-device-candidate' in upload
-assert re.search(r'^          path: \$\{\{ steps.encrypted_candidate.outputs.stage \}\}$', upload, re.M)
-assert workflow.index('      - name: Record build metadata') < workflow.index('      - name: Encrypt private device candidate')
+assert re.search(r'^          path: \$\{\{ steps.candidate_export.outputs.stage \}\}$', upload, re.M)
+assert workflow.index('      - name: Record build metadata') < workflow.index('      - name: Stage device candidate')
 PYTEST
   python3 tests/encrypted_device_candidate_test.py
 }

@@ -126,9 +126,12 @@ The configured public PKMD SHA-256 is
 `a7f6fd272a397c28451c131467d51cf1097d2e44c08579dab5784cfbaa3bf2bc`.
 Actual device enrollment, boot and persistence remain unobserved.
 
-Keep plaintext OTAs local; do not upload them to release assets, Custota channels
-or public CI artifacts. The explicit encrypted private handoff has its own
-recipient/request gate and is device-acceptance transport. The normal provider
+Explicit `export-device-candidate=true` permits normal signed OTA ZIPs in the
+`device-candidate` GitHub artifact when the optional recipient is empty. Extract
+GitHub's outer artifact ZIP once and sideload the chosen inner OTA ZIP. A public
+recipient certificate selects the existing encrypted private handoff instead.
+Both are build-only device-acceptance transport; release assets and Custota
+channels remain quarantined. The normal provider
 selects the latest nightly, so any later run must record its actual authenticated
 source identity rather than claim this fixture's evidence automatically.
 

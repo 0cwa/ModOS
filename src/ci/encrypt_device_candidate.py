@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export only authenticated-encrypted device-acceptance material."""
+"""Stage allowlisted device-acceptance material, optionally CMS encrypted."""
 import argparse
 import base64
 import hashlib
@@ -14,10 +14,10 @@ import tarfile
 import tempfile
 
 
-def require_candidate(profile, signing_mode, release_type, publish, recipient):
+def require_candidate(profile, signing_mode, release_type, publish):
     if (profile != 'care-map-pdx235' or signing_mode != 'repository' or
-            release_type != 'build-only' or publish or not recipient):
-        raise ValueError('Encrypted export requires an explicit nonpublishing repository-signed care-map device candidate and public recipient certificate')
+            release_type != 'build-only' or publish):
+        raise ValueError('Export requires an explicit nonpublishing repository-signed care-map device candidate')
 
 
 def validate_recipient(recipient_base64):
@@ -50,6 +50,40 @@ def open_input(root, path):
     return handle
 
 
+def candidate_members(otas, public_key, microg):
+    public_key = Path(public_key)
+    if public_key.name != 'device-candidate-avb_pkmd.bin':
+        raise ValueError('Candidate public key must use the designated public export path')
+    envelope_members = []
+    for index, ota in enumerate(otas):
+        if not str(ota).endswith('.zip'):
+            raise ValueError('Candidate OTA must be a ZIP output')
+        members = [Path(ota), Path(str(ota) + '.selection.json')]
+        if microg and index == 0:
+            members.append(Path(str(ota) + '.microg-patch-report.json'))
+        envelope_members.append(members + [public_key])
+    unique_members = [member for members in envelope_members for member in members if member != public_key] + [public_key]
+    names = [member.name for member in unique_members]
+    if len(set(names)) != len(names):
+        raise ValueError('Candidate export member names collide')
+    return envelope_members, unique_members
+
+
+def stage_plaintext_candidate(root, stage, otas, public_key, microg=False):
+    root = Path(root).resolve(strict=True)
+    stage = Path(stage)
+    stage.mkdir(mode=0o700, parents=False, exist_ok=False)
+    try:
+        _, members = candidate_members(otas, public_key, microg)
+        for member in members:
+            with open_input(root, member) as source, (stage / member.name).open('xb') as target:
+                os.chmod(target.name, 0o600)
+                shutil.copyfileobj(source, target, length=1024 * 1024)
+    except BaseException:
+        shutil.rmtree(stage)
+        raise
+
+
 def encrypt_candidate(root, stage, recipient_base64, otas, public_key, microg=False):
     root = Path(root).resolve(strict=True)
     stage = Path(stage)
@@ -59,21 +93,7 @@ def encrypt_candidate(root, stage, recipient_base64, otas, public_key, microg=Fa
     process = None
     try:
         recipient = validate_recipient(recipient_base64)
-        public_key = Path(public_key)
-        if public_key.name != 'device-candidate-avb_pkmd.bin':
-            raise ValueError('Candidate public key must use the designated public export path')
-        envelope_members = []
-        for index, ota in enumerate(otas):
-            if not str(ota).endswith('.zip'):
-                raise ValueError('Candidate OTA must be a ZIP output')
-            members = [Path(ota), Path(str(ota) + '.selection.json')]
-            if microg and index == 0:
-                members.append(Path(str(ota) + '.microg-patch-report.json'))
-            envelope_members.append(members + [public_key])
-        unique_members = [member for members in envelope_members for member in members if member != public_key] + [public_key]
-        names = [member.name for member in unique_members]
-        if len(set(names)) != len(names):
-            raise ValueError('Candidate export member names collide')
+        envelope_members, unique_members = candidate_members(otas, public_key, microg)
         opened = {}
         for member in unique_members:
             handle = open_input(root, member)
@@ -142,18 +162,20 @@ def main():
     args = parser.parse_args()
     require_candidate(os.environ.get('PIXENEOS_DEVELOPMENT_PROFILE'),
                       os.environ.get('SIGNING_MODE'), os.environ.get('RELEASE_TYPE'),
-                      os.environ.get('PUBLISH') != 'false',
-                      os.environ.get('DEVICE_CANDIDATE_RECIPIENT_BASE64'))
+                      os.environ.get('PUBLISH') != 'false')
     if os.environ.get('OUTPUT_SCOPE') != 'local-unpublished' or os.environ.get('ROM_FAMILY') != 'lineageos' or os.environ.get('DEVICE_NAME') != 'pdx235':
-        raise ValueError('Encrypted export requires local LineageOS/pdx235 device acceptance')
+        raise ValueError('Export requires local LineageOS/pdx235 device acceptance')
+    recipient = os.environ.get('DEVICE_CANDIDATE_RECIPIENT_BASE64', '')
     if args.validate_request:
-        validate_recipient(os.environ['DEVICE_CANDIDATE_RECIPIENT_BASE64'])
+        if recipient:
+            validate_recipient(recipient)
         return
     if not (args.workspace and args.stage and args.ota and args.public_key):
         parser.error('export requires workspace, fresh stage, OTA and public key')
-    encrypt_candidate(args.workspace, args.stage,
-                      os.environ['DEVICE_CANDIDATE_RECIPIENT_BASE64'],
-                      args.ota, args.public_key, args.microg)
+    if recipient:
+        encrypt_candidate(args.workspace, args.stage, recipient, args.ota, args.public_key, args.microg)
+    else:
+        stage_plaintext_candidate(args.workspace, args.stage, args.ota, args.public_key, args.microg)
 
 
 if __name__ == '__main__':
