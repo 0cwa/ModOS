@@ -207,10 +207,11 @@ test_reusable_workflow() {
   assert_not_contains "${REUSABLE}" \
     'GH_TOKEN:[[:space:]]*\$\{\{ secrets\.GH_TOKEN \}\}' \
     "release credential must not be unconditional"
-  assert_not_contains \
-    "${REUSABLE}" \
-    'actions/upload-artifact@' \
-    "local-unpublished outputs must not be uploaded"
+  # Plaintext stays local. The sole upload is the explicitly encrypted
+  # device-acceptance stage, verified behaviorally below.
+  assert_contains "${REUSABLE}" \
+    'path:.*steps\.encrypted_candidate\.outputs\.stage' \
+    "device-acceptance upload must use only the encrypted staging output"
   assert_not_contains \
     "${REUSABLE}" \
     '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
@@ -321,6 +322,42 @@ for release_type in ("default", "build-only"):
             assert value(binding(name), inputs, {name: "signing-passphrase"}) == (
                 "signing-passphrase" if repository_signer else "")
 PYTEST
+}
+
+test_encrypted_device_candidate_request_gate() {
+  python3 - <<'PYTEST'
+from pathlib import Path
+import os
+import re
+import subprocess
+import tempfile
+
+workflow = Path('.github/workflows/build-rom.yml').read_text()
+step = workflow.split('      - name: Validate build request\n', 1)[1].split('      - name:', 1)[0]
+script = step.split('        run: |\n', 1)[1]
+script = '\n'.join(line[10:] for line in script.splitlines())
+base = {**os.environ, 'EXPORT_DEVICE_CANDIDATE': 'true',
+        'DEVELOPMENT_PROFILE': 'care-map-pdx235', 'SIGNING_MODE': 'repository',
+        'RELEASE_TYPE': 'build-only', 'PUBLISH_REQUEST': 'false',
+        'DEVICE_CANDIDATE_RECIPIENT_BASE64': 'public-recipient-tested-separately',
+        'ROOT_MODE_INPUT': 'rootless', 'ADDITIONALS_ROOT': 'false', 'MAGISK_PREINIT_REQUEST': ''}
+with tempfile.TemporaryDirectory() as scratch:
+    base['GITHUB_ENV'] = str(Path(scratch) / 'env')
+    assert subprocess.run(['bash', '-euc', script], env=base, capture_output=True).returncode == 0
+    for name, forbidden in [('DEVELOPMENT_PROFILE', 'none'), ('SIGNING_MODE', 'disposable'),
+                            ('RELEASE_TYPE', 'default'), ('PUBLISH_REQUEST', 'true'),
+                            ('DEVICE_CANDIDATE_RECIPIENT_BASE64', '')]:
+        assert subprocess.run(['bash', '-euc', script], env={**base, name: forbidden},
+                              capture_output=True).returncode != 0, name
+# The one artifact destination is the export script's fresh encrypted stage,
+# after normal patch/postflight and metadata steps; no plaintext path/glob.
+upload = workflow.split('      - name: Upload encrypted private device candidate\n', 1)[1].split('      - name:', 1)[0]
+assert workflow.count('uses: actions/upload-artifact@') == 1
+assert 'if: inputs.export-device-candidate' in upload
+assert re.search(r'^          path: \$\{\{ steps.encrypted_candidate.outputs.stage \}\}$', upload, re.M)
+assert workflow.index('      - name: Record build metadata') < workflow.index('      - name: Encrypt private device candidate')
+PYTEST
+  python3 tests/encrypted_device_candidate_test.py
 }
 
 test_development_profile_activation() (
@@ -542,6 +579,7 @@ test_reusable_workflow
 test_build_only_signing
 test_build_only_permissions
 test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
 test_development_profile_activation
 test_release_triggers
 test_config_loading_isolated_to_scheduled_releases

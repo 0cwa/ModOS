@@ -52,6 +52,15 @@ on:
         required: false
         type: boolean
         default: true
+      export-device-candidate:
+        description: Export only an encrypted repository-signed development candidate
+        required: false
+        type: boolean
+        default: false
+      device-candidate-recipient-base64:
+        description: Base64 public PEM recipient certificate for encrypted device handoff
+        required: false
+        default: ""
       development-profile:
         description: Explicit build-only source experiment; production pins stay unchanged
         required: false
@@ -161,6 +170,8 @@ jobs:
       microg: ${{ inputs.microg }}
       disable-system-updater: ${{ inputs.disable-system-updater }}
       boot-animation: ${{ inputs.boot-animation }}
+      export-device-candidate: ${{ inputs.export-device-candidate }}
+      device-candidate-recipient-base64: ${{ inputs.device-candidate-recipient-base64 }}
       development-profile: ${{ inputs.development-profile }}
       signing-mode: ${{ inputs.signing-mode }}
       release-type: ${{ inputs.release-type }}

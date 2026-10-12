@@ -72,6 +72,16 @@ on:
       release-type:
         required: true
         type: string
+      export-device-candidate:
+        description: Encrypt the explicit device candidate for private acceptance delivery
+        required: false
+        type: boolean
+        default: false
+      device-candidate-recipient-base64:
+        description: Base64 public PEM recipient certificate (never a private key)
+        required: false
+        type: string
+        default: ""
       development-profile:
         description: Explicit source-build development profile (none or care-map-pdx235)
         required: false
@@ -146,7 +156,19 @@ jobs:
           MAGISK_PREINIT_REQUEST: ${{ inputs.magisk-preinit-device }}
           ROOT_MODE_INPUT: ${{ inputs.root-mode }}
           SIGNING_MODE: ${{ inputs.signing-mode }}
+          EXPORT_DEVICE_CANDIDATE: ${{ inputs.export-device-candidate }}
+          DEVELOPMENT_PROFILE: ${{ inputs.development-profile }}
+          DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
+          PUBLISH_REQUEST: ${{ inputs.publish }}
         run: |
+          if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
+            [[ "${DEVELOPMENT_PROFILE}" == care-map-pdx235 &&
+              "${SIGNING_MODE}" == repository && "${RELEASE_TYPE}" == build-only &&
+              "${PUBLISH_REQUEST}" == false && -n "${DEVICE_CANDIDATE_RECIPIENT_BASE64}" ]] || {
+              echo '::error::Encrypted export requires an explicit nonpublishing repository-signed development candidate and public recipient certificate'
+              exit 1
+            }
+          fi
           case "${SIGNING_MODE}" in
             disposable|repository) ;;
             *) echo "::error::signing-mode must be disposable or repository"; exit 1 ;;
@@ -183,6 +205,10 @@ jobs:
       - name: Enforce profile output policy
         shell: bash
         env:
+          EXPORT_DEVICE_CANDIDATE: ${{ inputs.export-device-candidate }}
+          SIGNING_MODE: ${{ inputs.signing-mode }}
+          PUBLISH: ${{ inputs.publish }}
+          DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
           ADDITIONALS_DEBUG: ${{ inputs.allow-unauthorized-adb }}
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ inputs.compatible-sepolicy-patching }}
           ADDITIONALS_ROOT: ${{ inputs.root }}
@@ -192,6 +218,9 @@ jobs:
           resolve_rom_profile
           enforce_output_policy "${OUTPUT_SCOPE}"
           activate_development_profile
+          if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
+            python3 src/ci/encrypt_device_candidate.py --validate-request
+          fi
 
       - name: Configure Android APK verification tools
         if: inputs.microg || inputs.fdroid-privileged-extension
@@ -240,11 +269,29 @@ jobs:
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ inputs.compatible-sepolicy-patching }}
           ADDITIONALS_ROOT: ${{ inputs.root }}
           CLEANUP: true
+          EXPORT_DEVICE_CANDIDATE: ${{ inputs.export-device-candidate }}
           MAGISK_PREINIT: ${{ inputs.magisk-preinit-device }}
           PASSPHRASE_AVB: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_AVB || '' }}
           PASSPHRASE_OTA: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_OTA || '' }}
         run: |
           source src/main.sh
+          if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
+            public_pkmd="${WORKDIR}/device-candidate-avb_pkmd.bin"
+            run_executable_tool avbroot key extract-avb \
+              -k "${KEYS[AVB]}" --pass-env-var PASSPHRASE_AVB -o "${public_pkmd}"
+            echo "DEVICE_CANDIDATE_PKMD=${public_pkmd}" >> "${GITHUB_ENV}"
+            # The signing inputs were decoded into this job's private workdir.
+            # Transport stages need only the verified outputs and public key.
+            for private_key in "${KEYS[AVB]}" "${KEYS[OTA]}"; do
+              case "${private_key}" in
+                "${WORKDIR}/.keys/"*) rm -f -- "${private_key}" ;;
+                *) echo '::error::Unexpected candidate signing-key storage'; exit 1 ;;
+              esac
+            done
+            for binding in KEYS_AVB_BASE64 KEYS_OTA_BASE64 KEYS_CERT_OTA_BASE64; do
+              printf '%s=\n' "${binding}" >> "${GITHUB_ENV}"
+            done
+          fi
           {
             echo "GRAPHENEOS_OTA_TARGET=${GRAPHENEOS[OTA_TARGET]}"
             echo "GRAPHENEOS_VERSION=${VERSION[GRAPHENEOS]}"
@@ -334,6 +381,40 @@ jobs:
             fi
             echo "Output scope: ${OUTPUT_SCOPE}"
           } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Encrypt private device candidate
+        if: inputs.export-device-candidate
+        id: encrypted_candidate
+        shell: bash
+        env:
+          SIGNING_MODE: ${{ inputs.signing-mode }}
+          PUBLISH: ${{ inputs.publish }}
+          DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
+        run: |
+          stage_parent="$(mktemp -d "${RUNNER_TEMP}/device-candidate-export.XXXXXX")"
+          stage="${stage_parent}/encrypted"
+          candidate_args=(--workspace "${GITHUB_WORKSPACE}" --stage "${stage}" \
+            --public-key "${DEVICE_CANDIDATE_PKMD}")
+          if [[ "${ROOT_MODE_RESOLVED}" == both ]]; then
+            candidate_args+=(--ota "${OUTPUTS_PATCHED_OTA_ROOTLESS}" --ota "${OUTPUTS_PATCHED_OTA_MAGISK}")
+          else
+            candidate_args+=(--ota "${OUTPUTS_PATCHED_OTA}")
+          fi
+          if [[ "${ADDITIONALS_MICROG}" == true ]]; then
+            candidate_args+=(--microg)
+          fi
+          python3 src/ci/encrypt_device_candidate.py "${candidate_args[@]}"
+          echo "stage=${stage}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload encrypted private device candidate
+        if: inputs.export-device-candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: encrypted-device-candidate
+          path: ${{ steps.encrypted_candidate.outputs.stage }}
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
 
       - name: Re-enforce publication policy
         if: inputs.publish && inputs.release-type != 'build-only'

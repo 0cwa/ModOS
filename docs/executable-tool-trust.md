@@ -195,8 +195,28 @@ The candidate helper's `tools/care-map/build_and_run.py` builds the reviewed
 source patch from its fixed manifest, then supplies its own sealed tool runner
 to the helper with `--runtime-care-map`. This is repository-reviewed development
 source provenance, not a chenxiaolong-signed executable release. afsr and Custota
-continue through the official executable lock. The profile neither exports
-artifacts nor relaxes the pdx235 publication quarantine.
+continue through the official executable lock. The pdx235 publication quarantine remains unchanged. Plaintext outputs stay
+local. A separate, default-off `export-device-candidate` request permits opaque,
+authenticated encryption for private device acceptance only with this profile,
+`signing-mode=repository`, `release-type=build-only`, and no publication. The
+public recipient certificate is validated before signing. The sole artifact
+upload contains a CMS AES-256-GCM envelope and a nonsecret transport manifest;
+its plaintext archive allowlist consists of final OTA outputs, their selection
+metadata, the microG report when enabled, and the designated public AVB key.
+Private signing material and raw working directories are never exported.
+
+The recipient decrypts to a temporary archive and extracts only after OpenSSL
+reports success. For example:
+
+```sh
+openssl cms -decrypt -binary -inform DER -in candidate.cms.der \
+  -recip recipient.crt -inkey recipient.key -out candidate.tar.tmp &&
+  mv candidate.tar.tmp candidate.tar
+```
+
+Keep the recipient private key outside the repository and GitHub workflow;
+supply only the base64-encoded public certificate. GitHub artifact delivery is
+private device-acceptance transport, not release or updater publication.
 
 [signing-guide]: https://github.com/chenxiaolong/chenxiaolong/blob/master/VERIFY_SSH_SIGNATURES.md
 [afsr-release]: https://github.com/chenxiaolong/afsr/releases/tag/v1.0.4
