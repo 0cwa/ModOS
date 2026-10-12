@@ -185,6 +185,19 @@ function run_executable_tool() {
     run "${tool}" -- "$@"
 }
 
+# Serialize an exact argv prefix: the helper may change cwd and must never
+# resolve the locked tools through its own PATH lookup.
+function executable_tool_runner_prefix_json() {
+  local repository_root
+  repository_root="$(git rev-parse --show-toplevel)" || return 1
+  python3 -I -c '
+import json, os, sys
+print(json.dumps([os.path.abspath(sys.executable), "-E", "-s",
+                  os.path.join(sys.argv[1], "src", "bootstrap_executable_tools.py"),
+                  "--workdir", os.path.abspath(sys.argv[2]), "run"]))
+' "${repository_root}" "${WORKDIR}"
+}
+
 # Function to check the flag status
 # If flag for a tool is disabled, it is not downloaded
 function flag_check() {
@@ -620,6 +633,9 @@ function patch_ota() {
   else
     echo -e "Patching OTA..."
     local args=()
+    local tool_runner_prefix
+    tool_runner_prefix="$(executable_tool_runner_prefix_json)" || return 1
+    args+=("--tool-runner-prefix-json" "${tool_runner_prefix}")
 
     # OTA input and output
     args+=("--input" "${ota_zip}.zip")
@@ -1185,8 +1201,8 @@ function env_setup() {
     executable_directories+=("$(dirname -- "${executable}")")
   done
 
-  # The pinned helper currently resolves these names through PATH. Track the
-  # exact injected prefix so a later setup can restore the caller's base PATH.
+  # Keep compatibility paths for callers; helper tool execution uses the
+  # authenticated runner prefix. Track this prefix for repeated setup.
   if ((${#executable_directories[@]})); then
     path_prefix="$(IFS=:; echo "${executable_directories[*]}")"
     PIXENEOS_EXECUTABLE_BASE_PATH="${PATH}"

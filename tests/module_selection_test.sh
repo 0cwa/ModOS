@@ -214,6 +214,7 @@ reset_fixture() {
 set_default_expected_args() {
   EXPECTED_ARGS=(
     "${WORKDIR}/tools/my-avbroot-setup/patch.py"
+    "--tool-runner-prefix-json" "$(executable_tool_runner_prefix_json)"
     "--input" "${WORKDIR}/fixture-ota.zip"
     "--output" "${WORKDIR}/patched.zip"
     "--verify-public-key-avb" "${WORKDIR}/extracted/avb_pkmd.bin"
@@ -346,9 +347,9 @@ test_boot_animation_module_is_optional_and_ordered() {
   prepare_boot_animation_module() { :; }
   set_default_expected_args
   EXPECTED_ARGS=(
-    "${EXPECTED_ARGS[@]:0:29}"
+    "${EXPECTED_ARGS[@]:0:31}"
     "--module-boot-animation" "${WORKDIR}/modules/boot-animation.zip"
-    "${EXPECTED_ARGS[@]:29}"
+    "${EXPECTED_ARGS[@]:31}"
   )
   for value in "${EXPECTED_ARGS[@]}"; do
     if [[ "${value}" == "--patch-arg=--rootless" ]]; then

@@ -153,13 +153,18 @@ anonymous file descriptor, sets the locked mode, seals the snapshot against
 content changes, and rechecks its digest and mode after sealing. It executes
 that sealed descriptor without resolving the executable pathname again.
 
-The `resolve` command and digest-addressed executable paths exist only for
-compatibility with the pinned helper. A successful resolution does not itself
-authorize execution. The helper still resolves `avbroot`, `afsr`, and
-`custota-tool` through `PATH`; PixeneOS places only enabled digest-addressed
-directories at the front of that path, but the helper's later pathname lookup
-remains an open execution boundary. Close it with the planned trusted-prefix
-`ToolRunner` integration before treating helper execution as inode-bound.
+The `resolve` command and digest-addressed executable paths remain for
+compatibility and enabled-tool setup validation. A successful resolution does
+not itself authorize execution. PixeneOS supplies the helper's
+`--tool-runner-prefix-json` with an exact argument array containing the absolute
+Python interpreter, flags disabling Python environment overrides and user
+site packages, absolute bootstrap script path, absolute work directory, and
+`run` subcommand. The helper appends the allowlisted
+tool ID, `--`, and tool arguments without shell parsing. Its tool invocations
+therefore pass through the same post-seal-verified descriptor execution as
+direct PixeneOS calls, even when the helper changes its working directory or
+an executable with the same name exists on `PATH`. Compatibility directories
+on `PATH` do not authorize helper execution.
 
 The canonical JSON report contains stable tool identity, version, architecture,
 archive and member sizes/digests, and signer verification results. It omits
@@ -170,12 +175,10 @@ succeeds.
 The offline lock validator by itself still does **not** authorize extraction,
 permission changes, or execution. A successful runtime transaction authorizes
 authenticated installation, and the `run` command authorizes direct PixeneOS
-execution only through its post-seal-verified anonymous file descriptor. It
-does not authorize the helper's compatibility PATH execution. Run acquisition
-through `check_and_download_dependencies`; do not call the legacy downloader
-for these three executable tools. Real OTA integration remains blocked until
-the helper uses the trusted runner and the other documented host-code
-supply-chain gates are closed.
+and helper execution only through its post-seal-verified anonymous file
+descriptor. Run acquisition through `check_and_download_dependencies`; do not call the legacy downloader
+for these three executable tools. Real OTA integration remains subject to
+the other documented host-code supply-chain gates.
 
 [signing-guide]: https://github.com/chenxiaolong/chenxiaolong/blob/master/VERIFY_SSH_SIGNATURES.md
 [afsr-release]: https://github.com/chenxiaolong/afsr/releases/tag/v1.0.4

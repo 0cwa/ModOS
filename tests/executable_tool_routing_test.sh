@@ -238,6 +238,33 @@ test_runner_constructs_exact_fd_bound_command() (
     "${root}/python-args"
 )
 
+test_helper_runner_prefix_survives_cwd_and_path_changes() (
+  local root="${TEST_ROOT}/helper runner"
+  local repository_root="$(pwd -P)"
+  local prefix
+  WORKDIR="${root}/work directory"
+  mkdir -p "${WORKDIR}" "${root}/elsewhere"
+  prefix="$(executable_tool_runner_prefix_json)"
+
+  python3 - "${prefix}" "${repository_root}" "${WORKDIR}" "${root}/elsewhere" <<'PYTEST'
+import json
+import os
+import subprocess
+import sys
+prefix = json.loads(sys.argv[1])
+assert prefix == [os.path.abspath(sys.executable), "-E", "-s",
+                  sys.argv[2] + "/src/bootstrap_executable_tools.py",
+                  "--workdir", sys.argv[3], "run"]
+# The real bootstrap imports its sibling modules and starts from a foreign cwd
+# with no PATH candidates. A relative interpreter/script or bare tool fails.
+result = subprocess.run(prefix + ["--help"], cwd=sys.argv[4],
+                        env={"PATH": "/nonexistent", "PYTHONPATH": "/nonexistent"},
+                        capture_output=True, text=True)
+assert result.returncode == 0, result.stderr
+assert " tool ..." in result.stdout
+PYTEST
+)
+
 test_runner_failure_prevents_generate_keys_fallback_execution() (
   local root="${TEST_ROOT}/generate-keys"
   local result
@@ -335,6 +362,7 @@ test_env_setup_resolves_only_enabled_executables
 test_env_setup_resolve_failure_is_transactional
 test_repeated_env_setup_removes_disabled_tool_bindings
 test_runner_constructs_exact_fd_bound_command
+test_helper_runner_prefix_survives_cwd_and_path_changes
 test_runner_failure_prevents_generate_keys_fallback_execution
 test_pixene_avbroot_calls_preserve_exact_arguments
 test_legacy_acquisition_rejects_locked_executables
