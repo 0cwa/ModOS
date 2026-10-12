@@ -50,15 +50,15 @@ class EncryptedCandidateTest(unittest.TestCase):
         export.encrypt_candidate(self.root, self.stage, self.recipient,
                                  [ota or self.ota], self.public, microg=True)
 
-    def decrypt(self, identity=0):
+    def decrypt(self, identity=0, envelope=1):
         key, cert = self.certs[identity]
         return subprocess.run(['openssl', 'cms', '-decrypt', '-binary',
-                               '-inform', 'DER', '-in', str(self.stage / 'candidate.cms.der'),
+                               '-inform', 'DER', '-in', str(self.stage / f'candidate-{envelope}.cms.der'),
                                '-recip', str(cert), '-inkey', str(key)], capture_output=True)
 
     def test_roundtrip_exports_only_allowlisted_members(self):
         self.encrypt()
-        self.assertEqual({p.name for p in self.stage.iterdir()}, {'candidate.cms.der', 'manifest.json'})
+        self.assertEqual({p.name for p in self.stage.iterdir()}, {'candidate-1.cms.der', 'manifest.json'})
         manifest = json.loads((self.stage / 'manifest.json').read_text())
         self.assertEqual(manifest['content_encryption'], 'AES-256-GCM')
         decrypted = self.decrypt()
@@ -68,10 +68,34 @@ class EncryptedCandidateTest(unittest.TestCase):
                              self.ota.name + '.microg-patch-report.json', self.public.name])
             self.assertEqual(archive.extractfile(self.ota.name).read(), self.ota.read_bytes())
 
+    def test_pair_envelopes_decrypt_and_merge_shared_public_key(self):
+        secondary = self.root / 'secondary.zip'
+        secondary.write_bytes(b'secondary fixture OTA')
+        Path(str(secondary) + '.selection.json').write_text('{}')
+        export.encrypt_candidate(self.root, self.stage, self.recipient,
+                                 [self.ota, secondary], self.public, microg=True)
+        manifest = json.loads((self.stage / 'manifest.json').read_text())
+        self.assertEqual(len(manifest['envelopes']), 2)
+        merged = {}
+        for index in (1, 2):
+            decrypted = self.decrypt(envelope=index)
+            self.assertEqual(decrypted.returncode, 0, decrypted.stderr)
+            with tarfile.open(fileobj=io.BytesIO(decrypted.stdout)) as archive:
+                for name in archive.getnames():
+                    data = archive.extractfile(name).read()
+                    if name in merged:
+                        self.assertEqual(name, self.public.name)
+                        self.assertEqual(data, merged[name])
+                    merged[name] = data
+        self.assertEqual(set(merged), {self.ota.name, self.ota.name + '.selection.json',
+                         self.ota.name + '.microg-patch-report.json', secondary.name,
+                         secondary.name + '.selection.json', self.public.name})
+        self.assertEqual(merged[secondary.name], secondary.read_bytes())
+
     def test_wrong_recipient_and_tamper_refused(self):
         self.encrypt()
         self.assertNotEqual(self.decrypt(1).returncode, 0)
-        envelope = self.stage / 'candidate.cms.der'
+        envelope = self.stage / 'candidate-1.cms.der'
         data = bytearray(envelope.read_bytes())
         data[-40] ^= 1
         envelope.write_bytes(data)

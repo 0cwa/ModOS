@@ -53,60 +53,71 @@ def open_input(root, path):
 def encrypt_candidate(root, stage, recipient_base64, otas, public_key, microg=False):
     root = Path(root).resolve(strict=True)
     stage = Path(stage)
-    # A fresh, separate stage contains exactly the opaque envelope and manifest.
+    # A fresh, separate stage contains only opaque envelopes and one manifest.
     stage.mkdir(mode=0o700, parents=False, exist_ok=False)
     handles = []
     process = None
     try:
         recipient = validate_recipient(recipient_base64)
-        members = []
-        for ota in otas:
+        public_key = Path(public_key)
+        if public_key.name != 'device-candidate-avb_pkmd.bin':
+            raise ValueError('Candidate public key must use the designated public export path')
+        envelope_members = []
+        for index, ota in enumerate(otas):
             if not str(ota).endswith('.zip'):
                 raise ValueError('Candidate OTA must be a ZIP output')
-            members.extend([Path(ota), Path(str(ota) + '.selection.json')])
-        if microg:
-            members.append(Path(str(otas[0]) + '.microg-patch-report.json'))
-        members.append(Path(public_key))
-        if Path(public_key).name != 'device-candidate-avb_pkmd.bin':
-            raise ValueError('Candidate public key must use the designated public export path')
-        names = [member.name for member in members]
+            members = [Path(ota), Path(str(ota) + '.selection.json')]
+            if microg and index == 0:
+                members.append(Path(str(ota) + '.microg-patch-report.json'))
+            envelope_members.append(members + [public_key])
+        unique_members = [member for members in envelope_members for member in members if member != public_key] + [public_key]
+        names = [member.name for member in unique_members]
         if len(set(names)) != len(names):
             raise ValueError('Candidate export member names collide')
-        for member in members:
-            handles.append(open_input(root, member))
+        opened = {}
+        for member in unique_members:
+            handle = open_input(root, member)
+            handles.append(handle)
+            opened[member] = handle
         with tempfile.TemporaryDirectory(prefix='candidate-recipient-') as recipient_dir:
             certificate = Path(recipient_dir) / 'recipient.pem'
             certificate.write_bytes(recipient)
             der = subprocess.check_output(['openssl', 'x509', '-in', str(certificate), '-outform', 'DER'])
-            envelope = stage / 'candidate.cms.der'
-            with tempfile.TemporaryFile() as errors:
-                process = subprocess.Popen([
-                    'openssl', 'cms', '-encrypt', '-binary', '-stream', '-aes-256-gcm',
-                    '-outform', 'DER', '-out', str(envelope), '-recip', str(certificate),
-                ], stdin=subprocess.PIPE, stderr=errors)
-                # Plaintext archive streams directly to encryption, never to an
-                # export directory or plaintext temporary archive.
-                with tarfile.open(fileobj=process.stdin, mode='w|') as archive:
-                    for name, handle in zip(names, handles):
-                        info = tarfile.TarInfo(name)
-                        info.size = os.fstat(handle.fileno()).st_size
-                        info.mode = 0o600
-                        archive.addfile(info, handle)
-                process.stdin.close()
-                if process.wait() != 0:
-                    errors.seek(0)
-                    raise ValueError('CMS encryption failed: ' + errors.read().decode(errors='replace'))
-            os.chmod(envelope, 0o600)
-            with envelope.open('rb') as encrypted_file:
-                digest = hashlib.file_digest(encrypted_file, 'sha256').hexdigest()
+            envelopes = []
+            # One authenticated envelope per OTA avoids combining the pair into
+            # a CMS object larger than OpenSSL's ASN.1 decoder can represent.
+            for index, members in enumerate(envelope_members, start=1):
+                envelope = stage / f'candidate-{index}.cms.der'
+                with tempfile.TemporaryFile() as errors:
+                    process = subprocess.Popen([
+                        'openssl', 'cms', '-encrypt', '-binary', '-stream', '-aes-256-gcm',
+                        '-outform', 'DER', '-out', str(envelope), '-recip', str(certificate),
+                    ], stdin=subprocess.PIPE, stderr=errors)
+                    # Plaintext streams directly to encryption, never to an
+                    # export directory or plaintext temporary archive.
+                    with tarfile.open(fileobj=process.stdin, mode='w|') as archive:
+                        for member in members:
+                            handle = opened[member]
+                            handle.seek(0)
+                            info = tarfile.TarInfo(member.name)
+                            info.size = os.fstat(handle.fileno()).st_size
+                            info.mode = 0o600
+                            archive.addfile(info, handle)
+                    process.stdin.close()
+                    if process.wait() != 0:
+                        errors.seek(0)
+                        raise ValueError('CMS encryption failed: ' + errors.read().decode(errors='replace'))
+                os.chmod(envelope, 0o600)
+                with envelope.open('rb') as encrypted_file:
+                    digest = hashlib.file_digest(encrypted_file, 'sha256').hexdigest()
+                envelopes.append({'envelope': envelope.name, 'envelope_sha256': digest})
             manifest = {
-                'schema_version': 1,
+                'schema_version': 2,
                 'purpose': 'encrypted-private-device-acceptance',
-                'envelope': envelope.name,
+                'envelopes': envelopes,
                 'content_encryption': 'AES-256-GCM',
-                'format': 'binary streaming CMS AuthEnvelopedData containing tar',
+                'format': 'one binary streaming CMS AuthEnvelopedData tar per OTA',
                 'recipient_certificate_sha256': hashlib.sha256(der).hexdigest(),
-                'envelope_sha256': digest,
             }
             (stage / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True, indent=2) + '\n')
     except BaseException:

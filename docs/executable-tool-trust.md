@@ -229,17 +229,21 @@ trust pins. afsr and Custota continue through the official executable lock. The 
 remains unchanged. Plaintext outputs stay local. A separate, default-off `export-device-candidate` request permits opaque,
 authenticated encryption for private device acceptance only with this profile,
 `signing-mode=repository`, `release-type=build-only`, and no publication. The
-public recipient certificate is validated before signing. The encrypted artifact upload contains per-OTA CMS AES-256-GCM envelopes
-and a nonsecret transport manifest;
-each plaintext archive allowlist consists of its final OTA output, its selection
+public recipient certificate is validated before signing. The sole artifact
+upload contains one CMS AES-256-GCM envelope per OTA and one nonsecret transport
+manifest. Each plaintext archive allowlist consists of its final OTA output, its selection
 metadata, the microG report when enabled, and the designated public AVB key.
 Private signing material and raw working directories are never exported.
 
-The recipient decrypts to a temporary archive and extracts only after OpenSSL
+Separate envelopes keep the paired output out of OpenSSL's combined-object
+ASN.1 size limit; the public AVB key appears identically in both, and the microG
+report belongs to the primary OTA envelope.
+
+The recipient decrypts each envelope to a temporary archive and extracts only after OpenSSL
 reports success. For example:
 
 ```sh
-openssl cms -decrypt -binary -inform DER -in candidate.cms.der \
+openssl cms -decrypt -binary -inform DER -in candidate-1.cms.der \
   -recip recipient.crt -inkey recipient.key -out candidate.tar.tmp &&
   mv candidate.tar.tmp candidate.tar
 ```
