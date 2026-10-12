@@ -568,11 +568,34 @@ function patch_ota() {
     fi
   fi
 
-  # Extract the official public keys and certificates if not found
+  # Extract the official public keys and certificates if not found.
+  # An extraction failure must terminate the patch request.
   if [[ ! -e "${grapheneos_pkmd}" || ! -e "${grapheneos_otacert}" ]]; then
     echo "Extracting official keys..."
-    extract_official_keys
+    extract_official_keys || return 1
   fi
+
+  # The normal strict verifier receives a certificate extracted from the OTA.
+  # For pdx235, independently match that certificate to the pinned LineageOS
+  # publisher and to this exact downloaded source ZIP, whether or not any
+  # source care-map exception is requested. The helper subsequently performs
+  # full OTA signature and payload/AVB verification with that certificate.
+  source_care_map_require_lineageos_pdx235_publisher \
+    "${ROM_FAMILY}" "${DEVICE_NAME:-}" "${ota_zip}.zip" \
+    "${grapheneos_otacert}" || return 1
+
+  # Do not take the historical "output already exists" success path for this
+  # affected device: it skips both helper cryptographic and care-map postflight.
+  # Fail closed on pre-existing rootless/Magisk bytes or sidecars. A future
+  # independently reviewed implementation may replace this with mandatory
+  # fresh verification of *every* signed output, including the secondary.
+  local secondary_ota=''
+  if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
+    secondary_ota="${OUTPUTS[PATCHED_OTA_MAGISK]}"
+  fi
+  reject_pdx235_preexisting_outputs \
+    "${ROM_FAMILY}" "${DEVICE_NAME:-}" "${RESOLVED_ROOT_MODE}" \
+    "${OUTPUTS[PATCHED_OTA]}" "${secondary_ota}" || return 1
 
   # Legacy output markers do not encode a locked module selection. Never reuse
   # one for an enabled F-Droid build. A dual build is reusable only when both
