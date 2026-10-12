@@ -262,3 +262,14 @@ callers explicitly grant `contents: write`; the shared workflow does not request
 write itself, because GitHub validates skipped reusable jobs against a read-only
 caller's ceiling before evaluating their conditions. The executed build-only
 job explicitly requests `contents: read`, including under a write-capable caller.
+
+The same Lineage workflow can retransport an existing encrypted candidate by
+supplying `source-artifact-id` and `expected-source-zip-sha256`. This mode skips
+all build, signing, and publication jobs. Read-only jobs verify GitHub's artifact
+digest and successful same-repository source run, then fetch exact 256 MiB byte
+ranges with a nonsecret part manifest. GitHub authorization is withheld from
+the signed artifact-storage request. Reassemble the parts in index order and
+verify the original ZIP digest before normal envelope decryption and OTA
+verification. Splitting addresses the client's artifact-download limit; it
+does not change the encrypted payload or establish OTA acceptance. The source
+run and commit are preserved in each manifest, independent of the transport run.

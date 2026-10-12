@@ -5,6 +5,14 @@ on:
     - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
+      source-artifact-id:
+        description: Optional encrypted artifact to transport only (no build or signing)
+        required: false
+        default: ""
+      expected-source-zip-sha256:
+        description: Required immutable ZIP digest for transport-only requests
+        required: false
+        default: ""
       device-id:
         description: Device code name
         required: true
@@ -128,7 +136,7 @@ jobs:
   scheduled_build:
     permissions:
       contents: write
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' && inputs.source-artifact-id == ''
     needs: schedule_config
     uses: ./.github/workflows/build-rom.yml
     with:
@@ -154,7 +162,7 @@ jobs:
     secrets: inherit
 
   manual_build:
-    if: github.event_name == 'workflow_dispatch' && inputs.release-type != 'build-only'
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type != 'build-only' && inputs.source-artifact-id == ''
     permissions:
       contents: write
     uses: ./.github/workflows/build-rom.yml
@@ -179,14 +187,14 @@ jobs:
     secrets: inherit
 
   manual_build_only:
-    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode != 'repository'
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode != 'repository' && inputs.source-artifact-id == ''
     permissions:
       contents: read
     uses: ./.github/workflows/build-rom.yml
     with: *lineage-build-inputs
 
   manual_device_candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode == 'repository'
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode == 'repository' && inputs.source-artifact-id == ''
     permissions:
       contents: read
     uses: ./.github/workflows/build-rom.yml
@@ -200,3 +208,55 @@ jobs:
       OTA_KEY: ${{ secrets.OTA_KEY }}
       PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
       PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
+
+  transport_plan:
+    if: github.event_name == 'workflow_dispatch' && inputs.source-artifact-id != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Plan existing encrypted candidate transport
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ARTIFACT_ID: ${{ inputs.source-artifact-id }}
+          EXPECTED_SOURCE_ZIP_SHA256: ${{ inputs.expected-source-zip-sha256 }}
+        run: python3 src/ci/transport_candidate_artifact.py plan
+
+  transport_part:
+    needs: transport_plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: true
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.transport_plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Fetch exact encrypted ZIP part
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ARTIFACT_ID: ${{ inputs.source-artifact-id }}
+          EXPECTED_SOURCE_ZIP_SHA256: ${{ inputs.expected-source-zip-sha256 }}
+          PART_INDEX: ${{ matrix.index }}
+        run: |
+          python3 src/ci/transport_candidate_artifact.py fetch-part \
+            --part-index "${PART_INDEX}" --output-dir "${RUNNER_TEMP}/encrypted-part"
+      - name: Upload encrypted ZIP part
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: encrypted-device-candidate-part-${{ matrix.index }}
+          path: ${{ runner.temp }}/encrypted-part
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

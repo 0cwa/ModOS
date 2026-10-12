@@ -328,11 +328,15 @@ assert "persist-credentials: ${{ inputs.publish" in build
 for release_type in ("default", "build-only"):
     for mode in ("disposable", "repository"):
         inputs = {"release-type": release_type, "signing-mode": mode,
-                  "publish": release_type != "build-only"}
+                  "publish": release_type != "build-only", "source-artifact-id": ""}
         selected = [name for name, section in routes.items() if value(condition(section), inputs)]
         expected = "manual_build" if inputs["publish"] else (
             "manual_device_candidate" if mode == "repository" else "manual_build_only")
         assert selected == [expected], (inputs, selected)
+        transport_inputs = {**inputs, "source-artifact-id": "123"}
+        assert not any(value(condition(section), transport_inputs) for section in routes.values())
+        assert value(condition(block(lineage, "transport_plan", 2)), transport_inputs)
+        assert not value(condition(block(lineage, "transport_plan", 2)), inputs)
         repository_signer = inputs["publish"] or mode == "repository"
         assert bool(value(signer, inputs)) == repository_signer
         assert bool(value(disposable, inputs)) != repository_signer
@@ -341,7 +345,16 @@ for release_type in ("default", "build-only"):
         for name in ("PASSPHRASE_AVB", "PASSPHRASE_OTA"):
             assert value(binding(name), inputs, {name: "signing-passphrase"}) == (
                 "signing-passphrase" if repository_signer else "")
+for name in ("transport_plan", "transport_part"):
+    section = block(lineage, name, 2)
+    assert "contents: read" in section and "actions: read" in section
+    assert "secrets." not in section and "secrets:" not in section
+    assert "persist-credentials: false" in section
+assert "inputs.source-artifact-id == ''" in block(lineage, "scheduled_build", 2)
+for name in ("source-artifact-id", "expected-source-zip-sha256"):
+    assert 'default: ""' in block(block(lineage, "workflow_dispatch", 2), name, 6)
 PYTEST
+  python3 tests/transport_candidate_artifact_test.py
 }
 
 test_encrypted_device_candidate_request_gate() {
