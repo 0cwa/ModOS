@@ -71,6 +71,7 @@ test_section_semantics() (
     'ROOT_MODE = "both"' \
     "'ADDITIONALS[MICROG]' = true" \
     "'ADDITIONALS[AFSR]' = false" \
+    "'ADDITIONALS[BOOT_ANIMATION]' = false" \
     'MAGISK_PREINIT = "sda10"' \
     'FORCE_UPDATE = true' \
     '[github]' \
@@ -88,6 +89,7 @@ test_section_semantics() (
     assert_equals both "${ROOT_MODE}" "build root mode"
     assert_equals true "${ADDITIONALS[MICROG]}" "build microG"
     assert_equals false "${ADDITIONALS[AFSR]}" "build AFSR"
+    assert_equals false "${ADDITIONALS[BOOT_ANIMATION]}" "build custom animation opt-out"
     assert_equals true "${FORCE_UPDATE}" "build force update"
     assert_equals '' "${PIXENEOS_RELEASE_OWNER}" "explicit empty GitHub value"
     assert_equals true "${TOML_CONFIG_PRESENT[release_owner]}" \
@@ -113,6 +115,8 @@ test_precedence_and_omission() (
     check_toml_env >/dev/null
     assert_equals declaration-default "$(toml_resolve_value afsr declaration-default)" \
       "omitted input preserves declaration default"
+    assert_equals true "$(toml_resolve_value boot_animation)" \
+      "omitted boot animation must use default-on contract"
     [[ -z "${TOML_CONFIG_PRESENT[afsr]+x}" ]] ||
       fail "omitted AFSR was reported as present"
   )

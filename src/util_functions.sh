@@ -630,7 +630,8 @@ function patch_ota() {
     args+=("--verify-cert-ota" "${grapheneos_otacert}")
 
     # Never enable the exception just because this is LineageOS/pdx235.
-    # The October 9 source's independent publisher/fingerprint provenance is
+    # The October 9 source publisher and filesystem fingerprints have been
+    # authenticated, but corrected output/runtime verification remains
     # unresolved; the checked-in pin is intentionally empty (strict default).
     # If a source is ever independently reviewed and pinned, also require the
     # exact source bytes, release filename, device and avbroot version.

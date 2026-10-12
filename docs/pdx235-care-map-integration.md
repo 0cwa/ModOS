@@ -1,355 +1,127 @@
-# pdx235 October 9 care-map: ModOS integration and nonpublishing acceptance
+# pdx235 care-map integration and acceptance
 
-**Status: BLOCKED — design and hermetic CI only.** Tracking issue:
+[Remaining work](remaining-work.md) records the current evidence, dependency
+order, responsible code boundaries, and check consolidation. This document
+specifies the acceptance boundary for
 [ModOS #114](https://github.com/0cwa/ModOS/issues/114).
-This document is Worklane 4's ModOS-side contract, not authorization to
-generate, sign, flash, distribute, or publish an OTA. Nothing here removes the
-existing production source-policy quarantine or turns on the source exception.
 
-**Baseline:** ModOS branch `feature/microg-pdx235-20260919` at
-`b38377c6fd8803f8722e834e68076aa181e5d41b`, plus an isolated draft PR.
-The fix to the actual care-map generator/verifier belongs to Worklane 1, the
-Android runtime interpretation to Worklane 2, and binary conformance fixtures
-to Worklane 3. As of October 12, 2026, [helper RFC #11](https://github.com/0cwa/my-avbroot-setup/pull/11)
-is **research-only**, and [helper conformance PR #10](https://github.com/0cwa/my-avbroot-setup/pull/10)
-is **test-only**. Neither supplies a production corrected avbroot binary.
-Keep the existing soft-fork boundary: ModOS orchestrates and
-enforces selection/release policy; the helper owns patching; avbroot owns OTA
-parsing, generation and verification. Do not port helper/avbroot internals into
-ModOS or introduce a temporary release workflow.
+## Current state
 
-## Baseline trust and exact dependency contract
+The October 9 source OTA has been independently authenticated with the
+published LineageOS signing key. Its filesystem fingerprints explain the
+care-map identities; they differ from the AVB fingerprint descriptors.
+The source is Android 16 despite the deliberately overridden Sony Android 15
+fingerprint string. Original signed-image evidence covers `odm`, `product`,
+`system`, `system_ext`, `vendor`, and `vendor_dlkm`.
 
-| Dependency/evidence | Immutable identity or existing gate | What it does **not** establish |
-| --- | --- | --- |
-| Original LineageOS OTA | `lineage-23.2-20261009-nightly-pdx235-signed.zip`, SHA-256 `b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8`; independently authenticated publisher signature and release metadata | That the original care-map fingerprints/ranges work at runtime |
-| Trusted LineageOS signing identity | OTA certificate SPKI SHA-256 `0848ca38cb604887cea216a7f39d7dd62bad20b513cfdeff357ece4e731d6372`, from independently versioned `LineageOS/update_verifier` public key | A trust anchor for AVB; this is an OTA signing key |
-| Helper | Git commit `70819893ff91488b4b40a8c6f45fde39854c6c68` in `0cwa/my-avbroot-setup`; independently check clean checkout, repository origin, commit, and compatibility manifest | Permission to trust arbitrary future helper commits |
-| Helper compatibility transform | `tools/compat/avbroot_setup_compat.json` binds original `patch.py` SHA-256 `3405142ea7d056a37ac5f7ff9301fff5d4fef8519ab63f32333ff2574fd387c5` to the exact helper commit; strict checkout test exercises it | A general helper patching license or trust in unreviewed source changes |
-| avbroot binary | Version 3.34.1; exact signed release ZIP SHA-256 `b1740ebf92d503cf2e81ca443afa4b615fb97ec365e170b71791ed72d9e559f8`; executable member SHA-256 `de0ed1b439175c8c358e2b2de289adc1a8947c655e3cce1598de374ab71d316b` | Correctness of current 3.34.1 care-map semantics |
-| Tool publisher | Detached OpenSSH `file`-namespace signature, identity `chenxiaolong`, trusted key fingerprint `SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA`; `locks/executable-tools-v1.json`, `trust/chenxiaolong.allowed_signers` | Authenticity of an unsigned custom replacement binary |
-| Other executables | afsr and custota-tool remain locked by the same immutable signature + archive/member inspection mechanism | Permission to alter their pins as part of this worklane |
-| Production exception | `readonly _SOURCE_CARE_MAP_PDX235_20261009_SHA256=''` in `src/source_care_map_policy.sh` | No compatibility waiver is currently approved or active |
+The research candidate and independent synthetic conformance suites agree.
+No corrected production strict verifier, final signed-output proof, or
+physical pdx235 acceptance has been established. A green synthetic test
+cannot substitute for those results.
 
-Any proposed replacement avbroot must have: reviewed *source* commit/tag and
-patch diff; independent build/reproducibility evidence or a documented
-binary-to-source provenance attestation; exact architecture and executable
-bytes; archive size/SHA-256; exact contained member sizes, types, modes and
-SHA-256; a **separately trusted** publisher signature/attestation and its
-verification method; and deterministic failing tests for wrong identity,
-wrong signature, wrong version and substituted bytes. An unsigned development
-binary is not covered by the existing chenxiaolong signature, even if its
-archive SHA-256 is pinned. A custom signing identity requires independent
-approval and a discrete trust-policy change; do not impersonate upstream
-signatures or weaken the executable bootstrap. A source Git SHA alone is
-not sufficient to authenticate a tool *executable*.
+The production source-exception digest remains empty and strict source
+verification remains active. The LineageOS/pdx235 output policy permits only
+`local-unpublished`; direct single and paired publication helpers enforce
+the same quarantine. Pre-existing output ZIPs or associated evidence are
+rejected rather than accepted through the historical existence shortcut.
 
-Before any dependency promotion, pin the exact reviewed helper revision in
-`src/declarations.sh` and its compatibility manifest together. Update the
-tool lock, signed executable provenance and validator-policy review in a
-separate atomic commit, including its negative tests. The normal ModOS
-selection fingerprint already includes the helper Git commit and
-`clear_vbmeta_flags`, but **does not currently include the avbroot
-executable archive digest, a care-map semantic contract version or the
-source OTA digest**. That is a remaining cache/selection risk: extend the
-canonical selection schema (and downstream preflight/sidecar consumers, with
-versioned migration tests) before a tool/semantic promotion so an old release
-cannot be mistaken for a compatible new output. An executable lock SHA-256
-must be derived from checked-in bytes, never from the latest GitHub release
-API or an environment override.
+Source publisher checks bind the extracted PEM certificate both to the
+independently trusted SPKI and to the unique certificate member in the
+current source archive. The helper must then authenticate the whole-file
+OTA signature, payload, partition hashes, and applicable AVB chain.
+A certificate identity match alone is not signature verification.
 
-## Immediate release quarantine (safe to test now)
+## Generator and verifier requirements
 
-`src/ci/pdx235_release_quarantine.sh` is a small shared, explicit temporary
-policy: when `ROM_FAMILY=lineageos` and `DEVICE_NAME=pdx235`, **only**
-`OUTPUT_SCOPE=local-unpublished` is acceptable. It deliberately applies to
-all nightly dates, root modes and microG selections. Calls from
-`enforce_output_policy` reject releases before patching. Calls from
-`src/ci/publish_ota.sh` and `src/ci/publish_ota_pair.sh` reject direct
-publication even if early checks were somehow bypassed. This quarantine
-is **not** governed by a workflow input, source digest, `FORCE_UPDATE`,
-`force-publish`, or `--allow-source-care-map-mismatch`. It can be lifted
-only by a later explicitly approved and independently reviewed code change
-after the gates below pass.
+Use one reviewed semantic rule for generation and independent verification:
 
-The independent source-publisher check is now mandatory in the normal
-LineageOS/pdx235 patch path, even when the care-map exception is disabled:
-`source_care_map_require_lineageos_pdx235_publisher` checks the exact current
-OTA ZIP's unique certificate member against its extracted certificate and
-the independently pinned official LineageOS public-key SPKI. This catches
-stale cached certificate reuse and unexpected upstream signers **before**
-the helper receives the OTA. It is only a signer-identity and ZIP-byte
-consistency preflight; cryptographic whole-file signature, signed payload
-and AVB verification in the helper must still succeed. The separate
-`tests/pdx235_source_publisher_test.sh` uses synthetic positive/negative
-archive fixtures, never a fake production publisher key.
+1. Obtain required partitions from the authenticated payload/AVB metadata;
+   do not let an incomplete care map define which partitions must be checked.
+2. Read each fingerprint using its intended filesystem/runtime property ID.
+   A mismatching AVB descriptor is not an acceptable substitute.
+3. Validate nonempty maps, unique required entries, range syntax and
+   half-open bounds within AVB-protected data. Confirm deterministic payload
+   writes cover any newly cared blocks. Source sparse ranges can be preserved
+   when their reuse proof holds; new allocations require a supported rule.
+4. Bind extracted image SHA-256 and sizes to the cryptographically verified
+   payload manifest. Synthetic caller-supplied hashes are not authentication.
+5. Reject unrelated source-integrity failures. A reviewed expected-map
+   verification boundary must replace the current incompatible AVB-only
+   equality rule; a blanket mismatch waiver is insufficient.
 
-The original `_SOURCE_CARE_MAP_PDX235_20261009_SHA256` must stay a literal
-empty readonly assignment. No unreviewed URL, release API, workflow
-parameter, build environment variable, artifact name or downloaded metadata
-may set it. An independently reviewed digest is only a byte identity
-allowlist, not source authentication and not care-map runtime proof. Prefer
-fixing the generator/verifier and passing strict source checks without an
-exception. If the original source requires a narrowly scoped waiver, review
-the precise meaning and residual first-boot risk in a **separate** security
-change. No catch-all mismatch ignore is acceptable.
+Avoid duplicating the helper's map parser or verifier in ModOS. The consumer
+passes reviewed inputs through its typed configuration and existing helper
+boundary. A dependency change must update source revision, compatibility
+manifest, executable trust policy as applicable, and selection identity
+consistently so cached assets cannot conceal changed semantics.
 
-Existing local-output reuse is also quarantined for pdx235. The historical
-`src/util_functions.sh:patch_ota` `outputs_ready` shortcut can skip
-helper signature verification, care-map verification and Magisk secondary
-postflight on pre-existing files. The ModOS caller now invokes
-`reject_pdx235_preexisting_outputs` **before** that shortcut; existing
-rootless/Magisk ZIPs, sidecars, selection metadata, reports and dangling
-symlinks fail closed. This is intentionally device-scoped to avoid changing
-unrelated historical builds; it is not a new way to verify a reused file.
+## Nonpublishing output acceptance
 
-**Remaining publication boundary:** publication helpers validate asset
-names, sidecars and selection identity, not the complete signed OTA and
-care map again. Before lifting the quarantine, require strict post-sign
-cryptographic and semantic verification of every actual final output
-(including the secondary Magisk output) bound to the **signed output
-manifest**, immediately before any success marker/sidecar/publication.
-Either a verified, non-reusable build operation or a cryptographically
-sound independently re-verifiable reuse mechanism is required. Existing
-release files alone never establish verification success; failure of either
-flavor invalidates the entire pair.
+Prepare a clean fixture runner that can use the exact authenticated October 9
+source; the normal provider selects the latest nightly and does not establish
+that fixture identity. Use read-only GitHub credentials and test signing
+material. The existing reusable release job still has write-scoped
+`GITHUB_TOKEN` permissions and production signing inputs, even when its
+separate `GH_TOKEN` is withheld for build-only. Correct that runner boundary
+before using it for this acceptance.
 
-Existing `.github/workflows/build-rom.yml` uses a `local-unpublished`
-output scope for `release-type=build-only`, and release steps are conditioned
-on `publish && release-type != 'build-only'`. The dedicated `GH_TOKEN`
-secret is withheld from build-only runs by this PR. **Residual risk:** the
-shared job still has `permissions: contents: write` and inherits signing
-secrets; workflow conditions are not a replacement for least privilege or a
-dedicated nonpublishing build runner. Do not treat a draft PR or CI test as
-permission to dispatch that workflow. A future further hardening can split
-write-scoped publication into a separate job with its own explicit
-read-only/build-only permissions without adding a long-lived parallel build
-workflow. Current PR CI runs tests only.
+Start with microG off to isolate the care-map fix, then exercise microG on.
+Use LineageOS/pdx235, `local-unpublished`, no publishing, and rootless/Magisk
+outputs with the configured preinit device. Do not upload OTA images to
+release assets, Custota channels, or public CI artifacts during this stage.
 
-## Required semantic and cryptographic acceptance (Worklanes 1–3)
+For each final signed output, including secondary Magisk:
 
-The safe generator/verifier contract for the exact **authenticated** source
-must satisfy the following, independently for the source, rootless output
-and Magisk output. Worklane 1 has now provided a conservative proposed
-proof: let `S_p` be the publisher-authenticated source's sparse care-map
-blocks for partition `p`, and `D_p` the protected 4,096-byte filesystem
-blocks changed from verified source to final image; require
-**`D_p ⊆ S_p`** for every required partition. Preserve `S_p` exactly
-and refuse changed out-of-range protected blocks, changed data extents,
-unsupported filesystem/property extraction and any untrusted proof hash.
-This is a *necessary proposed acceptance method*, not an implemented
-verifier or evidence from a real signed output:
+- Derive the expected AVB public key from the configured signing key with
+  its passphrase, and verify against it and the configured OTA certificate.
+- Verify whole-file/payload/partition/AVB integrity and correct care-map
+  semantics; re-extract final signed images and repeat image/property/range
+  proof against that specific output's verified manifest.
+- Check the selected modules, rootless/Magisk distinction, Magisk boot target
+  and preinit device, and expected equality of shared prepared partitions.
+- Refuse malformed/missing/duplicate maps, wrong fingerprints/ranges,
+  wrong signers, unsafe payload coverage, and any secondary-output failure
+  before sidecars, reports, release writes or success markers are emitted.
 
-1. Parse `care_map.pb` strictly as a single nonempty, correctly framed
-   protobuf in the expected ZIP member. Reject zero/multiple/empty,
-   malformed/unknown unsafe structure, duplicate/conflicting partition
-   entries, impossible or empty ranges, integer overflow, out-of-bounds
-   offsets and any required partition silently missing.
-2. Prove the required partition **names, property IDs, fingerprints and
-   block ranges** correspond to the exact target build and Android runtime
-   first-boot `update_verifier` selection rules; not simply equality to
-   an arbitrary reconstructed map. Handle AOSP meaningful-block/sparse
-   ranges correctly, including zero-filled/unused blocks and expected
-   parity between inputs and outputs. Verify the dynamic partitions
-   `odm`, `product`, `system`, `system_ext`, `vendor`,
-   `vendor_dlkm`. A silently skipped required partition is a failure.
-3. Detect the original Sony stock Android 15 versus LineageOS Android 16
-   fingerprint discrepancy. Do not silently substitute, preserve stale
-   fingerprints as assumed-good, or change signed source fingerprint
-   identities solely to satisfy a test. Worklane 2 must establish the
-   correct runtime property mapping; Worklane 1 must implement that rule
-   narrowly; Worklane 3 must prove it with authenticated and hostile
-   fixtures. Any intended identity rewrite needs separate forensic proof
-   that it makes the target runtime verify the intended blocks.
-4. Validate each source OTA's whole-file signature with the independently
-   pinned LineageOS publisher key and verify payload integrity, partition
-   hashes and AVB chain as applicable. Do not infer source trust from
-   keys/certificates taken from the same ZIP without independently checking
-   the publisher's signing key. Source verification must fail on **any**
-   non-care-map error.
-5. For each output, derive/encode the expected AVB public key from the
-   configured private signing key (respecting passphrase configuration),
-   then run strict `avbroot ota verify` against **that key** and the
-   configured output OTA certificate. Check payload/AVB integrity,
-   required single nonempty `care_map.pb`, and semantic metadata.
-   Never accept the output's own embedded cert/key as independent proof.
-   Check rootless and Magisk **separately**; a secondary failure must
-   abort the pair before creating sidecars, marking success or publishing.
-6. Verify Magisk's actual boot/init_boot patch, declared
-   `PREINITDEVICE=sda47` for pdx235, distinct boot images, and no Magisk
-   evidence in the rootless variant. Paired outputs must share the intended
-   prepared dynamic partitions, preserve selected modules (microG only
-   after its own functional validation), and be individually signed and
-   verified. A Magisk label, `Ramdisk: yes`, or patch-process exit code
-   is not runtime-root acceptance.
+Record source/output digests, tool/helper identities, selected options,
+map identities/ranges, expected signer identities and verification results
+in one reviewable receipt. Reusing outputs requires fresh verification of
+those actual bytes; otherwise keep reuse disabled. Publication asset-name
+and selection-sidecar checks do not verify an OTA's cryptography.
 
-All fixture and live-evidence reports must record *exact* source bytes,
-helper commit, executable hash, semantic rule version, selection identity,
-root mode, input/output ZIP SHA-256, map SHA-256, expected/actual partition
-fingerprints and ranges, verifier invocation/result, output AVB key
-identity and output OTA cert identity. Worklane 3 owns the binary/protobuf
-negative conformance suite; these ModOS tests freeze the calling boundary
-and quarantine, not the actual verifier implementation.
+## Physical acceptance and release
 
-**New test witness and candidate interface (not integrated):**
-[helper PR #10](https://github.com/0cwa/my-avbroot-setup/pull/10)
-reproduced the 1,086-byte publisher-signed original `care_map.pb` with
-SHA-256 `e903a2c0e4a71aaadf757d7d479a6be2ca80939a084c1832796db61c75e6e147`.
-Its independent `modos-care-map-conformance-v1` candidate adapter consumes
-one JSON request per call, and must not infer final fingerprints from AVB
-descriptors. The baseline no-adapter fixture test **skips**, so a green
-test-only helper CI is **not** evidence of a production corrected generator.
-A later isolated, approved integration must run with
-`CARE_MAP_CONFORMANCE_REQUIRE_CANDIDATE=1` and
-`CARE_MAP_CANDIDATE_CMD` set to the exact reviewed executable/adapter,
-report **zero skips**, and then verify actual signed source/final images.
-No CI entry point in this draft pretends to supply that candidate.
+Observe effective runtime fingerprints for all required partitions, verity
+mode, snapuserd verification status and successful-slot marking on pdx235.
+The pinned Android runtime can skip mismatching map entries and can mark
+without verification when verity is disabled or care-map parsing fails.
+It can also legitimately use snapuserd verification instead of individual
+care-map block reads; recognize that supported path in acceptance criteria.
 
-**Known hard blocker:** stock avbroot 3.34.1 `ota verify` still requires
-its AVB-descriptor-derived fingerprints and contiguous ranges. Thus even
-a properly preserved sparse source map cannot satisfy its old strict
-expected-map equality. A separately reviewed provenance-aware **strict
-expected-map verifier** (or equivalently independently verified and
-cryptographically bound boundary) is required. Never replace it with a
-blanket `--allow-source-care-map-mismatch` pass.
+Test first boot and a Custota OTA/A-B persistence cycle for rootless and
+Magisk. For Magisk, complete the matching manager's additional setup and
+verify `su -c id` after reboot. For microG, test self-check, restricted
+signature spoofing, account behavior, push, location and OTA persistence.
+Physical evidence requires the actual device and cannot be generated by CI.
 
-## Future **build-only** acceptance procedure — NOT RUN OR AUTHORIZED
+LineageOS's `--clear-vbmeta-flags` must apply to both outputs. Inspect resulting
+root flags and chained descriptors. Clearing verification-disable flags does
+not establish bootloader enforcement, trusted on-device keys, or first-boot
+block verification; the source's public AVB test keys are not a publisher
+identity. Check actual AVB/verity state and recovery behavior on-device.
 
-**Prerequisites:** Worklanes 1–3 have delivered and reviewed the semantic
-fix, authenticated tool provenance, negative-fixture suite and Android runtime
-interpretation. Keep the production exception literal empty and this
-quarantine active. Use an isolated clean checkout of the reviewed exact
-dependency commits, with only independently authorized test signing
-material. Never use `force-publish`, `OUTPUT_SCOPE=published`,
-`publish=true`, a release workflow's scheduled trigger, or the `main`
-branch. Build artifacts must remain in a protected local workspace and must
-not be uploaded to a GitHub release, Custota channel, public CI artifact,
-or any externally accessible endpoint.
+After semantic implementation, signed-output verification and applicable
+device acceptance are reviewed, promote the helper dependency before the
+ModOS microG consumer. Remove the temporary quarantine explicitly in a
+reviewed release change; keep microG scheduled builds off until its device
+acceptance is complete. Resolve #114 using that evidence, not test counts.
 
-1. Confirm the **exact October 9 source ZIP** independently matches the
-   pinned SHA-256 and publisher signature. The normal LineageOS provider
-   follows the *latest* nightly, so a normal manual `build-only` dispatch
-   does **not** pin the October 9 source. A separate reviewed,
-   input-immutable, read-only source-fixture mechanism is necessary. Never
-   replace the source digest pin by using an environment override.
-2. After explicit future approval to exercise the corrected toolchain,
-   choose `ROM_FAMILY=lineageos`, `DEVICE_NAME=pdx235`,
-   `release-type=build-only`, `publish=false`,
-   `OUTPUT_SCOPE=local-unpublished`, `root-mode=both`,
-   `magisk-preinit-device=sda47`, `allow-unauthorized-adb=false`.
-   Start with `microg=false` to isolate the care-map and AVB boundary.
-   Optionally repeat with `microg=true` *only after* the independent
-   module lock, signer/package/version and runtime acceptance remain valid.
-   Separate rootless and Magisk builds are also acceptable provided both
-   are checked and compared.
-3. Record immutable receipts and SHA-256 for both generated local ZIPs.
-   Execute the Worklane 3 semantic conformance checks and strict output
-   `avbroot ota verify` with the configured output key/cert for each ZIP.
-   Confirm one correct `care_map.pb`, correct partition fingerprints and
-   block ranges, AVB flag state, selected modules, distinct Magisk boot
-   patch, and valid rootless/Magisk output pair. Compare expected versus
-   observed verification results for every partition.
-4. Negative-inject an unreviewed source, wrong/changed fingerprint,
-   corrupt/missing/duplicated map, changed signer, failed output verifier,
-   and failed Magisk secondary output. Each must **block** before any
-   sidecars, release writes, update pointers or success markers. Recheck
-   that `GH_TOKEN` is absent for build-only, and no asset/tag/gh-pages
-   updates or artifact uploads happened.
-5. Preserve CI logs, SHA-256 receipts, both verifier results and the
-   nonpublishing run's exact commit/parameters for review. A passing local
-   build is only static acceptance; it is **not** permission to flash or
-   publish. Physical testing requires its own authorization.
+## Validation ownership
 
-Only the deterministic CI/policy tests can be run under the current
-Worklane 4 authorization. The procedure above is a *future* gated
-specification, not a command to start an OTA build today.
-
-## `--clear-vbmeta-flags`: precise scope and residual risk
-
-`src/rom_profiles.sh` sets `ROM_PROFILE[CLEAR_VBMETA_FLAGS]=true` for
-LineageOS and `false` for GrapheneOS. The common patch path forwards
-`--patch-arg=--clear-vbmeta-flags`; `ROOT_MODE=both` forwards
-`--secondary-patch-arg=--clear-vbmeta-flags` for the Magisk ZIP too.
-This clears root vbmeta header flags disabling AVB hash-tree / verification
-(for a typical source header value 0x3), so the resigner can request those
-checks rather than carrying an explicitly verification-disabled root
-header forward. It does **not** by itself prove verified boot is enforced
-by a pdx235 bootloader, prove which keys are trusted on-device, fix the
-original care-map metadata, or prove first-boot `update_verifier` read
-the intended partitions. The source may include public AVB test keys;
-their presence must never be portrayed as production AVB authenticity.
-
-Future acceptance must inspect each output root vbmeta flags and all
-chained/hashtree descriptors, verify keys on the actual device, and gather
-AVB/verity and `update_verifier` first-boot evidence from both root
-modes. An unlocked bootloader and an internally consistent signed output
-do not alone establish hardware-enforced verified boot. Explicitly test
-both slots and OTA update persistence without bypassing first-boot
-verification.
-
-## Release gate — all required before any later exception or pin promotion
-
-- [ ] Worklane 1: Reviewed fixed generator and verifier semantics, isolated
-      commit, precise CLI/compatibility interface, test evidence for the
-      exact October 9 source, output signature and first-boot behavior.
-- [ ] Worklane 2: Independent pdx235 first-boot `update_verifier` runtime
-      requirement analysis, correct fingerprint-property IDs, sparse-range
-      rules, verification failure/skip behavior, recovery/update constraints.
-- [ ] Worklane 3: Fixture manifests with independent source provenance and
-      coverage for all six partitions; deterministic positive/negative
-      conformance suite; wrong fingerprint, malformed map, signed-but-wrong
-      output and failed second-output cases fail closed.
-- [ ] Independent source publisher verification evidence is linked to
-      issue #114; original ZIP SHA-256, official release identity and
-      certificate public-key hash are independently reviewed.
-- [ ] Replacement helper/tool has reviewed exact source commits, executable
-      cryptographic provenance, artifact hash/member layout, immutable lock,
-      signature validation and strict compatibility tests. Existing pins
-      remain unchanged until review. No mutable URL/env digests.
-- [ ] Selection identity/sidecar schema is versioned to distinguish the
-      reviewed semantic toolchain and input source; cache collision or
-      skip-existing-release cannot conceal a changed binary or care map.
-- [ ] The ModOS and Worklane 3 CI suites pass, including negative cases.
-      No test green status is represented as OTA-source/runtime proof.
-- [ ] A separately approved **local-unpublished** build-only acceptance
-      successfully produces and strictly verifies *both* outputs using
-      authenticated inputs without publishing anything.
-- [ ] With separate device-test authorization, physical pdx235 rootless and
-      Magisk first boot demonstrates correct verified block reads, maps,
-      successful OS boot and full feature integrity; no silent skip of
-      required partitions. Verify expected AVB state and recovery behavior.
-- [ ] Physical-device OTA persistence / A/B slot switch and Custota
-      update cycle succeeds; Magisk manager additional setup and `su -c id`
-      confirm actual root after reboot. If microG enabled, verify
-      self-check, signature spoofing restriction, account behavior,
-      push/location, and survival across OTA.
-- [ ] Independent security review resolves ModOS #114, explicitly approves
-      a separate production-gate removal/pin-promotion PR and production
-      signing/release procedure. Never silently auto-promote or merge #97
-      into `main` based only on Worklane 4 tests.
-
-Until **every applicable gate** is met, the correct outcome is **no
-production source exception, no trusted tool revision change, no signed
-OTA release, and no publication**.
-
-## Cross-worklane interface to return
-
-- **Worklane 1 → 4:** versioned CLI/function contract, exact source commit
-  and executable identity, strict verifier invocations, output fingerprint
-  and map guarantees, handling of missing/invalid maps, secondary-output
-  fail-closed result.
-- **Worklane 2 → 1/3/4:** authoritative Android runtime property/range
-  semantics and trace-based acceptance assertions for all six partitions;
-  AVB/vbmeta flag and recovery verification requirements.
-- **Worklane 3 → 4:** deterministic fixture/test command, byte-identical
-  source and expected map evidence, failing mutations, both-output
-  negative test results, hashed test fixtures and CI status.
-- **Worklane 4 → reviewers:** permanent CI quarantine and version-pinning
-  interface, nonpublishing acceptance specification, updated selection
-  schema requirement and completed release-gate evidence.
-
-References: [ModOS #114](https://github.com/0cwa/ModOS/issues/114),
-[ModOS PR #97](https://github.com/0cwa/ModOS/pull/97),
-[avbroot care-map issue #639](https://github.com/chenxiaolong/avbroot/issues/639),
-[AOSP `update_verifier` source](https://android.googlesource.com/platform/bootable/recovery/+/master/update_verifier/update_verifier.cpp),
-and [ModOS executable trust policy](./executable-tool-trust.md).
+Existing source-policy, publisher, module-selection, quarantine, workflow,
+executable-lock and helper-compatibility suites cover their own boundaries.
+The removed static integration suite repeated literal tool pins, shell
+spelling, workflow inventory and behavior already checked elsewhere.
+Keep one authoritative test for each behavior and focused negative cases.
+Independent helper conformance owns binary semantics; signed-output checks
+own authenticity; device acceptance owns runtime results.

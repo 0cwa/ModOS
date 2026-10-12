@@ -3,7 +3,18 @@
 # Copyright (C) 2026 PixeneOS contributors
 set -euo pipefail
 
+# Evaluate the production policy with a hostile inherited pin. The checked-in
+# policy must override it and keep the exception disabled and immutable.
+export _SOURCE_CARE_MAP_PDX235_20261009_SHA256=untrusted-environment-value
 source src/source_care_map_policy.sh
+[[ -z "${_SOURCE_CARE_MAP_PDX235_20261009_SHA256}" ]] || {
+  echo 'FAIL: production exception is enabled' >&2
+  exit 1
+}
+if ( _SOURCE_CARE_MAP_PDX235_20261009_SHA256=override ) 2>/dev/null; then
+  echo 'FAIL: production exception pin is mutable' >&2
+  exit 1
+fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT

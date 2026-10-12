@@ -62,26 +62,26 @@ ADDITIONALS[DEBUG]=false
 ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]=false
 resolve_rom_profile
 
-# Test early policy enforcement and the later publication-evidence gate for
-# both flavors, independently of microG and force-publish/forced rebuild.
-for root_mode in rootless magisk both; do
-  for microg in false true; do
-    for release_type in default force-publish; do
-      ROOT_MODE="${root_mode}"
-      ADDITIONALS[MICROG]="${microg}"
-      RELEASE_TYPE="${release_type}"
-      FORCE_UPDATE=true
-      PUBLISH=true
-      PIXENEOS_PDX235_CARE_MAP_SHA256=b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8
-      export ROOT_MODE RELEASE_TYPE FORCE_UPDATE PUBLISH PIXENEOS_PDX235_CARE_MAP_SHA256
-      expect_allow "${root_mode}/microg=${microg} local-unpublished" \
-        enforce_output_policy local-unpublished
-      expect_quarantine_failure "${root_mode}/microg=${microg}/${release_type} early" \
-        enforce_output_policy published
-      expect_quarantine_failure "${root_mode}/microg=${microg}/${release_type} late" \
-        enforce_publication_evidence published
-    done
-  done
+# Cover a normal rootless request and an adversarial paired/microG forced
+# request. The gate depends only on ROM/device/scope; a Cartesian product of
+# unrelated module and root settings repeats the same policy invocation.
+for scenario in normal forced-pair; do
+  if [[ "${scenario}" == normal ]]; then
+    ROOT_MODE=rootless
+    ADDITIONALS[MICROG]=false
+    RELEASE_TYPE=default
+  else
+    ROOT_MODE=both
+    ADDITIONALS[MICROG]=true
+    RELEASE_TYPE=force-publish
+  fi
+  FORCE_UPDATE=true
+  PUBLISH=true
+  PIXENEOS_PDX235_CARE_MAP_SHA256=b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8
+  export ROOT_MODE RELEASE_TYPE FORCE_UPDATE PUBLISH PIXENEOS_PDX235_CARE_MAP_SHA256
+  expect_allow "${scenario} local-unpublished" enforce_output_policy local-unpublished
+  expect_quarantine_failure "${scenario} early" enforce_output_policy published
+  expect_quarantine_failure "${scenario} late" enforce_publication_evidence published
 done
 
 # Both release helpers must independently refuse direct publication attempts,
