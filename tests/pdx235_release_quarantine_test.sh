@@ -96,6 +96,37 @@ expect_quarantine_failure 'direct paired-output publisher' env \
   OUTPUT_SCOPE=published RELEASE_TYPE=default \
   bash src/ci/publish_ota_pair.sh
 
+# Reusing a locally present pdx235 ZIP must never bypass postflight checks.
+# These are only synthetic local files; no OTA is created or verified here.
+rootless="${tmp}/pdx235-rootless.zip"
+magisk="${tmp}/pdx235-magisk.zip"
+expect_allow 'fresh pdx235 rootless' \
+  reject_pdx235_preexisting_outputs lineageos pdx235 rootless "${rootless}" ''
+expect_allow 'fresh pdx235 pair' \
+  reject_pdx235_preexisting_outputs lineageos pdx235 both "${rootless}" "${magisk}"
+expect_reject 'missing primary output path' \
+  reject_pdx235_preexisting_outputs lineageos pdx235 rootless '' ''
+expect_reject 'identical paired paths' \
+  reject_pdx235_preexisting_outputs lineageos pdx235 both "${rootless}" "${rootless}"
+expect_reject 'missing Magisk paired output path' \
+  reject_pdx235_preexisting_outputs lineageos pdx235 both "${rootless}" ''
+for suffix in '' '.csig' '.selection.json' '.patch-report.json' '.microg-patch-report.json'; do
+  touch -- "${rootless}${suffix}"
+  expect_reject "rootless stale ${suffix:-OTA}" \
+    reject_pdx235_preexisting_outputs lineageos pdx235 rootless "${rootless}" ''
+  rm -- "${rootless}${suffix}"
+  touch -- "${magisk}${suffix}"
+  expect_reject "secondary stale ${suffix:-OTA}" \
+    reject_pdx235_preexisting_outputs lineageos pdx235 both "${rootless}" "${magisk}"
+  rm -- "${magisk}${suffix}"
+done
+ln -s "${tmp}/missing-OTA" "${rootless}"
+expect_reject 'dangling symlink output' \
+  reject_pdx235_preexisting_outputs lineageos pdx235 rootless "${rootless}" ''
+rm -- "${rootless}"
+expect_allow 'unaffected GrapheneOS cached output' \
+  reject_pdx235_preexisting_outputs grapheneos shiba both "${rootless}" "${magisk}"
+
 # Existing release support for non-pdx235 profiles must remain unchanged.
 ROM_FAMILY=grapheneos
 DEVICE_NAME=shiba
