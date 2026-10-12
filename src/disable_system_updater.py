@@ -35,6 +35,7 @@ UPDATER_TARGETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "/system_ext/priv-app/Updater/Updater.apk",
             "/system_ext/etc/default-permissions/default-permissions_org.lineageos.updater.xml",
             "/system_ext/etc/permissions/org.lineageos.updater.xml",
+            "/system_ext/etc/permissions/Updater.xml",
         ),
     ),
 }
@@ -75,8 +76,14 @@ def remove_system_updater(rom_family: str, ext_fs: dict[str, Any]) -> tuple[str,
 
     for index, raw_path in enumerate(target_paths):
         path = PurePosixPath(raw_path)
-        entries = _metadata_entries(fs, path)
-        tree_path = _tree_path(fs, path)
+        # system_ext is mounted at /system_ext, but its image root is /.
+        # The system image retains its /system directory (system-as-root).
+        image_path = (
+            PurePosixPath("/") / path.relative_to("/system_ext")
+            if partition == "system_ext" else path
+        )
+        entries = _metadata_entries(fs, image_path)
+        tree_path = _tree_path(fs, image_path)
         tree_exists = tree_path.exists() or tree_path.is_symlink()
 
         if not entries:

@@ -55,10 +55,18 @@ def test_lineageos() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         partition = Path(temporary)
         paths = list(target_for_family("lineageos")[1])
-        fs = fake_fs(partition, paths)
+        image_paths = [str(PurePosixPath("/") / PurePosixPath(p).relative_to("/system_ext")) for p in paths]
+        fs = fake_fs(partition, image_paths)
+        # An unrelated app must remain, including its metadata.
+        unrelated = "/priv-app/Other/Other.apk"
+        other_fs = fake_fs(partition, [unrelated])
+        fs.info.entries.extend(other_fs.info.entries)
         removed = remove_system_updater("lineageos", {"system_ext": fs})
         assert tuple(paths) == removed
-        assert not fs.info.entries
+        assert [str(e.path) for e in fs.info.entries] == [unrelated]
+        assert (partition / unrelated.lstrip("/")).exists()
+        for image_path in image_paths:
+            assert not (partition / image_path.lstrip("/")).exists()
 
 
 def test_optional_companion_files_can_be_absent() -> None:
@@ -72,10 +80,11 @@ def test_optional_companion_files_can_be_absent() -> None:
 def test_required_apk_missing_fails() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         fs = fake_fs(Path(temporary), [])
-        assert_raises(
-            lambda: remove_system_updater("grapheneos", {"system": fs}),
-            "missing updater APK",
-        )
+        for family, partition in [("grapheneos", "system"), ("lineageos", "system_ext")]:
+            assert_raises(
+                lambda: remove_system_updater(family, {partition: fs}),
+                f"{family} missing updater APK",
+            )
 
 
 def test_tree_only_file_fails_before_mutation() -> None:
@@ -115,8 +124,9 @@ def test_symlink_target_fails_before_mutation() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         partition = Path(temporary)
         apk = target_for_family("lineageos")[1][0]
-        fs = fake_fs(partition, [apk])
-        apk_path = partition / PurePosixPath(apk).relative_to("/")
+        image_path = PurePosixPath("/") / PurePosixPath(apk).relative_to("/system_ext")
+        fs = fake_fs(partition, [str(image_path)])
+        apk_path = partition / image_path.relative_to("/")
         apk_path.unlink()
         outside = partition / "outside.apk"
         outside.write_bytes(b"outside")
