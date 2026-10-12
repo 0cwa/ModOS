@@ -95,7 +95,7 @@ _config_schema_define oemunlockonboot 'ADDITIONALS[OEMUNLOCKONBOOT]' build boole
 _config_schema_define disable_system_updater 'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' build boolean \
   ADDITIONALS array DISABLE_SYSTEM_UPDATER ADDITIONALS_DISABLE_SYSTEM_UPDATER false true caller-or-existing-or-default
 _config_schema_define boot_animation 'ADDITIONALS[BOOT_ANIMATION]' build boolean \
-  ADDITIONALS array BOOT_ANIMATION ADDITIONALS_BOOT_ANIMATION false true caller-or-existing-or-default
+  ADDITIONALS array BOOT_ANIMATION ADDITIONALS_BOOT_ANIMATION true true caller-or-existing-or-default
 _config_schema_define compatible_sepolicy_patching 'ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]' build boolean \
   ADDITIONALS array MAS_COMPATIBLE_SEPOLICY ADDITIONALS_MAS_COMPATIBLE_SEPOLICY false true caller-or-existing-or-default
 _config_schema_define fdroid_privileged_extension \

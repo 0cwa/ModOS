@@ -7,17 +7,17 @@ default_value="$(env -u ADDITIONALS_BOOT_ANIMATION bash -c '
   source src/declarations.sh
   printf "%s\n" "${ADDITIONALS[BOOT_ANIMATION]}"
 ')"
-[[ "${default_value}" == "false" ]] || {
-  echo "boot animation is not default-off: ${default_value}" >&2
+[[ "${default_value}" == "true" ]] || {
+  echo "boot animation is not default-on: ${default_value}" >&2
   exit 1
 }
 
-enabled_value="$(ADDITIONALS_BOOT_ANIMATION=true bash -c '
+disabled_value="$(ADDITIONALS_BOOT_ANIMATION=false bash -c '
   source src/declarations.sh
   printf "%s\n" "${ADDITIONALS[BOOT_ANIMATION]}"
 ')"
-[[ "${enabled_value}" == "true" ]] || {
-  echo "boot animation environment override was not applied" >&2
+[[ "${disabled_value}" == "false" ]] || {
+  echo "boot animation explicit opt-out was not applied" >&2
   exit 1
 }
 
