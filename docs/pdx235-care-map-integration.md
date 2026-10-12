@@ -10,7 +10,10 @@ existing production source-policy quarantine or turns on the source exception.
 `b38377c6fd8803f8722e834e68076aa181e5d41b`, plus an isolated draft PR.
 The fix to the actual care-map generator/verifier belongs to Worklane 1, the
 Android runtime interpretation to Worklane 2, and binary conformance fixtures
-to Worklane 3. Keep the existing soft-fork boundary: ModOS orchestrates and
+to Worklane 3. As of October 12, 2026, [helper RFC #11](https://github.com/0cwa/my-avbroot-setup/pull/11)
+is **research-only**, and [helper conformance PR #10](https://github.com/0cwa/my-avbroot-setup/pull/10)
+is **test-only**. Neither supplies a production corrected avbroot binary.
+Keep the existing soft-fork boundary: ModOS orchestrates and
 enforces selection/release policy; the helper owns patching; avbroot owns OTA
 parsing, generation and verification. Do not port helper/avbroot internals into
 ModOS or introduce a temporary release workflow.
@@ -69,6 +72,18 @@ is **not** governed by a workflow input, source digest, `FORCE_UPDATE`,
 only by a later explicitly approved and independently reviewed code change
 after the gates below pass.
 
+The independent source-publisher check is now mandatory in the normal
+LineageOS/pdx235 patch path, even when the care-map exception is disabled:
+`source_care_map_require_lineageos_pdx235_publisher` checks the exact current
+OTA ZIP's unique certificate member against its extracted certificate and
+the independently pinned official LineageOS public-key SPKI. This catches
+stale cached certificate reuse and unexpected upstream signers **before**
+the helper receives the OTA. It is only a signer-identity and ZIP-byte
+consistency preflight; cryptographic whole-file signature, signed payload
+and AVB verification in the helper must still succeed. The separate
+`tests/pdx235_source_publisher_test.sh` uses synthetic positive/negative
+archive fixtures, never a fake production publisher key.
+
 The original `_SOURCE_CARE_MAP_PDX235_20261009_SHA256` must stay a literal
 empty readonly assignment. No unreviewed URL, release API, workflow
 parameter, build environment variable, artifact name or downloaded metadata
@@ -79,19 +94,25 @@ exception. If the original source requires a narrowly scoped waiver, review
 the precise meaning and residual first-boot risk in a **separate** security
 change. No catch-all mismatch ignore is acceptable.
 
-Another existing integration boundary needs explicit remediation before
-promotion: `src/util_functions.sh:patch_ota` has a local
-`outputs_ready` fast path that skips helper patching and post-patch root
-checks when the requested artifacts already exist. The publication helpers
-also validate asset names, sidecars and selection identity rather than
-independently re-reading every signed output's care map and AVB chain.
-**File existence or previously generated sidecars must never become
-evidence of successful verification.** Before removing this quarantine,
-invalidate/reject untrusted cached outputs or require fresh strict
-verification of **every** rootless and Magisk ZIP, signing key/certificate,
-care-map semantics and receipts immediately before any publication action.
-A verifier failure in either flavor must invalidate the whole pair and
-must not leave a publishable stale-output marker.
+Existing local-output reuse is also quarantined for pdx235. The historical
+`src/util_functions.sh:patch_ota` `outputs_ready` shortcut can skip
+helper signature verification, care-map verification and Magisk secondary
+postflight on pre-existing files. The ModOS caller now invokes
+`reject_pdx235_preexisting_outputs` **before** that shortcut; existing
+rootless/Magisk ZIPs, sidecars, selection metadata, reports and dangling
+symlinks fail closed. This is intentionally device-scoped to avoid changing
+unrelated historical builds; it is not a new way to verify a reused file.
+
+**Remaining publication boundary:** publication helpers validate asset
+names, sidecars and selection identity, not the complete signed OTA and
+care map again. Before lifting the quarantine, require strict post-sign
+cryptographic and semantic verification of every actual final output
+(including the secondary Magisk output) bound to the **signed output
+manifest**, immediately before any success marker/sidecar/publication.
+Either a verified, non-reusable build operation or a cryptographically
+sound independently re-verifiable reuse mechanism is required. Existing
+release files alone never establish verification success; failure of either
+flavor invalidates the entire pair.
 
 Existing `.github/workflows/build-rom.yml` uses a `local-unpublished`
 output scope for `release-type=build-only`, and release steps are conditioned
@@ -109,7 +130,15 @@ workflow. Current PR CI runs tests only.
 
 The safe generator/verifier contract for the exact **authenticated** source
 must satisfy the following, independently for the source, rootless output
-and Magisk output:
+and Magisk output. Worklane 1 has now provided a conservative proposed
+proof: let `S_p` be the publisher-authenticated source's sparse care-map
+blocks for partition `p`, and `D_p` the protected 4,096-byte filesystem
+blocks changed from verified source to final image; require
+**`D_p ⊆ S_p`** for every required partition. Preserve `S_p` exactly
+and refuse changed out-of-range protected blocks, changed data extents,
+unsupported filesystem/property extraction and any untrusted proof hash.
+This is a *necessary proposed acceptance method*, not an implemented
+verifier or evidence from a real signed output:
 
 1. Parse `care_map.pb` strictly as a single nonempty, correctly framed
    protobuf in the expected ZIP member. Reject zero/multiple/empty,
@@ -161,6 +190,28 @@ fingerprints and ranges, verifier invocation/result, output AVB key
 identity and output OTA cert identity. Worklane 3 owns the binary/protobuf
 negative conformance suite; these ModOS tests freeze the calling boundary
 and quarantine, not the actual verifier implementation.
+
+**New test witness and candidate interface (not integrated):**
+[helper PR #10](https://github.com/0cwa/my-avbroot-setup/pull/10)
+reproduced the 1,086-byte publisher-signed original `care_map.pb` with
+SHA-256 `e903a2c0e4a71aaadf757d7d479a6be2ca80939a084c1832796db61c75e6e147`.
+Its independent `modos-care-map-conformance-v1` candidate adapter consumes
+one JSON request per call, and must not infer final fingerprints from AVB
+descriptors. The baseline no-adapter fixture test **skips**, so a green
+test-only helper CI is **not** evidence of a production corrected generator.
+A later isolated, approved integration must run with
+`CARE_MAP_CONFORMANCE_REQUIRE_CANDIDATE=1` and
+`CARE_MAP_CANDIDATE_CMD` set to the exact reviewed executable/adapter,
+report **zero skips**, and then verify actual signed source/final images.
+No CI entry point in this draft pretends to supply that candidate.
+
+**Known hard blocker:** stock avbroot 3.34.1 `ota verify` still requires
+its AVB-descriptor-derived fingerprints and contiguous ranges. Thus even
+a properly preserved sparse source map cannot satisfy its old strict
+expected-map equality. A separately reviewed provenance-aware **strict
+expected-map verifier** (or equivalently independently verified and
+cryptographically bound boundary) is required. Never replace it with a
+blanket `--allow-source-care-map-mismatch` pass.
 
 ## Future **build-only** acceptance procedure — NOT RUN OR AUTHORIZED
 
