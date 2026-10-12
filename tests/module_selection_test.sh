@@ -528,6 +528,37 @@ test_pdx235_secondary_verification_failure_blocks_sidecars() (
     fail "sidecar generated after secondary verification failure"
 )
 
+# Exercise an actual Python child: its temporary directory must live below
+# WORKDIR and the caller's temporary-directory preference must remain intact.
+test_helper_uses_build_filesystem_scratch() (
+  reset_fixture 'helper scratch environment'
+  local caller_tmpdir="${TEST_ROOT}/caller-tmp"
+  mkdir -p "${caller_tmpdir}"
+  export TMPDIR="${caller_tmpdir}"
+  cat > "${WORKDIR}/tools/my-avbroot-setup/patch.py" <<'PYTHON'
+import json, os, pathlib, stat, sys, tempfile
+output = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+scratch = pathlib.Path(os.environ['TMPDIR'])
+with tempfile.TemporaryDirectory() as child:
+    receipt = {'scratch': str(scratch), 'child': child,
+               'mode': stat.S_IMODE(scratch.stat().st_mode)}
+output.with_suffix('.scratch.json').write_text(json.dumps(receipt))
+PYTHON
+  python() { command python3 "$@"; }
+  patch_ota >/dev/null
+  [[ "${TMPDIR}" == "${caller_tmpdir}" ]] || fail 'Helper changed caller TMPDIR'
+  python3 - "${WORKDIR}" "${OUTPUTS[PATCHED_OTA]%.*}.scratch.json" <<'PYTHON'
+import json, pathlib, sys
+workdir = pathlib.Path(sys.argv[1]).resolve()
+receipt = json.loads(pathlib.Path(sys.argv[2]).read_text())
+scratch = pathlib.Path(receipt['scratch'])
+assert scratch.is_absolute() and scratch.parent == workdir
+assert pathlib.Path(receipt['child']).parent == scratch
+assert receipt['mode'] == 0o700
+assert not scratch.exists(), 'Empty helper scratch parent was retained'
+PYTHON
+)
+
 test_microg_and_fdroid_locked_modes_conflict() {
   reset_fixture microg-fdroid-conflict
   enable_microg_fixture
@@ -753,6 +784,7 @@ test_care_map_compatibility_scope
 test_pdx235_publisher_preflight
 test_pdx235_existing_output_prevents_patch_skip
 test_pdx235_secondary_verification_failure_blocks_sidecars
+test_helper_uses_build_filesystem_scratch
 test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments
 test_fdroid_missing_or_untracked_inputs_fail_closed

@@ -825,19 +825,26 @@ function patch_ota() {
         ;;
     esac
 
-    # Python command to run the patch script
+    # Keep large helper images on the build filesystem rather than a small
+    # host /tmp tmpfs. Only the child inherits this private scratch location.
+    local -a helper_command=(python "${my_avbroot_setup}/patch.py")
     if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
       local repository_root build_parent
       repository_root="$(git rev-parse --show-toplevel)" || return 1
       build_parent="$(mktemp -d "${WORKDIR}/care-map-source-build.XXXXXX")" || return 1
-      python "${my_avbroot_setup}/tools/care-map/build_and_run.py" \
+      helper_command=(python "${my_avbroot_setup}/tools/care-map/build_and_run.py" \
         --modos-repo "${repository_root}" \
         --bootstrap-workdir "$(realpath -- "${WORKDIR}")" \
         --build-workdir "$(realpath -- "${build_parent}")/build" \
-        -- "${args[@]}" || return 1
-    else
-      python "${my_avbroot_setup}/patch.py" "${args[@]}" || return 1
+        --)
     fi
+    local helper_scratch helper_status=0
+    helper_scratch="$(mktemp -d "$(realpath -- "${WORKDIR}")/helper-scratch.XXXXXX")" || return 1
+    TMPDIR="${helper_scratch}" "${helper_command[@]}" "${args[@]}" || helper_status=$?
+    # Python owns cleanup of its nested temporary directories. Remove only an
+    # empty parent; preserve debugging contents for the normal WORKDIR lifecycle.
+    rmdir -- "${helper_scratch}" 2>/dev/null || :
+    [[ "${helper_status}" -eq 0 ]] || return "${helper_status}"
 
     # A Magisk label is publication metadata, not proof of a working runtime
     # root environment. Static CI can verify the Magisk boot patch and paired
