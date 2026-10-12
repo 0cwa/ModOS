@@ -70,6 +70,7 @@ test_section_semantics() (
     'ROOT = false' \
     'ROOT_MODE = "both"' \
     "'ADDITIONALS[MICROG]' = true" \
+    "'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true" \
     "'ADDITIONALS[AFSR]' = false" \
     "'ADDITIONALS[BOOT_ANIMATION]' = false" \
     'MAGISK_PREINIT = "sda10"' \
@@ -88,6 +89,7 @@ test_section_semantics() (
     assert_equals false "${ADDITIONALS[ROOT]}" "build root"
     assert_equals both "${ROOT_MODE}" "build root mode"
     assert_equals true "${ADDITIONALS[MICROG]}" "build microG"
+    assert_equals true "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" "build updater removal"
     assert_equals false "${ADDITIONALS[AFSR]}" "build AFSR"
     assert_equals false "${ADDITIONALS[BOOT_ANIMATION]}" "build custom animation opt-out"
     assert_equals true "${FORCE_UPDATE}" "build force update"

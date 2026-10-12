@@ -193,6 +193,7 @@ function module_selection_fingerprint() {
     "microg:MICROG"
     "msd:MSD"
     "oemunlockonboot:OEMUNLOCKONBOOT"
+    "disable-system-updater:DISABLE_SYSTEM_UPDATER"
   )
 
   resolve_rom_profile || return 1
@@ -278,6 +279,7 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_MICROG="${ADDITIONALS[MICROG]}"
   SELECTION_MODULE_MSD="${ADDITIONALS[MSD]}"
   SELECTION_MODULE_OEMUNLOCKONBOOT="${ADDITIONALS[OEMUNLOCKONBOOT]}"
+  SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
 
