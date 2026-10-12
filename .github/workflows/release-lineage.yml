@@ -52,6 +52,14 @@ on:
         required: false
         type: boolean
         default: true
+      signing-mode:
+        description: Build-only signing identity; repository preserves existing device keys
+        required: false
+        type: choice
+        default: disposable
+        options:
+          - disposable
+          - repository
       release-type:
         description: Release behavior
         required: true
@@ -145,13 +153,30 @@ jobs:
       microg: ${{ inputs.microg }}
       disable-system-updater: ${{ inputs.disable-system-updater }}
       boot-animation: ${{ inputs.boot-animation }}
+      signing-mode: ${{ inputs.signing-mode }}
       release-type: ${{ inputs.release-type }}
       publish: ${{ inputs.release-type != 'build-only' }}
     secrets: inherit
 
   manual_build_only:
-    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only'
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode != 'repository'
     permissions:
       contents: read
     uses: ./.github/workflows/build-rom.yml
     with: *lineage-build-inputs
+
+  manual_device_candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode == 'repository'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with: *lineage-build-inputs
+    # Preserve the installed signing identity without forwarding release/API
+    # credentials. This prepares signing only; acquisition/postflight and the
+    # publication quarantine remain unchanged.
+    secrets:
+      AVB_KEY: ${{ secrets.AVB_KEY }}
+      CERT_OTA: ${{ secrets.CERT_OTA }}
+      OTA_KEY: ${{ secrets.OTA_KEY }}
+      PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
+      PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}

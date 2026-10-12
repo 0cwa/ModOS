@@ -72,6 +72,11 @@ on:
       release-type:
         required: true
         type: string
+      signing-mode:
+        description: Build-only signer (disposable or repository); publication uses repository keys
+        required: false
+        type: string
+        default: disposable
       publish:
         required: true
         type: boolean
@@ -134,7 +139,12 @@ jobs:
           ADDITIONALS_ROOT: ${{ inputs.root }}
           MAGISK_PREINIT_REQUEST: ${{ inputs.magisk-preinit-device }}
           ROOT_MODE_INPUT: ${{ inputs.root-mode }}
+          SIGNING_MODE: ${{ inputs.signing-mode }}
         run: |
+          case "${SIGNING_MODE}" in
+            disposable|repository) ;;
+            *) echo "::error::signing-mode must be disposable or repository"; exit 1 ;;
+          esac
           root_mode="${ROOT_MODE_INPUT}"
           if [[ -z "${root_mode}" ]]; then
             if [[ "${ADDITIONALS_ROOT}" == "true" ]]; then
@@ -187,7 +197,7 @@ jobs:
           python-version: "3.12.11"
 
       - name: Setup signing environment
-        if: inputs.publish && inputs.release-type != 'build-only'
+        if: (inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository'
         shell: bash
         env:
           AVB_KEY: ${{ secrets.AVB_KEY }}
@@ -195,7 +205,7 @@ jobs:
           OTA_KEY: ${{ secrets.OTA_KEY }}
         run: |
           [[ -n "${AVB_KEY}" && -n "${CERT_OTA}" && -n "${OTA_KEY}" ]] || {
-            echo "::error::Publication requires configured signing material"
+            echo "::error::Repository signing requires configured signing material"
             exit 1
           }
           delimiter="$(openssl rand -hex 16)"
@@ -212,7 +222,7 @@ jobs:
           } >> "${GITHUB_ENV}"
 
       - name: Generate disposable build-only signing keys
-        if: '!inputs.publish || inputs.release-type == ''build-only'''
+        if: (!inputs.publish || inputs.release-type == 'build-only') && inputs.signing-mode != 'repository'
         shell: bash
         run: bash src/ci/setup_test_signing.sh
 
@@ -224,8 +234,8 @@ jobs:
           ADDITIONALS_ROOT: ${{ inputs.root }}
           CLEANUP: true
           MAGISK_PREINIT: ${{ inputs.magisk-preinit-device }}
-          PASSPHRASE_AVB: ${{ inputs.publish && inputs.release-type != 'build-only' && secrets.PASSPHRASE_AVB || '' }}
-          PASSPHRASE_OTA: ${{ inputs.publish && inputs.release-type != 'build-only' && secrets.PASSPHRASE_OTA || '' }}
+          PASSPHRASE_AVB: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_AVB || '' }}
+          PASSPHRASE_OTA: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_OTA || '' }}
         run: |
           source src/main.sh
           {
@@ -442,5 +452,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # The common pipeline uses disposable keys and skips every publisher.
+    # The common pipeline defaults to disposable keys. An explicit device
+    # candidate may retain repository signing identity; every publisher skips.
     steps: *rom-build-steps

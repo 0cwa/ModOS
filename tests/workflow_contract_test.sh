@@ -259,6 +259,70 @@ test_build_only_permissions() {
   done
 }
 
+# Evaluate the actual workflow routing/credential expressions across signing
+# modes; keep ordinary build-only on disposable keys and candidate API tokens off.
+test_device_candidate_signing_routes() {
+  python3 - <<'PYTEST'
+from pathlib import Path
+import re
+
+build = Path(".github/workflows/build-rom.yml").read_text()
+lineage = Path(".github/workflows/release-lineage.yml").read_text()
+
+def block(text, name, indent):
+    match = re.search(r"^" + " " * indent + re.escape(name) + r":\n(.*?)(?=^" +
+                      " " * indent + r"[A-Za-z0-9_-]+:|\Z)", text, re.M | re.S)
+    assert match, name
+    return match.group(1)
+
+def condition(text):
+    return re.search(r"^\s+if: (.+)$", text, re.M).group(1)
+
+def step_condition(name):
+    section = build.split("      - name: " + name + "\n", 1)[1]
+    return condition(section.split("      - name:", 1)[0])
+
+def value(expression, inputs, secrets=None):
+    expression = expression.removeprefix("${{ ").removesuffix(" }}")
+    expression = re.sub(r"inputs\.([a-z-]+)", lambda m: repr(inputs[m[1]]), expression)
+    expression = re.sub(r"secrets\.([A-Z_]+)", lambda m: repr((secrets or {})[m[1]]), expression)
+    expression = expression.replace("github.event_name", repr("workflow_dispatch"))
+    expression = expression.replace("&&", " and ").replace("||", " or ")
+    expression = re.sub(r"!(?!=)", " not ", expression)
+    return eval(expression.strip(), {"__builtins__": {}}, {})
+
+def binding(name):
+    return re.search(r"^\s+" + name + r": (\$\{\{.*?\}\})$", build, re.M)[1]
+
+routes = {name: block(lineage, name, 2) for name in
+          ("manual_build", "manual_build_only", "manual_device_candidate")}
+signer = step_condition("Setup signing environment")
+disposable = step_condition("Generate disposable build-only signing keys")
+assert "default: disposable" in block(block(lineage, "workflow_dispatch", 2), "signing-mode", 6)
+assert "secrets:" not in routes["manual_build_only"]
+candidate_bindings = re.findall(r"^      ([A-Z_]+):", routes["manual_device_candidate"], re.M)
+assert set(candidate_bindings) == {"AVB_KEY", "CERT_OTA", "OTA_KEY", "PASSPHRASE_AVB", "PASSPHRASE_OTA"}
+assert "contents: read" in routes["manual_device_candidate"]
+assert "persist-credentials: ${{ inputs.publish" in build
+for release_type in ("default", "build-only"):
+    for mode in ("disposable", "repository"):
+        inputs = {"release-type": release_type, "signing-mode": mode,
+                  "publish": release_type != "build-only"}
+        selected = [name for name, section in routes.items() if value(condition(section), inputs)]
+        expected = "manual_build" if inputs["publish"] else (
+            "manual_device_candidate" if mode == "repository" else "manual_build_only")
+        assert selected == [expected], (inputs, selected)
+        repository_signer = inputs["publish"] or mode == "repository"
+        assert bool(value(signer, inputs)) == repository_signer
+        assert bool(value(disposable, inputs)) != repository_signer
+        assert value(binding("GH_TOKEN"), inputs, {"GH_TOKEN": "api-token"}) == (
+            "api-token" if inputs["publish"] else "")
+        for name in ("PASSPHRASE_AVB", "PASSPHRASE_OTA"):
+            assert value(binding(name), inputs, {name: "signing-passphrase"}) == (
+                "signing-passphrase" if repository_signer else "")
+PYTEST
+}
+
 test_release_triggers() {
   local lineage="${WORKFLOW_DIR}/release-lineage.yml"
 
@@ -438,6 +502,7 @@ test_no_lineage_checkout_anywhere() {
 test_reusable_workflow
 test_build_only_signing
 test_build_only_permissions
+test_device_candidate_signing_routes
 test_release_triggers
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding
