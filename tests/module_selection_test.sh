@@ -472,6 +472,50 @@ test_pdx235_publisher_preflight() {
     fail "source publisher guard changed a non-pdx235 path"
 }
 
+# A local ZIP/sidecar must not make pdx235 patch_ota return success without
+# authenticating the current source and freshly verifying the signed output.
+test_pdx235_existing_output_prevents_patch_skip() {
+  reset_fixture lineage-stale-primary
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  touch -- "${OUTPUTS[PATCHED_OTA]}"
+  assert_patch_fails_before_execution "pdx235 stale primary OTA cannot skip patch"
+
+  reset_fixture lineage-stale-secondary
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  ROOT_MODE=both
+  MAGISK[PREINIT]=sda47
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  touch -- "${OUTPUTS[PATCHED_OTA_MAGISK]}.csig"
+  assert_patch_fails_before_execution "pdx235 stale secondary signature cannot skip patch"
+}
+
+# Even when the helper patch invocation returned successfully, a failed
+# secondary root/AVB postflight must terminate before generating any sidecar.
+test_pdx235_secondary_verification_failure_blocks_sidecars() (
+  reset_fixture lineage-secondary-verification-failure
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  ROOT_MODE=both
+  MAGISK[PREINIT]=sda47
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  verify_requested_root_outputs() {
+    return 1
+  }
+  generate_custota_variant_sidecars() {
+    touch -- "${WORKDIR}/unexpected-publishable-sidecar"
+    return 0
+  }
+  if patch_ota >/dev/null 2>&1; then
+    fail "failed secondary root verifier allowed paired patch completion"
+  fi
+  [[ "${#CAPTURED_ARGS[@]}" -ne 0 ]] ||
+    fail "secondary verification failure test did not reach helper boundary"
+  [[ ! -e "${WORKDIR}/unexpected-publishable-sidecar" ]] ||
+    fail "sidecar generated after secondary verification failure"
+)
+
 test_microg_and_fdroid_locked_modes_conflict() {
   reset_fixture microg-fdroid-conflict
   enable_microg_fixture
@@ -694,6 +738,8 @@ test_microg_locked_preparation_and_arguments
 test_lineage_both_modes_clear_vbmeta_flags
 test_care_map_compatibility_scope
 test_pdx235_publisher_preflight
+test_pdx235_existing_output_prevents_patch_skip
+test_pdx235_secondary_verification_failure_blocks_sidecars
 test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments
 test_fdroid_missing_or_untracked_inputs_fail_closed
