@@ -44,6 +44,18 @@ verify_checked_in_locked_input() {
   [[ "${LOCKED_INPUTS_VALID}" == "true" ]]
 }
 
+# This suite verifies orchestration/argv ordering without a full signed OTA.
+# Actual independent publisher/SPKI/ZIP-byte checks run in the separate
+# pdx235_source_publisher_test.sh and production policy.
+declare -a PUBLISHER_CHECKS=()
+PUBLISHER_CHECK_FAILURE=false
+source_care_map_require_lineageos_pdx235_publisher() {
+  if [[ "$1" == 'lineageos' && "$2" == 'pdx235' ]]; then
+    PUBLISHER_CHECKS+=("$1|$2|$3|$4")
+    [[ "${PUBLISHER_CHECK_FAILURE}" != 'true' ]]
+  fi
+}
+
 deactivate() {
   :
 }
@@ -195,6 +207,8 @@ reset_fixture() {
 
   CAPTURED_ARGS=()
   PREPARE_STAGES=()
+  PUBLISHER_CHECKS=()
+  PUBLISHER_CHECK_FAILURE=false
 }
 
 set_default_expected_args() {
@@ -432,6 +446,32 @@ test_care_map_compatibility_scope() {
   assert_not_contains "--allow-source-care-map-mismatch" "GrapheneOS must retain strict verification"
 }
 
+test_pdx235_publisher_preflight() {
+  reset_fixture lineage-publisher-required
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  run_patch
+  [[ "${#PUBLISHER_CHECKS[@]}" -eq 1 ]] ||
+    fail "pdx235 did not independently preflight the source publisher once"
+  [[ "${PUBLISHER_CHECKS[0]}" == "lineageos|pdx235|${WORKDIR}/fixture-ota.zip|${WORKDIR}/extracted/ota/META-INF/com/android/otacert" ]] ||
+    fail "pdx235 preflight received wrong source ZIP or extracted certificate"
+
+  reset_fixture lineage-publisher-rejected
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  PUBLISHER_CHECK_FAILURE=true
+  assert_patch_fails_before_execution "untrusted LineageOS publisher certificate"
+  [[ "${#PUBLISHER_CHECKS[@]}" -eq 1 ]] ||
+    fail "untrusted-publisher case never invoked the independent gate"
+
+  reset_fixture other-lineage-publisher-not-forced
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=other_device
+  run_patch
+  [[ "${#PUBLISHER_CHECKS[@]}" -eq 0 ]] ||
+    fail "source publisher guard changed a non-pdx235 path"
+}
+
 test_microg_and_fdroid_locked_modes_conflict() {
   reset_fixture microg-fdroid-conflict
   enable_microg_fixture
@@ -653,6 +693,7 @@ test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
 test_lineage_both_modes_clear_vbmeta_flags
 test_care_map_compatibility_scope
+test_pdx235_publisher_preflight
 test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments
 test_fdroid_missing_or_untracked_inputs_fail_closed
