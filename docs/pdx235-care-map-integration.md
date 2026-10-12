@@ -14,10 +14,23 @@ The source is Android 16 despite the deliberately overridden Sony Android 15
 fingerprint string. Original signed-image evidence covers `odm`, `product`,
 `system`, `system_ext`, `vendor`, and `vendor_dlkm`.
 
-The research candidate and independent synthetic conformance suites agree.
-No corrected production strict verifier, final signed-output proof, or
-physical pdx235 acceptance has been established. A green synthetic test
-cannot substitute for those results.
+The strict development verifier and helper postflight are implemented. Real
+microG-off and microG-on rootless/Magisk pairs passed with disposable local keys;
+all six images were freshly bound to each verified payload and their actual
+filesystem properties checked. This closes the earlier local artifact-proof gap.
+It does not establish the complete enabled-module profile, a repository-signed
+candidate for an existing installation, production dependency promotion, physical
+pdx235 acceptance or publication.
+
+The exact fixture was `lineage-23.2-20261009-nightly-pdx235-signed.zip`,
+1,232,106,897 bytes, SHA-256
+`b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8`.
+The source-engine commit was
+`6107d7e92c35b81cac0d28aec3806b45c8cb1f59`; its source patch/build provenance are
+carried with the helper. The local proof binary SHA-256 was
+`81187e3eb8ed32ea73ce680d757e291df15320a0fc1ab9e5f21c16d9a682c7fe`.
+This measured digest records that experiment; it is not a production executable
+trust pin.
 
 The production source-exception digest remains empty and strict source
 verification remains active. The LineageOS/pdx235 output policy permits only
@@ -31,9 +44,9 @@ current source archive. The helper must then authenticate the whole-file
 OTA signature, payload, partition hashes, and applicable AVB chain.
 A certificate identity match alone is not signature verification.
 
-## Generator and verifier requirements
+## Implemented generator and verifier boundary
 
-Use one reviewed semantic rule for generation and independent verification:
+The source-engine expected-map interface and helper use one semantic rule:
 
 1. Obtain required partitions from the authenticated payload/AVB metadata;
    do not let an incomplete care map define which partitions must be checked.
@@ -45,9 +58,11 @@ Use one reviewed semantic rule for generation and independent verification:
    when their reuse proof holds; new allocations require a supported rule.
 4. Bind extracted image SHA-256 and sizes to the cryptographically verified
    payload manifest. Synthetic caller-supplied hashes are not authentication.
-5. Reject unrelated source-integrity failures. A reviewed expected-map
-   verification boundary must replace the current incompatible AVB-only
-   equality rule; a blanket mismatch waiver is insufficient.
+5. Reject unrelated source-integrity failures. Strict `--expected-care-map`
+   equality replaces only the incompatible AVB-property comparison; all
+   cryptographic checks remain active. Successful `--verification-report`
+   receipts include verified image hashes/sizes, protected extents and AVB flags.
+   Explicitly expected signing keys cannot be satisfied by unsigned headers.
 
 Avoid duplicating the helper's map parser or verifier in ModOS. The consumer
 passes reviewed inputs through its typed configuration and existing helper
@@ -57,18 +72,42 @@ consistently so cached assets cannot conceal changed semantics.
 
 ## Nonpublishing output acceptance
 
-Prepare a clean fixture runner that can use the exact authenticated October 9
-source; the normal provider selects the latest nightly and does not establish
-that fixture identity. Use read-only GitHub credentials and test signing
-material. The existing reusable release job still has write-scoped
-`GITHUB_TOKEN` permissions and production signing inputs, even when its
-separate `GH_TOKEN` is withheld for build-only. Correct that runner boundary
-before using it for this acceptance.
+The exact authenticated fixture was tested locally with microG off, then on,
+using rootless/Magisk pairs, Magisk v30.7 and preinit device `sda47`. Each output
+passed configured OTA/AVB signer verification, payload/partition checks, safe
+runtime maps and fresh filesystem-property proof. A real wrong-signer secondary
+failed before sidecar/report callbacks. Local evidence includes the paired
+`acceptance.json` receipts and independent product/secondary-failure records.
 
-Start with microG off to isolate the care-map fix, then exercise microG on.
-Use LineageOS/pdx235, `local-unpublished`, no publishing, and rootless/Magisk
-outputs with the configured preinit device. Do not upload OTA images to
-release assets, Custota channels, or public CI artifacts during this stage.
+| Disposable-key output | SHA-256 |
+| --- | --- |
+| microG off, rootless | `50d58cef94b429699572075769d6d2c9042a06b85a10a73a0df61a3c33e11d07` |
+| microG off, Magisk | `e50e2947e2711b3f62046b9783362be58e2a7f5b7ffe413e18e8e67e57cdc3f9` |
+| microG on, rootless | `f42cb6c36e4b6bc8c107850f5875c2d5c338ed8b792f63d1b5a62c6ab1e4fdd6` |
+| microG on, Magisk | `c9942edfe6cf7587da3a26b29d4f150377f7f5a7b84eddb138243827f05d9e46` |
+
+Independent product inspection found 24,419 changed protected blocks outside
+source care ranges; deterministic final coverage accepted them safely. The
+original WebView was unchanged, installed locked APK bytes matched, and XML
+scope and modes/labels were checked. Final dynamic-image sizes fit the
+unchanged authenticated group budget. Initial Code 28 failures came from an
+8.8 GiB host `/tmp` tmpfs; workspace scratch and per-stage cleanup resolved them
+without a new partition-growth policy.
+
+Build-only jobs now request `contents: read` and ordinary runs use disposable
+keys without inheriting production signing secrets. The separately selected
+repository-signer candidate forwards only signing material; publishers remain
+skipped and quarantine remains active. A source-build development profile and
+an optional authenticated encrypted private handoff are prepared. Ordinary
+production executable pins remain unchanged. Complete enabled-module profile
+validation and the actual development/workflow/installed-signer run remain
+underway, rather than established by the smaller local pairs.
+
+Keep plaintext OTAs local; do not upload them to release assets, Custota channels
+or public CI artifacts. The explicit encrypted private handoff has its own
+recipient/request gate and is device-acceptance transport. The normal provider
+selects the latest nightly, so any later run must record its actual authenticated
+source identity rather than claim this fixture's evidence automatically.
 
 For each final signed output, including secondary Magisk:
 
@@ -110,8 +149,8 @@ not establish bootloader enforcement, trusted on-device keys, or first-boot
 block verification; the source's public AVB test keys are not a publisher
 identity. Check actual AVB/verity state and recovery behavior on-device.
 
-After semantic implementation, signed-output verification and applicable
-device acceptance are reviewed, promote the helper dependency before the
+After complete-profile, installed-signer output and applicable device acceptance
+are reviewed, promote the helper dependency before the
 ModOS microG consumer. Remove the temporary quarantine explicitly in a
 reviewed release change; keep microG scheduled builds off until its device
 acceptance is complete. Resolve #114 using that evidence, not test counts.

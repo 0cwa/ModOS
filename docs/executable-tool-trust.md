@@ -180,6 +180,24 @@ descriptor. Run acquisition through `check_and_download_dependencies`; do not ca
 for these three executable tools. Real OTA integration remains subject to
 the other documented host-code supply-chain gates.
 
+## Current integration evidence
+
+The earlier helper PATH execution gap is closed in the goal integration:
+direct ModOS and helper calls use the exact authenticated runner prefix and
+post-seal-verified descriptor execution described above. Ordinary build-only
+jobs now use read-only repository permissions and disposable signing material;
+the separately selected repository-signer device candidate forwards only its
+signing inputs, with publishing still disabled.
+
+The strict care-map source engine at
+`6107d7e92c35b81cac0d28aec3806b45c8cb1f59` and helper passed actual October 9
+source verification and disposable-key rootless/Magisk output pairs with microG
+off and on. Those local proofs establish artifact semantics, not the complete
+enabled-module profile, installed-signer/device acceptance or production lock
+promotion. [Acceptance](pdx235-care-map-integration.md) records fixture and output
+digests and the remaining evidence. Full profile and development-workflow
+validation remain underway.
+
 ## Explicit source-build development profile
 
 The manual LineageOS workflow may select `development-profile=care-map-pdx235`
@@ -191,12 +209,19 @@ candidate helper contract at
 metadata rejects activation. Production helper and executable pins remain
 unchanged; ordinary build-only signing remains disposable.
 
-The candidate helper's `tools/care-map/build_and_run.py` builds the reviewed
-source patch from its fixed manifest, then supplies its own sealed tool runner
-to the helper with `--runtime-care-map`. This is repository-reviewed development
-source provenance, not a chenxiaolong-signed executable release. afsr and Custota
-continue through the official executable lock. The pdx235 publication quarantine remains unchanged. Plaintext outputs stay
-local. A separate, default-off `export-device-candidate` request permits opaque,
+The prepared candidate helper's `tools/care-map/build_and_run.py` reads tracked,
+clean source inputs from the captured helper commit, verifies its fixed patch
+and Cargo.lock hashes, obtains a fresh exact upstream checkout and builds with
+`cargo build --release --locked`. Signing secrets and GitHub credentials are
+excluded from compiler processes. The parent retains the newly compiled binary
+digest/size in memory and supplies its own sealed runner to the helper with
+`--runtime-care-map`; a saved receipt never authorizes execution. ModOS's
+existing `open_sealed_executable` binds each execution to those measured bytes.
+This development path assumes a trusted compiler/host/dependency cache and is
+repository-reviewed source authorization, not a chenxiaolong-signed executable
+release. Historical measured binary digests are evidence, not mutable replacement
+trust pins. afsr and Custota continue through the official executable lock. The pdx235 publication quarantine
+remains unchanged. Plaintext outputs stay local. A separate, default-off `export-device-candidate` request permits opaque,
 authenticated encryption for private device acceptance only with this profile,
 `signing-mode=repository`, `release-type=build-only`, and no publication. The
 public recipient certificate is validated before signing. The sole artifact
