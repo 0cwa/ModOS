@@ -68,7 +68,7 @@ def main():
     record('kernel-logs', 'dmesg')
     if args.microg_state:
         record('microg-services-package', 'dumpsys package com.google.android.gms')
-        record('microg-companion-package', 'dumpsys package com.google.android.gsf')
+        record('microg-companion-package', 'dumpsys package com.android.vending')
     if args.root_state:
         record('shell-identity', 'id')
         record('magisk-manager-package', 'dumpsys package com.topjohnwu.magisk')
