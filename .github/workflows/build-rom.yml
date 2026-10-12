@@ -4,8 +4,9 @@ on:
   workflow_call:
     inputs:
       rom-family:
-        required: true
+        required: false
         type: string
+        default: grapheneos
       device-id:
         required: true
         type: string
@@ -93,8 +94,9 @@ on:
         type: string
         default: disposable
       publish:
-        required: true
+        required: false
         type: boolean
+        default: false
     secrets:
       AVB_KEY:
         required: false

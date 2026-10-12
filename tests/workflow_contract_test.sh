@@ -263,6 +263,15 @@ test_build_only_permissions() {
       END { exit !(readonly && !forbidden) }
     ' "${workflow}" || fail "Build-only credential boundary failed: ${workflow}"
   done
+  # A read-only multi-device caller must reach the shared builder directly;
+  # the dispatch/publishing wrapper also contains write-scoped jobs.
+  local multi_route
+  multi_route="$(awk '/^  build_only:$/ { active=1; next } active { print }' \
+    "${WORKFLOW_DIR}/multi-release.yml")"
+  [[ "${multi_route}" == *'uses: ./.github/workflows/build-rom.yml'* ]] || \
+    fail 'Multi-device build-only route must call the shared builder directly'
+  assert_dispatch_default "${REUSABLE}" rom-family grapheneos
+  assert_dispatch_default "${REUSABLE}" publish false
 }
 
 # Evaluate the actual workflow routing/credential expressions across signing

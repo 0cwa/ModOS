@@ -185,5 +185,7 @@ jobs:
       contents: read
     needs: matrix
     strategy: *device-strategy
-    uses: ./.github/workflows/release.yml
+    # Skip the publishing wrapper and its write-permission preflight branch.
+    # The shared builder defaults to GrapheneOS with publishing disabled.
+    uses: ./.github/workflows/build-rom.yml
     with: *multi-build-inputs
