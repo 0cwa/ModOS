@@ -22,3 +22,59 @@ enforce_pdx235_care_map_quarantine() {
     return 1
   fi
 }
+
+# Worklane 4: exact-output freshness gate. The historical ModOS patch path
+# treats local ZIP existence as a success shortcut, bypassing strict verification
+# of signatures, output care maps and the secondary Magisk image. Refuse that
+# shortcut for pdx235 until post-sign cryptographic+semantic re-verification
+# can be proved. No automatic deletion/reuse of previously signed outputs.
+#
+# Arguments: ROM family, device, resolved root mode, primary OTA, secondary OTA.
+reject_pdx235_preexisting_outputs() {
+  if [[ "$#" -ne 5 ]]; then
+    echo "Error: pdx235 output-freshness gate requires five arguments." >&2
+    return 1
+  fi
+  local family="$1" device="$2" mode="$3" primary="$4" secondary="$5"
+  [[ "${family}" == 'lineageos' && "${device}" == 'pdx235' ]] || return 0
+  [[ -n "${primary}" ]] || {
+    echo "Error: pdx235 primary output path is missing." >&2
+    return 1
+  }
+
+  local -a output_paths=("${primary}")
+  case "${mode}" in
+    rootless|magisk)
+      [[ -z "${secondary}" ]] || {
+        echo "Error: unexpected pdx235 secondary output path." >&2
+        return 1
+      }
+      ;;
+    both)
+      [[ -n "${secondary}" && "${secondary}" != "${primary}" ]] || {
+        echo "Error: pdx235 paired output paths are missing or identical." >&2
+        return 1
+      }
+      output_paths+=("${secondary}")
+      ;;
+    *)
+      echo "Error: unknown pdx235 root mode: ${mode}" >&2
+      return 1
+      ;;
+  esac
+
+  local output candidate
+  for output in "${output_paths[@]}"; do
+    for candidate in \
+      "${output}" \
+      "${output}.csig" \
+      "${output}.selection.json" \
+      "${output}.patch-report.json" \
+      "${output}.microg-patch-report.json"; do
+      if [[ -e "${candidate}" || -L "${candidate}" ]]; then
+        echo "Error: refusing to reuse existing pdx235 OTA output/evidence: ${candidate}" >&2
+        return 1
+      fi
+    done
+  done
+}
