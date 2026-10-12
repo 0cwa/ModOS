@@ -137,6 +137,16 @@ class ModOSCareMapIntegrationContractTests(unittest.TestCase):
         self.assertIn("_SOURCE_CARE_MAP_PDX235_20261009_SHA256", prior)
         self.assertIn("run_executable_tool avbroot --version", prior)
         self.assertIn("source_care_map_exception_allowed", read("src/source_care_map_policy.sh"))
+        self.assertIn("source_care_map_require_lineageos_pdx235_publisher", util)
+        self.assertIn("reject_pdx235_preexisting_outputs", util)
+        self.assertLess(
+            util.index("source_care_map_require_lineageos_pdx235_publisher"),
+            util.index("local outputs_ready=false"),
+        )
+        self.assertLess(
+            util.index("reject_pdx235_preexisting_outputs"),
+            util.index("local outputs_ready=false"),
+        )
 
     def test_no_workflow_pin_input_or_hidden_publication_path(self) -> None:
         workflows = {
