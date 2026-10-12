@@ -192,11 +192,16 @@ signing inputs, with publishing still disabled.
 The strict care-map source engine at
 `6107d7e92c35b81cac0d28aec3806b45c8cb1f59` and helper passed actual October 9
 source verification and disposable-key rootless/Magisk output pairs with microG
-off and on. Those local proofs establish artifact semantics, not the complete
-enabled-module profile, installed-signer/device acceptance or production lock
-promotion. [Acceptance](pdx235-care-map-integration.md) records fixture and output
-digests and the remaining evidence. Full profile and development-workflow
-validation remain underway.
+off and on. The genuine complete enabled-module profile has also passed
+rootless/Magisk postflight, with module archives verified through the pinned SSH signer.
+[The review receipt](evidence/pdx235-20261012.json) records exact complete-profile
+outputs and selected modules. Independent inspection passed for genuine module
+payloads, compatible policy labels, both regular boot variants, updater removal
+and shared images/root distinctions. Retained inert updater caches are recorded
+without adding another gate. These proofs establish artifact semantics, not the
+repository-signed installed-identity candidate, device acceptance or production
+lock promotion. [Acceptance](pdx235-care-map-integration.md) records the remaining
+development-workflow and physical evidence.
 
 ## Explicit source-build development profile
 
@@ -224,9 +229,9 @@ trust pins. afsr and Custota continue through the official executable lock. The 
 remains unchanged. Plaintext outputs stay local. A separate, default-off `export-device-candidate` request permits opaque,
 authenticated encryption for private device acceptance only with this profile,
 `signing-mode=repository`, `release-type=build-only`, and no publication. The
-public recipient certificate is validated before signing. The sole artifact
-upload contains a CMS AES-256-GCM envelope and a nonsecret transport manifest;
-its plaintext archive allowlist consists of final OTA outputs, their selection
+public recipient certificate is validated before signing. The encrypted artifact upload contains per-OTA CMS AES-256-GCM envelopes
+and a nonsecret transport manifest;
+each plaintext archive allowlist consists of its final OTA output, its selection
 metadata, the microG report when enabled, and the designated public AVB key.
 Private signing material and raw working directories are never exported.
 

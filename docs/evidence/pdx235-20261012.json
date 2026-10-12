@@ -1,0 +1,206 @@
+{
+  "schema": "modos-pdx235-review-evidence-v1",
+  "date": "2026-10-12",
+  "scope": "local disposable-key artifact acceptance; not device acceptance or publication authorization",
+  "source": {
+    "filename": "lineage-23.2-20261009-nightly-pdx235-signed.zip",
+    "size": 1232106897,
+    "sha256": "b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8",
+    "independent_publisher_signature": "PASS",
+    "official_api_digest_and_size": "PASS",
+    "all_six_actual_filesystem_identities": "PASS"
+  },
+  "engine": {
+    "implementation_commit": "6107d7e92c35b81cac0d28aec3806b45c8cb1f59",
+    "binary_sha256": "81187e3eb8ed32ea73ce680d757e291df15320a0fc1ab9e5f21c16d9a682c7fe",
+    "authorization": "reviewed source-built development candidate; ordinary vendor executable lock unchanged"
+  },
+  "helper": {
+    "revision": "d9b59f535b4dd75c48d68dc32072777253ed2d03",
+    "module_adapters": "reviewed ModOS boot-animation and updater registration",
+    "recipe_sha256": {
+      "patch.py": "1e70fcf356c6d2904a5cba8fe7405ddfaf7c6f1b5c7344f2f0718e7d084ef34c",
+      "lib/modules/registry.py": "19fb8d5414a7b7c1a2ca155ecd0cac981b1348a009206921afae7b5e799be132",
+      "lib/modules/boot_animation.py": "78990b82b5923618a58511101951d4fca9392c8c20bec48cb2180777d0a8f209",
+      "lib/modules/disable_system_updater.py": "14928159fe74d2e58ce5c1e8a255e1115fa28ec05e38ba81ebdafc0b28ce6fdd"
+    }
+  },
+  "full_profile": {
+    "status": "PASS actual per-output cryptographic/filesystem postflight and independent module-content inspection",
+    "module_ids": [
+      "alterinstaller",
+      "bcr",
+      "custota",
+      "msd",
+      "oemunlockonboot",
+      "boot-animation",
+      "disable-system-updater",
+      "microg"
+    ],
+    "signed_standard_module_versions": {
+      "bcr": "3.9",
+      "custota": "6.5",
+      "msd": "2.4",
+      "oemunlockonboot": "1.4",
+      "alterinstaller": "2.4"
+    },
+    "standard_module_authentication": "actual detached SSH signature verification with pinned chenxiaolong identity",
+    "microg_lock_sha256": "5691d66db1c82465c75af5568d03d09262b6dacb9b931030099664d18bdedb20",
+    "boot_animation_sha256": "cc802180f0958f90deff10a90a9df90c89e4f0648bf2b2ab16bc09a70ea60a30",
+    "compatible_sepolicy": true,
+    "updater_image_root_fix": true,
+    "root_modes": [
+      "rootless",
+      "magisk"
+    ],
+    "magisk_version": "30.7",
+    "magisk_preinit_device": "sda47",
+    "signing_material": "disposable local keys",
+    "expected_avb_public_sha256": "d3e59b3ff93da7ee27c86b6abaf98ad83d0b1b3b337898258943802dfbf3f412",
+    "expected_ota_certificate_file_sha256": "8fa208304555edb5c2817750831da74ff949bed9f212a9fcc0f70ee817c7cb23",
+    "outputs": [
+      {
+        "root_mode": "rootless",
+        "size": 1411480987,
+        "sha256": "38799f3bff234c71c61cee9724bdd988b8b44e0b07928bfca5839bf7304774fc"
+      },
+      {
+        "root_mode": "magisk",
+        "size": 1411831840,
+        "sha256": "cc5a2a0f80b1d387ce2d243b1e7d828c020d8e70acc3ea286e1a8b02c9525a29"
+      }
+    ],
+    "care_map": {
+      "block_bytes": 4096,
+      "fingerprint": "Sony/XQ-DC72/XQ-DC72:15/68.2.A.3.107/068002A003010700521798587:user/release-keys",
+      "same_entries_for_both_outputs": true,
+      "entries": [
+        {
+          "partition": "odm",
+          "property_id": "ro.odm.build.fingerprint",
+          "ranges": "2,0,475",
+          "protected_data_bytes": 1945600,
+          "rootless_image_sha256": "835d14ab0ec0d61e748cb75c3284fe8ca663c3f3945f1086e862a69b6e41d2a7"
+        },
+        {
+          "partition": "product",
+          "property_id": "ro.product.build.fingerprint",
+          "ranges": "2,0,155372",
+          "protected_data_bytes": 636403712,
+          "rootless_image_sha256": "ba9b4e92cad8d6d31d2ddf04e3ee132f747c4c2aa8eaec8bcb93edb65a34570a"
+        },
+        {
+          "partition": "system",
+          "property_id": "ro.system.build.fingerprint",
+          "ranges": "2,0,254340",
+          "protected_data_bytes": 1041776640,
+          "rootless_image_sha256": "5d9d38ea835be81486dfdd20108989324ef2f492ed3e506140fb8203d7d4f9cd"
+        },
+        {
+          "partition": "system_ext",
+          "property_id": "ro.system_ext.build.fingerprint",
+          "ranges": "2,0,109368",
+          "protected_data_bytes": 447971328,
+          "rootless_image_sha256": "b58221e849ec0f8401d32344926280d5ab92494430c57c5b81643dbf83a70bd9"
+        },
+        {
+          "partition": "vendor",
+          "property_id": "ro.vendor.build.fingerprint",
+          "ranges": "2,0,188622",
+          "protected_data_bytes": 772595712,
+          "rootless_image_sha256": "922cc2b41c615d2eb71c1317618d6c3a0c9b495cf78a4e85330f971a53735a6a"
+        },
+        {
+          "partition": "vendor_dlkm",
+          "property_id": "ro.vendor_dlkm.build.fingerprint",
+          "ranges": "2,0,6575",
+          "protected_data_bytes": 26931200,
+          "rootless_image_sha256": "95fc33431bd257adcfc80c39079a49e8c17569d5cde3eb4e81ea6f083b1e4ba1"
+        }
+      ]
+    },
+    "verified_avb_headers": [
+      {
+        "flags": 0,
+        "name": "vbmeta"
+      },
+      {
+        "flags": 0,
+        "name": "vbmeta_system"
+      }
+    ],
+    "dynamic_group_membership_and_quota_preserved": true,
+    "rootless_verified_group_budget": [
+      {
+        "group": "somc_dynamic_partitions",
+        "maximum_size": 6169821184,
+        "final_image_total": 2974183424,
+        "headroom": 3195637760
+      }
+    ],
+    "independent_module_inventory": "PASS; genuine apps/native/init, microG bytes/XML, policy files/labels and both boot variants inspected",
+    "shared_filesystem_and_vendor_boot_bytes": "identical between roots; boot carries expected Magisk distinction",
+    "boot_animation_variants": "both regular ZIP_STORED archives; source member bytes preserved",
+    "compatible_policy": "actual vendor/odm CIL and seapp files with matching mounted labels verified",
+    "updater_removal": {
+      "apk_and_selected_permission_xml_absent": true,
+      "inert_precompiled_files_remaining": [
+        "priv-app/Updater/oat/arm64/Updater.odex",
+        "priv-app/Updater/oat/arm64/Updater.vdex"
+      ],
+      "assessment": "informational retained caches; do not block selected APK/XML removal or introduce a new acceptance gate"
+    }
+  },
+  "earlier_microg_off_and_on_pairs": {
+    "both_root_modes": "PASS",
+    "changed_protected_blocks_outside_source_care": 24419,
+    "interpretation": "new allocations supported by authenticated deterministic final writes; original WebView unchanged"
+  },
+  "negative_proofs": {
+    "wrong_expected_ota_certificate": "rejected without success receipt",
+    "wrong_expected_avb_key": "rejected without success receipt",
+    "mismatched_expected_care_map": "rejected without success receipt",
+    "wrong_signer_secondary": "actual signed secondary rejected; no sidecar/report callbacks",
+    "secondary_test_boundary": "construction copied actual signed OTAs; cryptographic/filesystem checks unmocked; success callbacks were sentinels"
+  },
+  "scratch_capacity": {
+    "initial_failure": "host /tmp 8.8 GiB tmpfs exhausted",
+    "resolution": "workspace TMPDIR and staged cleanup",
+    "partition_growth_required": false
+  },
+  "local_record_references": [
+    {
+      "record": "source-authentication.json",
+      "sha256": "9e1ef78ae92fae203abf4ff53fc1090ebf7ac0592490ade5a3d29333eeb2d95f"
+    },
+    {
+      "record": "independent-negative-proof.json",
+      "sha256": "ee8851e071981c2a8622a6a9b3ab3e30eca30cede10cc7de57e03ae59c54ee17"
+    },
+    {
+      "record": "independent-secondary-negative.json",
+      "sha256": "4c16e7dacf59878dbc798064f07959e6b4df371ed8d1d6732560f8be0e3d4323"
+    },
+    {
+      "record": "independent-product-proof.json",
+      "sha256": "f258b13c5e9ab5fde633088cef84b5e7d7cbee15f6681e0e65e6aea01b6ec3d4"
+    },
+    {
+      "record": "independent-full-profile-proof.json",
+      "sha256": "bd17f366f39fd03356efb28eaaac9d23935cbffc63b77779e131904589550238"
+    },
+    {
+      "record": "acceptance.json",
+      "sha256": "d4af48b5c78982ef1a0718577ff37a388df7793088ea0d057419a8231b09158f"
+    }
+  ],
+  "remaining": {
+    "repository_signed_candidate": "pending explicit workflow run",
+    "physical_first_boot_and_ota_persistence": "pending pdx235 device",
+    "main_dependency_promotion": "pending review",
+    "publication": "quarantined",
+    "microg_scheduled_builds": "off"
+  },
+  "flashed": false,
+  "published": false
+}

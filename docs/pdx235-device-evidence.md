@@ -46,6 +46,15 @@ Physical acceptance still requires the observed rootless/Magisk behavior,
 Magisk setup and `su -c id` after reboot when applicable, microG self-check and
 restricted spoofing, account/push/location checks, and OTA persistence. Follow
 [pdx235 acceptance](pdx235-care-map-integration.md) and record these human/device
-results alongside the private receipt. CI's disposable signing keys are for
-fixture verification; device/OTA-persistence acceptance needs a stable local
-test signer and the corresponding reviewed installation procedure.
+results alongside the private receipt. Disposable-key fixture OTAs establish
+artifact verification and are not upgrade candidates for an existing installation.
+
+The explicit LineageOS workflow now supports `development-profile=care-map-pdx235`,
+`release-type=build-only` and `signing-mode=repository` to retain the configured
+repository signing identity. Optional `export-device-candidate` with a public
+recipient certificate produces an authenticated encrypted private handoff; it
+keeps publication quarantined. The actual repository-signed candidate run and
+physical acceptance remain pending. Confirm that its public AVB key and OTA
+certificate match the installation's required identity, then follow the reviewed
+installation/OTA procedure and collect these observations. The workflow path
+makes stable candidates possible; it does not prove which firmware booted.

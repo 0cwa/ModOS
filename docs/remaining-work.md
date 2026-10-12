@@ -36,8 +36,21 @@ work reacquired the exact October 9 fixture for actual source/output validation:
   partition-growth restriction was needed.
 
 [Acceptance details](pdx235-care-map-integration.md) records the precise boundary.
-These were local artifact tests, not repository-signed device candidates, device
-boots, the complete enabled-module profile, or release publication.
+The complete scheduled-default profile plus custom boot animation, updater
+removal and microG has now also passed cryptographic and filesystem-property
+postflight for rootless and Magisk with compatible SELinux-context handling. Its genuine legacy module archives were authenticated
+through the existing pinned SSH-signature boundary. Actual execution exercised
+the updater image-root normalization and compatible-context fix. Independent
+inspection passed for genuine app/native/init payloads, microG permissions,
+compatible policy files/labels, root distinctions and shared image bytes. Both
+boot variants are regular normalized archives with preserved member contents;
+updater APK and selected XML are absent. Retained inert updater ODEX/VDEX caches
+are informational and do not justify another acceptance gate. The compact
+[review receipt](evidence/pdx235-20261012.json) binds its exact artifacts, maps,
+group budget and selected module IDs.
+
+These were disposable-key local artifact tests, not repository-signed device
+candidates, device boots or release publication.
 
 Integration code now retains main's boot-animation default, merges stock-updater
 selection independently, routes helper tool calls through authenticated sealed
@@ -50,11 +63,10 @@ publication remains quarantined and microG schedules remain off.
 
 | Order | Boundary | Next delivery | Completion evidence |
 | --- | --- | --- | --- |
-| 1 | Complete enabled-module profile | Finish the real default-module plus microG/updater/root-pair run already underway; reconcile any real integration failures. | Both exact final outputs pass helper postflight, selected-module inspection and receipts. The smaller microG off/on pairs already passed. |
-| 2 | Development workflow and installed signer | Validate the explicit source-build profile end to end, then prepare an authorized repository-signed private candidate with the installed signing identity. | Fresh reviewed source build, read-only job, expected configured signers, verified final outputs and optional authenticated encrypted handoff; no plaintext OTA upload or publication. |
-| 3 | pdx235 device | Install through the reviewed device procedure, collect first-boot observations and complete rootless/Magisk and Custota persistence acceptance. | Runtime property agreement, effective verity/snapuserd verification, successful-slot state, Magisk setup and microG self-check/spoofing/account/push/location behavior. Requires the actual device. |
-| 4 | Dependency/main promotion | Review consolidated source, helper compatibility/trust metadata and measured profile/device evidence; promote helper before its ModOS consumers. | Explicit reviewed dependency changes, coherent selection identities and no stale cached outputs. A source-built development artifact is not a vendor-signed executable-lock promotion. |
-| 5 | Release policy | Deliberately lift the pdx235 quarantine and enable any microG publication/schedules only after the applicable acceptance. | Reviewed publication change and real acceptance evidence; #114 closes on those results, not synthetic test counts. |
+| 1 | Development workflow and installed signer | Validate the explicit source-build profile end to end, then prepare an authorized repository-signed private candidate with the installed signing identity. | Fresh reviewed source build, read-only job, expected configured signers, verified final outputs and optional authenticated encrypted handoff; no plaintext OTA upload or publication. |
+| 2 | pdx235 device | Install through the reviewed device procedure, collect first-boot observations and complete rootless/Magisk and Custota persistence acceptance. | Runtime property agreement, effective verity/snapuserd verification, successful-slot state, Magisk setup and microG self-check/spoofing/account/push/location behavior. Requires the actual device. |
+| 3 | Dependency/main promotion | Review consolidated source, helper compatibility/trust metadata and measured profile/device evidence; promote helper before its ModOS consumers. | Explicit reviewed dependency changes, coherent selection identities and no stale cached outputs. A source-built development artifact is not a vendor-signed executable-lock promotion. |
+| 4 | Release policy | Deliberately lift the pdx235 quarantine and enable any microG publication/schedules only after the applicable acceptance. | Reviewed publication change and real acceptance evidence; #114 closes on those results, not synthetic test counts. |
 
 The read-only [device collector](pdx235-device-evidence.md) is prepared. CI cannot
 supply the physical observations or prove the installed signing identity matches
@@ -87,15 +99,16 @@ source-snippet checks as integration prerequisites.
 
 ## Separate follow-ups
 
-- Stock updater removal is integrated as an independent selection; full-profile
-  artifact and applicable device acceptance remain distinct from its unit tests.
+- Stock updater removal is integrated as an independent selection and exercised
+  in the real complete-profile artifact pair; device acceptance remains separate.
 - F-Droid stays default-off pending a reviewed production lock/profile and source
   delivery. Keep it separate from the helper's one locked-bundle-per-call boundary.
 - ROM-neutral naming of the remaining `GRAPHENEOS` configuration array is a
   nonblocking cleanup.
 - Reconcile #113/#115 after integration review to distinguish implemented fixes
   from main promotion and remaining device acceptance. Keep #114 open for its
-  actual profile/installed-signer/device/release blockers.
+  actual installed-signer/device/release blockers.
 
-Four disposable-key OTAs were built and strictly verified locally. No OTA was
-flashed or published, and final acceptance remains incomplete.
+MicroG-off, microG-on and complete-profile disposable-key pairs were built and
+strictly verified locally. No OTA was flashed or published, and final acceptance
+remains incomplete.

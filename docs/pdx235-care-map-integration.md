@@ -18,9 +18,21 @@ The strict development verifier and helper postflight are implemented. Real
 microG-off and microG-on rootless/Magisk pairs passed with disposable local keys;
 all six images were freshly bound to each verified payload and their actual
 filesystem properties checked. This closes the earlier local artifact-proof gap.
-It does not establish the complete enabled-module profile, a repository-signed
-candidate for an existing installation, production dependency promotion, physical
-pdx235 acceptance or publication.
+The complete scheduled-default profile plus custom boot animation, stock-updater
+removal and microG has now also passed cryptographic/filesystem-property
+postflight for both roots with compatible SELinux context handling and the corrected updater image-root adapter. Genuine legacy
+module archives were verified against the pinned SSH signer. Independent detailed
+module inspection passed: genuine module payloads, locked microG/scoped XML,
+policy files/labels and shared filesystem/vendor_boot bytes were checked. Both
+boot variants are regular normalized archives with source member contents
+preserved; Magisk targets boot with `sda47`, while rootless has no Magisk. The
+updater APK and selected permission XML are absent. Retained inert ODEX/VDEX
+caches are informational; their presence adds no acceptance gate. The
+[compact review receipt](evidence/pdx235-20261012.json) records the complete-profile
+artifact digests, maps, budget and selected modules.
+
+This does not establish a repository-signed candidate for an existing installation,
+production dependency promotion, physical pdx235 acceptance or publication.
 
 The exact fixture was `lineage-23.2-20261009-nightly-pdx235-signed.zip`,
 1,232,106,897 bytes, SHA-256
@@ -99,9 +111,10 @@ keys without inheriting production signing secrets. The separately selected
 repository-signer candidate forwards only signing material; publishers remain
 skipped and quarantine remains active. A source-build development profile and
 an optional authenticated encrypted private handoff are prepared. Ordinary
-production executable pins remain unchanged. Complete enabled-module profile
-validation and the actual development/workflow/installed-signer run remain
-underway, rather than established by the smaller local pairs.
+production executable pins remain unchanged. The complete enabled-module profile
+has passed actual disposable-key output postflight. The development workflow and
+repository-signed installed-identity candidate remain to be exercised; local
+artifact proofs do not establish those results.
 
 Keep plaintext OTAs local; do not upload them to release assets, Custota channels
 or public CI artifacts. The explicit encrypted private handoff has its own
@@ -149,8 +162,8 @@ not establish bootloader enforcement, trusted on-device keys, or first-boot
 block verification; the source's public AVB test keys are not a publisher
 identity. Check actual AVB/verity state and recovery behavior on-device.
 
-After complete-profile, installed-signer output and applicable device acceptance
-are reviewed, promote the helper dependency before the
+After the completed artifact evidence, installed-signer output and applicable
+device acceptance are reviewed, promote the helper dependency before the
 ModOS microG consumer. Remove the temporary quarantine explicitly in a
 reviewed release change; keep microG scheduled builds off until its device
 acceptance is complete. Resolve #114 using that evidence, not test counts.
