@@ -72,6 +72,11 @@ on:
       release-type:
         required: true
         type: string
+      development-profile:
+        description: Explicit source-build development profile (none or care-map-pdx235)
+        required: false
+        type: string
+        default: none
       signing-mode:
         description: Build-only signer (disposable or repository); publication uses repository keys
         required: false
@@ -104,6 +109,7 @@ env:
   OUTPUT_SCOPE: ${{ inputs.publish && inputs.release-type != 'build-only' && 'published' || 'local-unpublished' }}
   # Build-only runs must not receive the separate release-API credential.
   GH_TOKEN: ${{ inputs.publish && inputs.release-type != 'build-only' && secrets.GH_TOKEN || '' }}
+  PIXENEOS_DEVELOPMENT_PROFILE: ${{ inputs.development-profile }}
   RELEASE_TYPE: ${{ inputs.release-type }}
   ROOT_MODE: ${{ inputs.root-mode }}
   ADDITIONALS_AFSR: ${{ inputs.afsr }}
@@ -185,6 +191,7 @@ jobs:
           source src/rom_profiles.sh
           resolve_rom_profile
           enforce_output_policy "${OUTPUT_SCOPE}"
+          activate_development_profile
 
       - name: Configure Android APK verification tools
         if: inputs.microg || inputs.fdroid-privileged-extension

@@ -180,6 +180,24 @@ descriptor. Run acquisition through `check_and_download_dependencies`; do not ca
 for these three executable tools. Real OTA integration remains subject to
 the other documented host-code supply-chain gates.
 
+## Explicit source-build development profile
+
+The manual LineageOS workflow may select `development-profile=care-map-pdx235`
+for `build-only`. This profile requires LineageOS/pdx235 and
+`local-unpublished` output scope. It uses the common acquisition, module,
+root-mode, signing, and output-verification pipeline, with one checked-in
+candidate helper contract at
+`tools/compat/avbroot_setup_care_map_pdx235.json`. Missing or modified candidate
+metadata rejects activation. Production helper and executable pins remain
+unchanged; ordinary build-only signing remains disposable.
+
+The candidate helper's `tools/care-map/build_and_run.py` builds the reviewed
+source patch from its fixed manifest, then supplies its own sealed tool runner
+to the helper with `--runtime-care-map`. This is repository-reviewed development
+source provenance, not a chenxiaolong-signed executable release. afsr and Custota
+continue through the official executable lock. The profile neither exports
+artifacts nor relaxes the pdx235 publication quarantine.
+
 [signing-guide]: https://github.com/chenxiaolong/chenxiaolong/blob/master/VERIFY_SSH_SIGNATURES.md
 [afsr-release]: https://github.com/chenxiaolong/afsr/releases/tag/v1.0.4
 [avbroot-release]: https://github.com/chenxiaolong/avbroot/releases/tag/v3.34.1

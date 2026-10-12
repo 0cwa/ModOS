@@ -52,6 +52,14 @@ on:
         required: false
         type: boolean
         default: true
+      development-profile:
+        description: Explicit build-only source experiment; production pins stay unchanged
+        required: false
+        type: choice
+        default: none
+        options:
+          - none
+          - care-map-pdx235
       signing-mode:
         description: Build-only signing identity; repository preserves existing device keys
         required: false
@@ -153,6 +161,7 @@ jobs:
       microg: ${{ inputs.microg }}
       disable-system-updater: ${{ inputs.disable-system-updater }}
       boot-animation: ${{ inputs.boot-animation }}
+      development-profile: ${{ inputs.development-profile }}
       signing-mode: ${{ inputs.signing-mode }}
       release-type: ${{ inputs.release-type }}
       publish: ${{ inputs.release-type != 'build-only' }}

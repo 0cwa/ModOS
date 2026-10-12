@@ -323,6 +323,45 @@ for release_type in ("default", "build-only"):
 PYTEST
 }
 
+test_development_profile_activation() (
+  source src/util_functions.sh
+  local original_pin="${VERSION[AVBROOT_SETUP]}" fixture repository_root
+  repository_root="$(pwd -P)"
+  PIXENEOS_DEVELOPMENT_PROFILE=none
+  activate_development_profile
+  [[ "${VERSION[AVBROOT_SETUP]}" == "${original_pin}" ]] || fail 'Default profile changed helper pin'
+  PIXENEOS_DEVELOPMENT_PROFILE=unreviewed
+  if validate_development_profile local-unpublished 2>/dev/null; then fail 'Unknown development profile accepted'; fi
+  PIXENEOS_DEVELOPMENT_PROFILE=care-map-pdx235
+  ROM_FAMILY=lineageos DEVICE_NAME=pdx235 OUTPUT_SCOPE=local-unpublished
+  validate_development_profile
+  for OUTPUT_SCOPE in private shared published; do
+    if validate_development_profile 2>/dev/null; then fail 'Development shared scope accepted'; fi
+  done
+  OUTPUT_SCOPE=local-unpublished DEVICE_NAME=other
+  if validate_development_profile 2>/dev/null; then fail 'Development wrong device accepted'; fi
+  DEVICE_NAME=pdx235 ROM_FAMILY=grapheneos
+  if validate_development_profile 2>/dev/null; then fail 'Development wrong family accepted'; fi
+  ROM_FAMILY=lineageos
+  fixture="$(mktemp -d)"
+  trap 'rm -rf "${fixture}"' EXIT
+  git init -q "${fixture}"
+  cd "${fixture}"
+  if activate_development_profile 2>/dev/null; then fail 'Missing reviewed metadata accepted'; fi
+  mkdir -p tools/compat
+  cp "${repository_root}/tools/compat/avbroot_setup_compat.py" tools/compat/
+  python3 - "${repository_root}/tools/compat/avbroot_setup_compat.json" <<'PYTEST'
+import json, pathlib, sys
+manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
+manifest["revision"] = "a" * 40
+pathlib.Path("tools/compat/avbroot_setup_care_map_pdx235.json").write_text(json.dumps(manifest))
+PYTEST
+  git add tools/compat
+  git -c user.name=Fixture -c user.email=fixture@example.invalid -c core.hooksPath=/dev/null commit -qm fixture
+  activate_development_profile
+  [[ "${VERSION[AVBROOT_SETUP]}" == aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ]] || fail 'Reviewed development helper not selected'
+)
+
 test_release_triggers() {
   local lineage="${WORKFLOW_DIR}/release-lineage.yml"
 
@@ -503,6 +542,7 @@ test_reusable_workflow
 test_build_only_signing
 test_build_only_permissions
 test_device_candidate_signing_routes
+test_development_profile_activation
 test_release_triggers
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding

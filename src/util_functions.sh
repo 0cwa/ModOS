@@ -704,8 +704,13 @@ function patch_ota() {
     echo -e "Patching OTA..."
     local args=()
     local tool_runner_prefix
-    tool_runner_prefix="$(executable_tool_runner_prefix_json)" || return 1
-    args+=("--tool-runner-prefix-json" "${tool_runner_prefix}")
+    if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+      activate_development_profile || return 1
+      args+=("--runtime-care-map")
+    else
+      tool_runner_prefix="$(executable_tool_runner_prefix_json)" || return 1
+      args+=("--tool-runner-prefix-json" "${tool_runner_prefix}")
+    fi
 
     # OTA input and output
     args+=("--input" "${ota_zip}.zip")
@@ -821,7 +826,18 @@ function patch_ota() {
     esac
 
     # Python command to run the patch script
-    python "${my_avbroot_setup}/patch.py" "${args[@]}" || return 1
+    if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+      local repository_root build_parent
+      repository_root="$(git rev-parse --show-toplevel)" || return 1
+      build_parent="$(mktemp -d "${WORKDIR}/care-map-source-build.XXXXXX")" || return 1
+      python "${my_avbroot_setup}/tools/care-map/build_and_run.py" \
+        --modos-repo "${repository_root}" \
+        --bootstrap-workdir "$(realpath -- "${WORKDIR}")" \
+        --build-workdir "$(realpath -- "${build_parent}")/build" \
+        -- "${args[@]}" || return 1
+    else
+      python "${my_avbroot_setup}/patch.py" "${args[@]}" || return 1
+    fi
 
     # A Magisk label is publication metadata, not proof of a working runtime
     # root environment. Static CI can verify the Magisk boot patch and paired
@@ -1154,6 +1170,12 @@ function my_avbroot_setup() {
   local compatibility_helper="tools/compat/avbroot_setup_compat.py"
   local helper_source="${PIXENEOS_AVBROOT_SETUP_SOURCE:-${DOMAIN}/0cwa/my-avbroot-setup}"
   local location_path
+  local -a compatibility_args=()
+  if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+    activate_development_profile || return 1
+    helper_source="${PIXENEOS_AVBROOT_SETUP_SOURCE}"
+    compatibility_args+=("--manifest" "${PIXENEOS_DEVELOPMENT_COMPAT_MANIFEST}")
+  fi
 
   if [[ -n "${PIXENEOS_RELEASE_BASE_URL}" ]]; then
     location_path="${PIXENEOS_RELEASE_BASE_URL%/}/${OUTPUTS[PATCHED_OTA]}"
@@ -1162,7 +1184,7 @@ function my_avbroot_setup() {
   fi
 
   echo -e "Running script modifications..."
-  python3 "${compatibility_helper}" \
+  python3 "${compatibility_helper}" "${compatibility_args[@]}" \
     --source "${helper_source}" \
     "${helper_root}" \
     "${location_path}" \

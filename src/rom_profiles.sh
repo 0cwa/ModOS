@@ -9,6 +9,7 @@ declare -gA ROM_PROFILE
 _rom_profiles_source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_rom_profiles_source_dir}/ci/selection_variant.sh"
 source "${_rom_profiles_source_dir}/ci/pdx235_release_quarantine.sh"
+source "${_rom_profiles_source_dir}/development_profile.sh"
 unset _rom_profiles_source_dir
 
 function _require_profile_boolean() {
@@ -90,6 +91,8 @@ function enforce_output_policy() {
     return 1
     ;;
   esac
+
+  validate_development_profile "${output_scope}" || return 1
 
   # Block pdx235 releases *before* source download or signing. This remains
   # independent of release-type, FORCE_UPDATE, module selections and root mode.
