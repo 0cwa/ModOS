@@ -198,10 +198,13 @@ rootless/Magisk postflight, with module archives verified through the pinned SSH
 outputs and selected modules. Independent inspection passed for genuine module
 payloads, compatible policy labels, both regular boot variants, updater removal
 and shared images/root distinctions. Retained inert updater caches are recorded
-without adding another gate. These proofs establish artifact semantics, not the
-repository-signed installed-identity candidate, device acceptance or production
-lock promotion. [Acceptance](pdx235-care-map-integration.md) records the remaining
-development-workflow and physical evidence.
+without adding another gate. The real read-only source-build/repository-signing workflow and independent
+verification of its exact retrieved encrypted candidate have now also passed.
+[Acceptance](pdx235-care-map-integration.md) and the receipt's
+`repository_candidate` section record the exact run, archive and output identities.
+The public PKMD is authenticated by configured-key workflow provenance; physical
+enrolled-key matching, boot/persistence and production lock promotion remain
+separate and unobserved.
 
 ## Explicit source-build development profile
 

@@ -31,8 +31,10 @@ caches are informational; their presence adds no acceptance gate. The
 [compact review receipt](evidence/pdx235-20261012.json) records the complete-profile
 artifact digests, maps, budget and selected modules.
 
-This does not establish a repository-signed candidate for an existing installation,
-production dependency promotion, physical pdx235 acceptance or publication.
+The explicit source-build/repository-signing workflow and retrieved repository-key
+candidate have now also passed; see the receipt's `repository_candidate` section.
+This establishes configured-key provenance, not the actual device's enrolled-key
+match, physical pdx235 acceptance, production dependency promotion or publication.
 
 The exact fixture was `lineage-23.2-20261009-nightly-pdx235-signed.zip`,
 1,232,106,897 bytes, SHA-256
@@ -112,9 +114,17 @@ repository-signer candidate forwards only signing material; publishers remain
 skipped and quarantine remains active. A source-build development profile and
 an optional authenticated encrypted private handoff are prepared. Ordinary
 production executable pins remain unchanged. The complete enabled-module profile
-has passed actual disposable-key output postflight. The development workflow and
-repository-signed installed-identity candidate remain to be exercised; local
-artifact proofs do not establish those results.
+has passed actual disposable-key output postflight. The actual read-only repository-key workflow at `0db76b4` succeeded in
+[run 38303462721](https://github.com/0cwa/ModOS/actions/runs/38303462721).
+The exact encrypted ZIP was retrieved through read-only transport and checked
+against SHA-256 `f51e4cf10cb32de8a714e052f1a826301c21e48beb66a5fe393838f79d0bb548`
+and size 2,826,101,688 before per-OTA authenticated CMS decryption. Independent
+local checks passed on both exact decrypted outputs: signatures, payload/AVB,
+runtime maps and write coverage, every filesystem property, paired image bytes,
+genuine module/microG content, root distinctions and unchanged group quotas.
+The configured public PKMD SHA-256 is
+`a7f6fd272a397c28451c131467d51cf1097d2e44c08579dab5784cfbaa3bf2bc`.
+Actual device enrollment, boot and persistence remain unobserved.
 
 Keep plaintext OTAs local; do not upload them to release assets, Custota channels
 or public CI artifacts. The explicit encrypted private handoff has its own
@@ -162,8 +172,8 @@ not establish bootloader enforcement, trusted on-device keys, or first-boot
 block verification; the source's public AVB test keys are not a publisher
 identity. Check actual AVB/verity state and recovery behavior on-device.
 
-After the completed artifact evidence, installed-signer output and applicable
-device acceptance are reviewed, promote the helper dependency before the
+After the completed configured-signer artifact evidence and applicable enrolled-key
+and device acceptance are reviewed, promote the helper dependency before the
 ModOS microG consumer. Remove the temporary quarantine explicitly in a
 reviewed release change; keep microG scheduled builds off until its device
 acceptance is complete. Resolve #114 using that evidence, not test counts.

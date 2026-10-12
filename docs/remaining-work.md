@@ -49,24 +49,33 @@ are informational and do not justify another acceptance gate. The compact
 [review receipt](evidence/pdx235-20261012.json) binds its exact artifacts, maps,
 group budget and selected module IDs.
 
-These were disposable-key local artifact tests, not repository-signed device
-candidates, device boots or release publication.
+The explicit source-build/repository-signing workflow has now also succeeded
+at `0db76b4edab40386d147fff49a5c6683e8b4551c` in
+[run 38303462721](https://github.com/0cwa/ModOS/actions/runs/38303462721).
+Read-only [transport run 38306959045](https://github.com/0cwa/ModOS/actions/runs/38306959045)
+delivered the exact encrypted archive; per-OTA authenticated decryption and
+independent verification of both retrieved repository-key outputs passed.
+Actual signatures, payload/AVB/maps/operation coverage, all six filesystem
+properties, genuine module/microG content, paired image equality and root
+variants were verified again on those bytes. Public PKMD provenance comes from
+the configured-key workflow. The device's enrolled key and boot behavior have
+not been observed; this proves candidate generation, not installed-key matching
+or device acceptance.
 
 Integration code now retains main's boot-animation default, merges stock-updater
 selection independently, routes helper tool calls through authenticated sealed
 execution, and separates build-only jobs with read-only GitHub permissions and
-disposable signing. An explicit repository-signer/private encrypted handoff is
-prepared separately. The source exception remains empty; LineageOS/pdx235
+disposable signing. The explicit repository-signer/private encrypted handoff has
+passed the real workflow and retrieved-candidate verification. The source exception remains empty; LineageOS/pdx235
 publication remains quarantined and microG schedules remain off.
 
 ## Remaining execution queue
 
 | Order | Boundary | Next delivery | Completion evidence |
 | --- | --- | --- | --- |
-| 1 | Development workflow and installed signer | Validate the explicit source-build profile end to end, then prepare an authorized repository-signed private candidate with the installed signing identity. | Fresh reviewed source build, read-only job, expected configured signers, verified final outputs and optional authenticated encrypted handoff; no plaintext OTA upload or publication. |
-| 2 | pdx235 device | Install through the reviewed device procedure, collect first-boot observations and complete rootless/Magisk and Custota persistence acceptance. | Runtime property agreement, effective verity/snapuserd verification, successful-slot state, Magisk setup and microG self-check/spoofing/account/push/location behavior. Requires the actual device. |
-| 3 | Dependency/main promotion | Review consolidated source, helper compatibility/trust metadata and measured profile/device evidence; promote helper before its ModOS consumers. | Explicit reviewed dependency changes, coherent selection identities and no stale cached outputs. A source-built development artifact is not a vendor-signed executable-lock promotion. |
-| 4 | Release policy | Deliberately lift the pdx235 quarantine and enable any microG publication/schedules only after the applicable acceptance. | Reviewed publication change and real acceptance evidence; #114 closes on those results, not synthetic test counts. |
+| 1 | pdx235 device | Confirm enrolled-key compatibility, install through the reviewed device procedure, collect first-boot observations and complete rootless/Magisk and Custota persistence acceptance. | Runtime property agreement, effective verity/snapuserd verification, successful-slot state, Magisk setup and microG self-check/spoofing/account/push/location behavior. Requires the actual device. |
+| 2 | Dependency/main promotion | Review consolidated source, helper compatibility/trust metadata and measured profile/device evidence; promote helper before its ModOS consumers. | Explicit reviewed dependency changes, coherent selection identities and no stale cached outputs. A source-built development artifact is not a vendor-signed executable-lock promotion. |
+| 3 | Release policy | Deliberately lift the pdx235 quarantine and enable any microG publication/schedules only after the applicable acceptance. | Reviewed publication change and real acceptance evidence; #114 closes on those results, not synthetic test counts. |
 
 The read-only [device collector](pdx235-device-evidence.md) is prepared. CI cannot
 supply the physical observations or prove the installed signing identity matches
@@ -107,8 +116,8 @@ source-snippet checks as integration prerequisites.
   nonblocking cleanup.
 - Reconcile #113/#115 after integration review to distinguish implemented fixes
   from main promotion and remaining device acceptance. Keep #114 open for its
-  actual installed-signer/device/release blockers.
+  actual enrolled-key/device/release blockers.
 
-MicroG-off, microG-on and complete-profile disposable-key pairs were built and
-strictly verified locally. No OTA was flashed or published, and final acceptance
-remains incomplete.
+Disposable fixture pairs and the exact retrieved repository-key complete-profile
+pair passed strict verification. No OTA was flashed or release-published, and
+physical acceptance and reviewed production promotion remain incomplete.

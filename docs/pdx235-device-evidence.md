@@ -53,8 +53,10 @@ The explicit LineageOS workflow now supports `development-profile=care-map-pdx23
 `release-type=build-only` and `signing-mode=repository` to retain the configured
 repository signing identity. Optional `export-device-candidate` with a public
 recipient certificate produces an authenticated encrypted private handoff; it
-keeps publication quarantined. The actual repository-signed candidate run and
-physical acceptance remain pending. Confirm that its public AVB key and OTA
-certificate match the installation's required identity, then follow the reviewed
+keeps publication quarantined. The actual repository-key workflow, exact encrypted
+transport/decryption and independent local candidate verification have passed;
+[the review receipt](evidence/pdx235-20261012.json) records their identities.
+Physical acceptance and enrolled-key matching remain pending. Confirm that the
+public AVB key and OTA certificate match the installation's required identity, then follow the reviewed
 installation/OTA procedure and collect these observations. The workflow path
 makes stable candidates possible; it does not prove which firmware booted.

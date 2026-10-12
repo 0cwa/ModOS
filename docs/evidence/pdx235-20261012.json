@@ -1,7 +1,7 @@
 {
   "schema": "modos-pdx235-review-evidence-v1",
   "date": "2026-10-12",
-  "scope": "local disposable-key artifact acceptance; not device acceptance or publication authorization",
+  "scope": "verified disposable and repository-key candidates; physical device acceptance and publication authorization remain separate",
   "source": {
     "filename": "lineage-23.2-20261009-nightly-pdx235-signed.zip",
     "size": 1232106897,
@@ -192,15 +192,88 @@
     {
       "record": "acceptance.json",
       "sha256": "d4af48b5c78982ef1a0718577ff37a388df7793088ea0d057419a8231b09158f"
+    },
+    {
+      "record": "device-candidate-independent-proof.json",
+      "sha256": "bfda944e78d9d2b567408f08cef78d19a9ef72d9ea33ca7cd6da40fead7e8712"
     }
   ],
   "remaining": {
-    "repository_signed_candidate": "pending explicit workflow run",
     "physical_first_boot_and_ota_persistence": "pending pdx235 device",
     "main_dependency_promotion": "pending review",
     "publication": "quarantined",
-    "microg_scheduled_builds": "off"
+    "microg_scheduled_builds": "off",
+    "physical_enrolled_key_match": "not observed; compare actual device enrollment to configured-key provenance"
   },
   "flashed": false,
-  "published": false
+  "published": false,
+  "repository_candidate": {
+    "status": "PASS authorized workflow, exact encrypted transport, authenticated decryption and independent local output verification",
+    "workflow_head": "0db76b4edab40386d147fff49a5c6683e8b4551c",
+    "workflow_run_id": 38303462721,
+    "workflow_url": "https://github.com/0cwa/ModOS/actions/runs/38303462721",
+    "fresh_reviewed_source_build": "PASS pinned compiler and locked Cargo build in read-only build job",
+    "signing_material": "configured repository keys; physical enrolled-key identity not observed",
+    "output_scope": "local-unpublished",
+    "encrypted_artifact": {
+      "id": 11771199818,
+      "zip_size": 2826101688,
+      "zip_sha256": "f51e4cf10cb32de8a714e052f1a826301c21e48beb66a5fe393838f79d0bb548",
+      "plaintext_uploaded": false
+    },
+    "read_only_transport": {
+      "workflow_run_id": 38306959045,
+      "workflow_url": "https://github.com/0cwa/ModOS/actions/runs/38306959045",
+      "exact_reassembled_archive": "PASS",
+      "per_ota_cms_authenticated_decryption": "PASS"
+    },
+    "public_pkmd": {
+      "size": 1032,
+      "sha256": "a7f6fd272a397c28451c131467d51cf1097d2e44c08579dab5784cfbaa3bf2bc"
+    },
+    "trust_anchor": "Public PKMD exported by exact authorized repository-key GitHub workflow; encrypted artifact provenance authenticates delivery. No independent physical enrolled-key digest available.",
+    "ota_certificate_trust": "Unique embedded OTA certificate verified by whole-OTA/payload signatures and recovery certificate binding within configured-key-authenticated AVB chain; no signature, hash, operation-coverage or recovery-certificate waiver.",
+    "outputs": [
+      {
+        "root_mode": "magisk",
+        "filename": "pdx235-20261009-magisk-v30.7-6d12220e222325ab26f0670c3195afcff36379109160b45c97b860b659a30690-0db76b4.zip",
+        "size": 1411831632,
+        "sha256": "38477339d9d0829f909c62af1fdc10d6798f9cf269412188cd4b1bfa3714e590",
+        "ota_certificate_der_sha256": "879d54c44045f2206889906f59c0004ce3506c8506b9fe61b6fa26b373945313"
+      },
+      {
+        "root_mode": "rootless",
+        "filename": "pdx235-20261009-rootless-adc7c40413a7ffa0db103d5e0224b6c5d79eae9785be0da9f4b62db6020d7a93-0db76b4.zip",
+        "size": 1411480707,
+        "sha256": "cf2ca3e77fdb9c4814cae4824b6211cd0af673ecdb164edc9c32e4f6e862fa35",
+        "ota_certificate_der_sha256": "879d54c44045f2206889906f59c0004ce3506c8506b9fe61b6fa26b373945313"
+      }
+    ],
+    "strict_signature_payload_avb_care_map_and_operation_verification": "PASS both exact outputs; all verified flags zero",
+    "actual_filesystem_property_proof": "PASS all six filesystem identities on fresh verified bytes",
+    "care_map": "same entries and fingerprint as full_profile.care_map",
+    "paired_filesystems": "all six image bytes identical across roots",
+    "genuine_module_and_locked_microg_bytes": "PASS; fresh system payload inspection and unchanged protected bytes bind prior independent full-profile inspection",
+    "root_boot_evidence": [
+      {
+        "mode": "magisk",
+        "magisk_present": true,
+        "preinit": "sda47",
+        "boot_sha256": "86d62db764cf0309e0626efe57491654b0afe9f199ae74d2d664e75fa2343b8f"
+      },
+      {
+        "mode": "rootless",
+        "magisk_present": false,
+        "preinit": null,
+        "boot_sha256": "8a9163fc5944a00a78258939c1c62d43a715421f63383dce20481193cf1963db"
+      }
+    ],
+    "signed_group_budget": {
+      "name": "somc_dynamic_partitions",
+      "final_image_total": 2974183424,
+      "maximum_size": 6169821184,
+      "both_root_modes": true
+    },
+    "physical_device_acceptance": "not established; enrolled-key match, boot, verity/snapuserd and persistence require the actual device"
+  }
 }
