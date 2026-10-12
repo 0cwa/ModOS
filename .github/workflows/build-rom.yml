@@ -277,7 +277,7 @@ jobs:
           source src/main.sh
           if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
             public_pkmd="${WORKDIR}/device-candidate-avb_pkmd.bin"
-            run_executable_tool avbroot key extract-avb \
+            run_executable_tool avbroot key encode-avb \
               -k "${KEYS[AVB]}" --pass-env-var PASSPHRASE_AVB -o "${public_pkmd}"
             echo "DEVICE_CANDIDATE_PKMD=${public_pkmd}" >> "${GITHUB_ENV}"
             # The signing inputs were decoded into this job's private workdir.

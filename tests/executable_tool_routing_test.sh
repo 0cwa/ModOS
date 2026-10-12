@@ -314,7 +314,7 @@ test_pixene_avbroot_calls_preserve_exact_arguments() (
     "$(printf '%s\n' \
       "avbroot key generate-key -o ${KEYS[AVB]}" \
       "avbroot key generate-key -o ${KEYS[OTA]}" \
-      "avbroot key extract-avb -k ${KEYS[AVB]} -o ${KEYS[PKMD]}" \
+      "avbroot key encode-avb -k ${KEYS[AVB]} -o ${KEYS[PKMD]}" \
       "avbroot key generate-cert -k ${KEYS[OTA]} -o ${KEYS[CERT_OTA]}" \
       "avbroot ota extract --input ${WORKDIR}/official.zip --directory ${WORKDIR}/extracted/extracts --all --public-key-avb ${WORKDIR}/extracted/avb_pkmd.bin")" \
     "${root}/runner-args"

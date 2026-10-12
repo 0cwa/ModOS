@@ -595,7 +595,7 @@ function generate_keys() {
 
   # Convert the public key portion of the AVB signing key to the AVB public key metadata format
   # This is the format that the bootloader requires when setting the custom root of trust
-  run_executable_tool avbroot key extract-avb \
+  run_executable_tool avbroot key encode-avb \
     -k "${KEYS[AVB]}" -o "${KEYS[PKMD]}" || return 1
 
   # Generate a self-signed certificate for the OTA signing key
