@@ -227,7 +227,12 @@ test_build_only_signing() (
   GITHUB_ENV="${temp_dir}/env" RUNNER_TEMP="${temp_dir}" \
     GITHUB_STEP_SUMMARY="${temp_dir}/summary" \
     bash src/ci/setup_test_signing.sh >/dev/null
-  while IFS='=' read -r name encoded; do
+  # Split only the assignment separator: read with IFS='=' strips a single
+  # trailing '=' padding byte; older GNU base64 rejects the truncated value.
+  local binding name encoded
+  while IFS= read -r binding; do
+    name="${binding%%=*}"
+    encoded="${binding#*=}"
     case "${name}" in
       KEYS_AVB_BASE64) printf '%s' "${encoded}" | base64 -d > "${temp_dir}/avb.key" ;;
       KEYS_OTA_BASE64) printf '%s' "${encoded}" | base64 -d > "${temp_dir}/ota.key" ;;
