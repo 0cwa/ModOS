@@ -51,6 +51,37 @@ source_care_map_certificate_has_public_key_digest() (
   [[ "${actual%% *}" == "$expected" ]]
 )
 
+# Independent source-publisher check for every LineageOS/pdx235 patch path,
+# not just the dormant October 9 exception. The ZIP member must be unique and
+# byte-for-byte equal to the extracted certificate handed to the helper. A
+# stale extracted certificate from a different downloaded OTA must not pass.
+# The helper must STILL verify the whole-file OTA signature against this cert.
+source_care_map_source_publisher_matches_pin() {
+  [[ "$#" -eq 3 ]] || return 1
+  local source_zip="$1" extracted_cert="$2" expected_pubkey="$3"
+  local policy_dir
+
+  source_care_map_certificate_has_public_key_digest \
+    "${extracted_cert}" "${expected_pubkey}" || return 1
+  policy_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)" || return 1
+  python3 "${policy_dir}/ci/check_ota_certificate_member.py" \
+    "${source_zip}" "${extracted_cert}"
+}
+
+# Scope strictly to pdx235; other ROMs/devices retain their existing policy.
+source_care_map_require_lineageos_pdx235_publisher() {
+  [[ "$#" -eq 4 ]] || return 1
+  local family="$1" device="$2" source_zip="$3" extracted_cert="$4"
+  [[ "${family}" == 'lineageos' && "${device}" == 'pdx235' ]] || return 0
+
+  if ! source_care_map_source_publisher_matches_pin \
+    "${source_zip}" "${extracted_cert}" \
+    "${_LINEAGEOS_OFFICIAL_OTA_PUBKEY_SPKI_SHA256}"; then
+    echo "Error: independently pinned LineageOS/pdx235 publisher certificate does not match the current source OTA." >&2
+    return 1
+  fi
+}
+
 # Production gate: strict by default. A future exception requires both the
 # exact independently reviewed ZIP identity and the trusted LineageOS OTA
 # signing identity before allowing avbroot's single care-map-only exception.
