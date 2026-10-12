@@ -133,9 +133,8 @@ env:
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 
-permissions:
-  contents: read
-
+# Publishing inherits the caller job's permission ceiling. A reusable
+# publishing job cannot request write even when skipped by a read-only caller.
 jobs:
   build:
     if: inputs.publish && inputs.release-type != 'build-only'
@@ -143,9 +142,6 @@ jobs:
     concurrency:
       group: gh-pages
       cancel-in-progress: false
-    permissions:
-      contents: write
-
     steps: &rom-build-steps
       - name: Validate build request
         shell: bash

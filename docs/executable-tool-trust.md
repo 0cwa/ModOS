@@ -185,7 +185,7 @@ the other documented host-code supply-chain gates.
 The earlier helper PATH execution gap is closed in the goal integration:
 direct ModOS and helper calls use the exact authenticated runner prefix and
 post-seal-verified descriptor execution described above. Ordinary build-only
-jobs now use read-only repository permissions and disposable signing material;
+jobs enforce read-only repository permissions and use disposable signing material;
 the separately selected repository-signer device candidate forwards only its
 signing inputs, with publishing still disabled.
 
@@ -247,3 +247,9 @@ private device-acceptance transport, not release or updater publication.
 [afsr-release]: https://github.com/chenxiaolong/afsr/releases/tag/v1.0.4
 [avbroot-release]: https://github.com/chenxiaolong/avbroot/releases/tag/v3.34.1
 [custota-release]: https://github.com/chenxiaolong/Custota/releases/tag/v6.4
+
+The reusable ROM publisher inherits its calling job's permissions. Publishing
+callers explicitly grant `contents: write`; the shared workflow does not request
+write itself, because GitHub validates skipped reusable jobs against a read-only
+caller's ceiling before evaluating their conditions. The executed build-only
+job explicitly requests `contents: read`, including under a write-capable caller.

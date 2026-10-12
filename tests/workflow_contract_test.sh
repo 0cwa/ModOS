@@ -302,6 +302,12 @@ def binding(name):
 
 routes = {name: block(lineage, name, 2) for name in
           ("manual_build", "manual_build_only", "manual_device_candidate")}
+# GitHub validates every reusable job's permission request before evaluating
+# its if-condition. Inherit publisher permissions from the selected caller;
+# keep the executed build-only job read-only even under a write-capable caller.
+assert not re.search(r"^permissions:", build, re.M)
+assert "permissions:" not in block(build, "build", 2)
+assert "contents: write" in routes["manual_build"]
 signer = step_condition("Setup signing environment")
 disposable = step_condition("Generate disposable build-only signing keys")
 assert "default: disposable" in block(block(lineage, "workflow_dispatch", 2), "signing-mode", 6)
