@@ -265,6 +265,57 @@ assert " tool ..." in result.stdout
 PYTEST
 )
 
+test_boot_animation_verification_uses_authenticated_runner() (
+  local root="${TEST_ROOT}/boot-animation runner"
+  WORKDIR="${root}/work"
+  mkdir -p "${WORKDIR}"
+  local ota="${root}/candidate.zip"
+  printf 'OTA fixture' > "${ota}"
+  _resolve_boot_animation_payloads
+  # The real payload verifier runs; only tool output acquisition is simulated
+  # at its existing runner boundary. A pathname-only execution is forbidden.
+  resolve_executable_tool() { fail 'Boot animation bypassed authenticated execution'; }
+  run_executable_tool() {
+    local tool="${1}" command="${2}" directory='' raw='' tree='' flag
+    shift 2
+    printf '%s\n' "${tool}" >> "${root}/runner-calls"
+    while [[ "$#" -gt 0 ]]; do
+      flag="${1}"; shift
+      case "${flag}" in
+        --directory) directory="${1}"; shift ;;
+        --output-raw) raw="${1}"; shift ;;
+        --output-tree) tree="${1}"; shift ;;
+      esac
+    done
+    case "${tool}:${command}" in
+      avbroot:ota) printf 'image fixture' > "${directory}/product.img" ;;
+      avbroot:avb) printf 'raw fixture' > "${raw}" ;;
+      afsr:unpack)
+        mkdir -p "${tree}/media"
+        python3 - "${BOOT_ANIMATION_LIGHT_PAYLOAD}" "${BOOT_ANIMATION_DARK_PAYLOAD}" "${tree}" <<'PYTEST'
+import importlib.util
+from pathlib import Path
+import sys
+spec = importlib.util.spec_from_file_location('boot', 'src/boot_animation.py')
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+light, dark = module.resolve_runtime_payloads(sys.argv[1], sys.argv[2])
+media = Path(sys.argv[3]) / 'media'
+(media / 'bootanimation.zip').write_bytes(light)
+(media / 'bootanimation-dark.zip').write_bytes(dark)
+PYTEST
+        ;;
+      *) fail 'Unexpected tool request in boot-animation verifier' ;;
+    esac
+  }
+  verify_boot_animation_ota "${ota}" >/dev/null
+  assert_file_equals $'avbroot\navbroot\nafsr' "${root}/runner-calls"
+  run_executable_tool() { return 66; }
+  if verify_boot_animation_ota "${ota}" >/dev/null 2>&1; then
+    fail 'Boot-animation verification accepted failed authenticated execution'
+  fi
+)
+
 test_runner_failure_prevents_generate_keys_fallback_execution() (
   local root="${TEST_ROOT}/generate-keys"
   local result
@@ -363,6 +414,7 @@ test_env_setup_resolve_failure_is_transactional
 test_repeated_env_setup_removes_disabled_tool_bindings
 test_runner_constructs_exact_fd_bound_command
 test_helper_runner_prefix_survives_cwd_and_path_changes
+test_boot_animation_verification_uses_authenticated_runner
 test_runner_failure_prevents_generate_keys_fallback_execution
 test_pixene_avbroot_calls_preserve_exact_arguments
 test_legacy_acquisition_rejects_locked_executables

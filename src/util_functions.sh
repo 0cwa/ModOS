@@ -903,7 +903,7 @@ function extract_ota_boot_target() {
 
 function verify_boot_animation_ota() {
   local ota_path="${1}"
-  local temp_dir payload_path dark_payload_path avbroot_bin afsr_bin ota_abs
+  local temp_dir payload_path dark_payload_path ota_abs
   local extract_dir unpack_dir image_path raw_image
 
   [[ -f "${ota_path}" ]] || {
@@ -920,22 +920,6 @@ function verify_boot_animation_ota() {
     rm -rf -- "${temp_dir}"
     return 1
   }
-  avbroot_bin="$(resolve_executable_tool avbroot)" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
-  afsr_bin="$(resolve_executable_tool afsr)" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
-  avbroot_bin="$(realpath -- "${avbroot_bin}")" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
-  afsr_bin="$(realpath -- "${afsr_bin}")" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
 
   extract_dir="${temp_dir}/extract-product"
   unpack_dir="${temp_dir}/unpack-product"
@@ -944,7 +928,7 @@ function verify_boot_animation_ota() {
     return 1
   }
 
-  if ! "${avbroot_bin}" ota extract \
+  if ! run_executable_tool avbroot ota extract \
     --input "${ota_abs}" \
     --directory "${extract_dir}" \
     --partition product >/dev/null; then
@@ -963,12 +947,14 @@ function verify_boot_animation_ota() {
     return 1
   }
 
-  if ! (
-    cd -- "${unpack_dir}" &&
-      "${avbroot_bin}" avb unpack --quiet --input "${image_path}" &&
-      raw_image="$(realpath -- raw.img)" &&
-      "${afsr_bin}" unpack --input "${raw_image}"
-  ); then
+  raw_image="${unpack_dir}/raw.img"
+  if ! run_executable_tool avbroot avb unpack --quiet \
+    --input "${image_path}" \
+    --output-info "${unpack_dir}/avb.toml" \
+    --output-raw "${raw_image}" ||
+    ! run_executable_tool afsr unpack --input "${raw_image}" \
+      --output-metadata "${unpack_dir}/fs_metadata.toml" \
+      --output-tree "${unpack_dir}/fs_tree"; then
     rm -rf -- "${temp_dir}"
     return 1
   fi
