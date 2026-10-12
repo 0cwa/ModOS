@@ -142,7 +142,7 @@ test_workflow_contract() {
   local workflow="${ROOT_DIR}/.github/workflows/build-rom.yml"
   local release_line helper_line
 
-  release_line="$(grep -n 'uses: softprops/action-gh-release@' "${workflow}" | cut -d: -f1)"
+  release_line="$(awk '/uses: softprops\/action-gh-release@/ { line = NR } END { print line }' "${workflow}")"
   helper_line="$(grep -n 'bash src/ci/publish_ota.sh' "${workflow}" | cut -d: -f1)"
   (( release_line < helper_line )) || fail "release assets must precede OTA publication"
   grep -Fq 'group: gh-pages' "${workflow}" || fail "gh-pages serialization changed"

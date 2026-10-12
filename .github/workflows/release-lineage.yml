@@ -58,7 +58,7 @@ on:
         default: default
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   schedule_config:
@@ -95,6 +95,8 @@ jobs:
         run: bash src/ci/load_schedule_definition.sh
 
   scheduled_build:
+    permissions:
+      contents: write
     if: github.event_name == 'schedule'
     needs: schedule_config
     uses: ./.github/workflows/build-rom.yml
@@ -120,9 +122,11 @@ jobs:
     secrets: inherit
 
   manual_build:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type != 'build-only'
+    permissions:
+      contents: write
     uses: ./.github/workflows/build-rom.yml
-    with:
+    with: &lineage-build-inputs
       rom-family: lineageos
       device-id: ${{ inputs.device-id }}
       root: ${{ inputs.root }}
@@ -136,3 +140,10 @@ jobs:
       release-type: ${{ inputs.release-type }}
       publish: ${{ inputs.release-type != 'build-only' }}
     secrets: inherit
+
+  manual_build_only:
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with: *lineage-build-inputs

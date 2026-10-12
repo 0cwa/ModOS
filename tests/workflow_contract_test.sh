@@ -216,6 +216,48 @@ test_reusable_workflow() {
     "shared ROM workflow must not check out a divergent lineage branch"
 }
 
+# Credential checks stay with the existing workflow suite. Generate real disposable
+# material to check the boundary's behavior, rather than freezing shell text.
+test_build_only_signing() (
+  local temp_dir
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf "${temp_dir}"' EXIT
+  GITHUB_ENV="${temp_dir}/env" RUNNER_TEMP="${temp_dir}" \
+    GITHUB_STEP_SUMMARY="${temp_dir}/summary" \
+    bash src/ci/setup_test_signing.sh >/dev/null
+  while IFS='=' read -r name encoded; do
+    case "${name}" in
+      KEYS_AVB_BASE64) printf '%s' "${encoded}" | base64 -d > "${temp_dir}/avb.key" ;;
+      KEYS_OTA_BASE64) printf '%s' "${encoded}" | base64 -d > "${temp_dir}/ota.key" ;;
+      KEYS_CERT_OTA_BASE64) printf '%s' "${encoded}" | base64 -d > "${temp_dir}/ota.crt" ;;
+      *) fail "Unexpected build-only signing export: ${name}" ;;
+    esac
+  done < "${temp_dir}/env"
+  openssl pkey -in "${temp_dir}/avb.key" -check -noout >/dev/null
+  openssl pkey -in "${temp_dir}/ota.key" -pubout -out "${temp_dir}/key.pub"
+  openssl x509 -in "${temp_dir}/ota.crt" -pubkey -noout > "${temp_dir}/cert.pub"
+  cmp "${temp_dir}/key.pub" "${temp_dir}/cert.pub" || fail 'Disposable OTA signer and certificate differ'
+  if find "${temp_dir}" -type d -name 'modos-test-signing.*' | grep -q .; then
+    fail 'Disposable signing scratch directory was retained'
+  fi
+)
+
+test_build_only_permissions() {
+  local workflow
+  for workflow in "${REUSABLE}" "${RELEASE}" \
+    "${WORKFLOW_DIR}/release-lineage.yml" "${WORKFLOW_DIR}/multi-release.yml"; do
+    # Build-only routes must have their own read-only token and omit secret
+    # forwarding. Shared steps/inputs are anchors, not duplicated pipelines.
+    awk '
+      /^  (build_only|manual_build_only):$/ { active = 1; next }
+      active && /^  [A-Za-z0-9_-]+:$/ { active = 0 }
+      active && /contents: read/ { readonly = 1 }
+      active && /secrets:/ { forbidden = 1 }
+      END { exit !(readonly && !forbidden) }
+    ' "${workflow}" || fail "Build-only credential boundary failed: ${workflow}"
+  done
+}
+
 test_release_triggers() {
   local lineage="${WORKFLOW_DIR}/release-lineage.yml"
 
@@ -388,6 +430,8 @@ test_no_lineage_checkout_anywhere() {
 }
 
 test_reusable_workflow
+test_build_only_signing
+test_build_only_permissions
 test_release_triggers
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding

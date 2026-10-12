@@ -70,15 +70,15 @@ on:
         default: default
     secrets:
       AVB_KEY:
-        required: true
+        required: false
       CERT_OTA:
-        required: true
+        required: false
       OTA_KEY:
-        required: true
+        required: false
       PASSPHRASE_AVB:
-        required: true
+        required: false
       PASSPHRASE_OTA:
-        required: true
+        required: false
       GH_TOKEN:
         required: false
       EMAIL:
@@ -169,7 +169,7 @@ on:
         default: default
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   preflight:
@@ -320,16 +320,18 @@ jobs:
           fi
 
   build:
+    permissions:
+      contents: write
     uses: ./.github/workflows/build-rom.yml
     needs: preflight
     if: >-
-      always() &&
+      always() && (github.event_name == 'schedule' || inputs.release-type != 'build-only') &&
       (
         (github.event_name != 'schedule' && inputs.release-type != 'default') ||
         (github.event_name != 'schedule' && inputs.root-mode != '') ||
         needs.preflight.outputs.should_build == 'true'
       )
-    with:
+    with: &grapheneos-build-inputs
       rom-family: grapheneos
       # Scheduled builds use the checked-in shiba definition; manual inputs remain authoritative.
       device-id: ${{ github.event_name == 'schedule' && needs.preflight.outputs.device_id || inputs.device-id }}
@@ -350,3 +352,11 @@ jobs:
       release-type: ${{ github.event_name == 'schedule' && 'default' || inputs.release-type }}
       publish: ${{ github.event_name == 'schedule' || inputs.release-type != 'build-only' }}
     secrets: inherit
+
+  build_only:
+    needs: preflight
+    if: always() && github.event_name != 'schedule' && inputs.release-type == 'build-only'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with: *grapheneos-build-inputs
