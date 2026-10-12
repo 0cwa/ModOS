@@ -201,6 +201,7 @@ class ModOSCareMapIntegrationContractTests(unittest.TestCase):
         self.assertIn("release-type: ${{ inputs.release-type }}", lineage)
         self.assertIn("publish: ${{ inputs.release-type != 'build-only' }}", lineage)
         self.assertIn("bash tests/pdx235_release_quarantine_test.sh", workflows["ci.yml"])
+        self.assertIn("bash tests/pdx235_source_publisher_test.sh", workflows["ci.yml"])
         self.assertIn("python3 tests/pdx235_integration_contract_test.py", workflows["ci.yml"])
 
     def test_quarantine_reached_from_all_publication_boundaries(self) -> None:
