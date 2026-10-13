@@ -23,6 +23,55 @@
       }
     ]
   },
+  "apk_upgrade_continuity": {
+    "checks": [
+      {
+        "apk_identity_continuity": "passed",
+        "identities": [
+          {
+            "archive_sha256": "924391fed31f2c7e06fe3855efbc59e1e54988dd66a780a6890c302802900f5c",
+            "certificate_sha256": "35749a70d9b855fe1a6262537db529fabc0ea24d1115ceb82835bf5a589578ae",
+            "min_sdk": 33,
+            "package": "com.chiller3.custota",
+            "version": "6.5",
+            "version_code": 394496
+          },
+          {
+            "archive_sha256": "95bef249eada9fc68321b7113d8913b5a68ee06a970a75ca5c42f3cd305f9c62",
+            "certificate_sha256": "35749a70d9b855fe1a6262537db529fabc0ea24d1115ceb82835bf5a589578ae",
+            "min_sdk": 33,
+            "package": "com.chiller3.custota",
+            "version": "6.6",
+            "version_code": 394752
+          }
+        ],
+        "module": "Custota"
+      },
+      {
+        "apk_identity_continuity": "passed",
+        "identities": [
+          {
+            "archive_sha256": "638dca60fbf2fcb678882648703b7bb8ebc8ea2e1982c4226a7e2bb79a7bd489",
+            "certificate_sha256": "de6ea74388dcff7a6120c0f192e77a92c486d40bb166c392fdf4101abc125954",
+            "min_sdk": 30,
+            "package": "com.chiller3.msd",
+            "version": "2.4",
+            "version_code": 132096
+          },
+          {
+            "archive_sha256": "d2c03c9b964ee282b2e857f7c3c1ce1ec4f3d881083858ab4e386af3a0ee1e16",
+            "certificate_sha256": "de6ea74388dcff7a6120c0f192e77a92c486d40bb166c392fdf4101abc125954",
+            "min_sdk": 30,
+            "package": "com.chiller3.msd",
+            "version": "2.5",
+            "version_code": 132352
+          }
+        ],
+        "module": "MSD"
+      }
+    ],
+    "run": 38419959898
+  },
   "artifacts": [
     {
       "app_contexts": "user=_app isPrivApp=true name=com.chiller3.custota domain=custota_app type=app_data_file levelFrom=all",
