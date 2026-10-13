@@ -67,28 +67,28 @@
     },
     {
       "arch": "x86_64-unknown-linux-gnu",
-      "artifact_name": "custota-tool-6.5-x86_64-unknown-linux-gnu.zip",
+      "artifact_name": "custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
       "id": "custota-tool",
       "layout": [
         {
           "mode": "0755",
           "path": "custota-tool",
-          "sha256": "09e97e6b15d3257a6154876c7e0c77d18e4a97e8b624a08922e70c4c09cbb527",
-          "size": 5605136,
+          "sha256": "a967123bbcb5424ea0faf588103bfff191c296e0b8df118b03efef9415f4c8aa",
+          "size": 5629680,
           "type": "file"
         }
       ],
-      "sha256": "936566f6aa69f6649d4f501f221271ca3f2ce3a68e063feef20af539a4dfc30b",
+      "sha256": "c556e5e72b7671914d7c772728abb0d2f602ff53d8873a1e6efdf202df654d73",
       "signature": {
         "identity": "chenxiaolong",
         "namespace": "file",
         "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
         "type": "ssh",
-        "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.5/custota-tool-6.5-x86_64-unknown-linux-gnu.zip.sig"
+        "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.6/custota-tool-6.6-x86_64-unknown-linux-gnu.zip.sig"
       },
-      "size": 2380483,
-      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.5/custota-tool-6.5-x86_64-unknown-linux-gnu.zip",
-      "version": "6.5"
+      "size": 2389309,
+      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.6/custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
+      "version": "6.6"
     }
   ]
 }

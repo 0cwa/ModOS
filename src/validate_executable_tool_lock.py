@@ -72,9 +72,9 @@ TOOL_POLICY = {
         "layout": {"LICENSE": "0644", "README.md": "0644", "avbroot": "0755"},
     },
     "custota-tool": {
-        "version": "6.5",
+        "version": "6.6",
         "repository": "Custota",
-        "artifact_name": "custota-tool-6.5-x86_64-unknown-linux-gnu.zip",
+        "artifact_name": "custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
         "layout": {"custota-tool": "0755"},
     },
 }

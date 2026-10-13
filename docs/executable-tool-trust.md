@@ -284,3 +284,23 @@ verify the original ZIP digest before normal envelope decryption and OTA
 verification. Splitting addresses the client's artifact-download limit; it
 does not change the encrypted payload or establish OTA acceptance. The source
 run and commit are preserved in each manifest, independent of the transport run.
+
+## October 13 upstream module/tool qualification
+
+Custota module 6.6, MSD module 2.5 and `custota-tool` 6.6 were downloaded from
+their exact official release URLs and verified against the unchanged checked-in
+SSH signer (identity `chenxiaolong`, namespace `file`). Exact archive/signature
+and member sizes/digests are recorded in
+[the module qualification receipt](evidence/upstream-modules-20261013.json).
+The Custota host tool's archive is 2,389,309 bytes, SHA-256
+`c556e5e72b7671914d7c772728abb0d2f602ff53d8873a1e6efdf202df654d73`.
+Its single `custota-tool` member retains executable mode `0755`. The canonical
+lock and validator policy advance together; no signer change is accepted.
+
+The new module archives retain the helper's APK/XML/tool paths and separate
+platform app selectors. Their source changes do not alter SELinux patcher code
+or context rules. The image adapter uses signed APK/XML/native payloads; it
+does not execute module installer or post-fs-data shell scripts. Existing vendor
+and ODM app-context files remain unchanged, preserving the bootloop repair.
+These are source/build compatibility checks, not new physical-device acceptance.
+Publication quarantine stays in place.

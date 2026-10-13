@@ -1,0 +1,471 @@
+{
+  "adapter_checks": {
+    "app_contexts": "each selector appears once, only in platform; vendor/ODM originals unchanged",
+    "cil_fallback": "both module rules present in vendor and ODM fixtures",
+    "limitations": [
+      "No binary Android policy patched in this fixture; policy-tool source/context rules unchanged between releases.",
+      "No full OTA build or phone runtime acceptance claimed."
+    ],
+    "modules": [
+      {
+        "actual_apk_xml_bytes_and_modes": "passed",
+        "archive": "Custota-6.6-release.zip",
+        "module": "custota",
+        "native_patcher_help": "passed",
+        "signed_helper_constructor": "passed"
+      },
+      {
+        "actual_apk_xml_bytes_and_modes": "passed",
+        "archive": "MSD-2.5-release.zip",
+        "module": "msd",
+        "native_patcher_help": "passed",
+        "signed_helper_constructor": "passed"
+      }
+    ]
+  },
+  "apk_upgrade_continuity": {
+    "checks": [
+      {
+        "apk_identity_continuity": "passed",
+        "identities": [
+          {
+            "archive_sha256": "924391fed31f2c7e06fe3855efbc59e1e54988dd66a780a6890c302802900f5c",
+            "certificate_sha256": "35749a70d9b855fe1a6262537db529fabc0ea24d1115ceb82835bf5a589578ae",
+            "min_sdk": 33,
+            "package": "com.chiller3.custota",
+            "version": "6.5",
+            "version_code": 394496
+          },
+          {
+            "archive_sha256": "95bef249eada9fc68321b7113d8913b5a68ee06a970a75ca5c42f3cd305f9c62",
+            "certificate_sha256": "35749a70d9b855fe1a6262537db529fabc0ea24d1115ceb82835bf5a589578ae",
+            "min_sdk": 33,
+            "package": "com.chiller3.custota",
+            "version": "6.6",
+            "version_code": 394752
+          }
+        ],
+        "module": "Custota"
+      },
+      {
+        "apk_identity_continuity": "passed",
+        "identities": [
+          {
+            "archive_sha256": "638dca60fbf2fcb678882648703b7bb8ebc8ea2e1982c4226a7e2bb79a7bd489",
+            "certificate_sha256": "de6ea74388dcff7a6120c0f192e77a92c486d40bb166c392fdf4101abc125954",
+            "min_sdk": 30,
+            "package": "com.chiller3.msd",
+            "version": "2.4",
+            "version_code": 132096
+          },
+          {
+            "archive_sha256": "d2c03c9b964ee282b2e857f7c3c1ce1ec4f3d881083858ab4e386af3a0ee1e16",
+            "certificate_sha256": "de6ea74388dcff7a6120c0f192e77a92c486d40bb166c392fdf4101abc125954",
+            "min_sdk": 30,
+            "package": "com.chiller3.msd",
+            "version": "2.5",
+            "version_code": 132352
+          }
+        ],
+        "module": "MSD"
+      }
+    ],
+    "run": 38419959898
+  },
+  "artifacts": [
+    {
+      "app_contexts": "user=_app isPrivApp=true name=com.chiller3.custota domain=custota_app type=app_data_file levelFrom=all",
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "module.prop",
+          "sha256": "aaf3d9204b6e416223ed9e3e10a3b17a927d01e9a6965c1d77ff6c6c824c3ac3",
+          "size": 218,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "plat_seapp_contexts",
+          "sha256": "ba7cf38226cff4ef72328d9e9478d621c724d56e0b4bd525a39cec04a25aed55",
+          "size": 102,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "boot_common.sh",
+          "sha256": "32bb4beac8aba260de6a20b550116a51e0ced56f51e9d7b68ccd31b545b0a2d5",
+          "size": 797,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "customize.sh",
+          "sha256": "70f531cc67b1c8916b62caba34ff6e04ceb1cc52407fd8305a79af3276fb71bb",
+          "size": 414,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "post-fs-data.sh",
+          "sha256": "4e6d3c562b436e4754da872ea562a0301327c048b5474285c34692b18c9317d0",
+          "size": 4077,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "size": 35149,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "README.md",
+          "sha256": "04fe2281c90ac136731a2ef0931eb299d6b9b5c4e2024247dbb2dbfeca818815",
+          "size": 22011,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "system/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "system/etc/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "system/etc/permissions/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/permissions/privapp-permissions-com.chiller3.custota.xml",
+          "sha256": "303c3599f4e5d6f08d072e519a7c4dfc2abc5fd2af06c65186598f93a9ea82e5",
+          "size": 510,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "system/etc/sysconfig/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/sysconfig/config-com.chiller3.custota.xml",
+          "sha256": "16c897fb40c9280db450a34cab5ec2eebedb9fb5ee439849f9917fb65a305161",
+          "size": 182,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "system/priv-app/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "system/priv-app/com.chiller3.custota/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0644",
+          "path": "system/priv-app/com.chiller3.custota/app-release.apk",
+          "sha256": "a1da836e6a025ccef9cc4eb240438beea54b42aed751eaea0b3ab04f62ef844e",
+          "size": 4508704,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "custota-selinux.arm64-v8a",
+          "sha256": "591cfc935b5020a6fc5c95b52fde4dd45b990ab199ff329991409799d19b5fd3",
+          "size": 1144624,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "custota-selinux.x86_64",
+          "sha256": "b65c9336f3e967b7133e36d7231961027bcc30c9dc212c886ee15eefdc8e0b73",
+          "size": 1266080,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/com/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/com/google/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/com/google/android/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0644",
+          "path": "META-INF/com/google/android/update-binary",
+          "sha256": "366e2b5c963508bcdef4f8f5380ce44e1e3cab06bd3e8aef724fbbccba1c11c2",
+          "size": 783,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "META-INF/com/google/android/updater-script",
+          "sha256": "d2b8203193a083e43ad076fde01b9c7821e0aa521e1f8077b8628fb1cdb70c60",
+          "size": 8,
+          "type": "file"
+        }
+      ],
+      "name": "Custota-6.6-release.zip",
+      "sha256": "95bef249eada9fc68321b7113d8913b5a68ee06a970a75ca5c42f3cd305f9c62",
+      "signature_sha256": "bc5348b87d722beaf62278456c134ce9f621f9a7425084fcf66f5ba3e223450b",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 3535281
+    },
+    {
+      "app_contexts": "user=_app isPrivApp=true name=com.chiller3.msd domain=msd_app type=app_data_file levelFrom=all",
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "module.prop",
+          "sha256": "b72ec0c747688a1c4ccbade8e5def4ca63b67a576160b6aa3572747eabcecd6c",
+          "size": 225,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "plat_seapp_contexts",
+          "sha256": "1d210cdd45b070896ec682f7846870e1284665808777b9572c8615540105ea0d",
+          "size": 94,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "boot_common.sh",
+          "sha256": "788a82bd96c7acd7f2ac467bfc363ae94ffd88df39b2e5fa5ea51b07a8053ae6",
+          "size": 846,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "customize.sh",
+          "sha256": "b7731d80c3e6455035a38be773257c76f0af037fd07776ee5e81c108c8f29c81",
+          "size": 393,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "post-fs-data.sh",
+          "sha256": "427ca00f68f680e71518b82ff14f7ec73b7ee389dc576e46a9baff45d94f4a52",
+          "size": 2014,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "service.sh",
+          "sha256": "8938121f2db166ef1c1cb8b663aa3c0be7824f93841743ca8f6f3b57a8086673",
+          "size": 1063,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "size": 35149,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "README.md",
+          "sha256": "f4c31efcea56b4fc08c4b834c4c50ec41e412af82139ef16c6cfdf3d2df59cee",
+          "size": 6973,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "system/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "system/etc/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "system/etc/sysconfig/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/sysconfig/config-com.chiller3.msd.xml",
+          "sha256": "b61e3085b588dba9d442c2cbc552b6edd1f80423a48acffa76c6dd9f7d585a8e",
+          "size": 186,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "system/priv-app/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "system/priv-app/com.chiller3.msd/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0644",
+          "path": "system/priv-app/com.chiller3.msd/app-release.apk",
+          "sha256": "8c1cb046fab9b8b5d99b0f68cbd88d59f81ab914e28e377f3e5ebc9b87b4f345",
+          "size": 3918067,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "msd-tool.arm64-v8a",
+          "sha256": "95c489c360bd7a725b261f29db7e74b25e4b9f3bb62b10e240975ec564c9d3a8",
+          "size": 1571632,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "msd-tool.armeabi-v7a",
+          "sha256": "a1cbeb0a9329e5b4552ad2feb45506b5d2362605b728118fbd06b2fa5b3a2b2b",
+          "size": 1081296,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "msd-tool.x86_64",
+          "sha256": "84b80f30c07ac133cc5d51e847aed30ca30f095235d6a7ec2e94393c4148e679",
+          "size": 1726176,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/com/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/com/google/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0755",
+          "path": "META-INF/com/google/android/",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size": 0,
+          "type": "directory"
+        },
+        {
+          "mode": "0644",
+          "path": "META-INF/com/google/android/update-binary",
+          "sha256": "f50daade498aa362b6a620cb384e8f6cc58184206bbf3bde4510e32f7d9a933b",
+          "size": 783,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "META-INF/com/google/android/updater-script",
+          "sha256": "d2b8203193a083e43ad076fde01b9c7821e0aa521e1f8077b8628fb1cdb70c60",
+          "size": 8,
+          "type": "file"
+        }
+      ],
+      "name": "MSD-2.5-release.zip",
+      "sha256": "d2c03c9b964ee282b2e857f7c3c1ce1ec4f3d881083858ab4e386af3a0ee1e16",
+      "signature_sha256": "79f43017b1dc3143ef46700da754ca7ef3b78e58c43d2a9c1648e94fd743ba68",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 4146040
+    },
+    {
+      "app_contexts": null,
+      "layout": [
+        {
+          "mode": "0755",
+          "path": "custota-tool",
+          "sha256": "a967123bbcb5424ea0faf588103bfff191c296e0b8df118b03efef9415f4c8aa",
+          "size": 5629680,
+          "type": "file"
+        }
+      ],
+      "name": "custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
+      "sha256": "c556e5e72b7671914d7c772728abb0d2f602ff53d8873a1e6efdf202df654d73",
+      "signature_sha256": "b572263f37a922daa933ed521f7b4e78bfcc1b96c93f28a6050636d7a0f66e53",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 2389309
+    }
+  ],
+  "custota_tool_checks": {
+    "bootstrap_security_regressions": "21 archive tests and13 bootstrap tests passed under system Python",
+    "bootstrap_signature_archive_member_verification": "passed",
+    "gen_csig_argument_contract": "unchanged helper arguments accepted by help; no signing-key use",
+    "gen_update_info_create_update": "version2, expected full OTA/csig URLs; malformed missing-version input rejected",
+    "sealed_native_execution": "custota-tool v6.6"
+  },
+  "limitations": [
+    "No physical installation of these versions performed.",
+    "Publication quarantine remains active."
+  ],
+  "purpose": "upstream module and Custota-tool qualification; no phone runtime acceptance",
+  "schema_version": 1,
+  "source_diff_review": "Custota6.5..6.6 and MSD2.4..2.5 leave SELinux patcher source, app contexts and helper input paths unchanged; KernelSU fix is in module post-fs-data.sh, which image adapter does not execute.",
+  "upstream_lead": [
+    "https://github.com/pixincreate/PixeneOS/pull/355",
+    "https://github.com/pixincreate/PixeneOS/pull/356"
+  ]
+}
