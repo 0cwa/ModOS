@@ -115,6 +115,7 @@ set_selection_fixture() {
   ADDITIONALS[ALTERINSTALLER]="true"
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
+  ADDITIONALS[MICROG]="false"
   resolve_rom_profile
 }
 
@@ -132,7 +133,7 @@ fingerprint() {
 }
 
 test_selection_fingerprint() (
-  local baseline repeated afsr_on afsr_off root_changed rom_changed module_changed
+  local baseline repeated afsr_on afsr_off root_changed rom_changed microg_changed module_changed
   local boot_changed second_boot_changed fingerprint_input
   local rootless_repo_changed rooted_repo_changed rooted_version_changed
 
@@ -201,8 +202,19 @@ test_selection_fingerprint() (
   [[ "${rom_changed}" != "${baseline}" ]] ||
     fail "ROM family did not change the fingerprint"
 
+  ADDITIONALS[MICROG]="true"
+  microg_changed="$(fingerprint)"
+  [[ "${microg_changed}" != "${rom_changed}" ]] ||
+    fail "microG selection did not change the fingerprint"
+  ADDITIONALS[MICROG]="false"
+
   ROM_FAMILY="grapheneos"
   resolve_rom_profile
+  ADDITIONALS[MICROG]="true"
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "GrapheneOS unexpectedly accepted microG"
+  fi
+  ADDITIONALS[MICROG]="false"
   ADDITIONALS[BCR]="false"
   module_changed="$(fingerprint)"
   [[ "${module_changed}" != "${baseline}" ]] ||
@@ -309,6 +321,72 @@ test_output_policy() (
   fi
 )
 
+
+test_official_key_extraction_uses_root_vbmeta_only() (
+  # The root vbmeta can contain chained partitions with their own keys.
+  # Assert that the dedicated root key extractor, not avb info, is used.
+  WORKDIR="${TEST_ROOT}/key-extract"
+  GRAPHENEOS[OTA_TARGET]="lineage-test-signed"
+  mkdir -p "${WORKDIR}"
+  : >"${WORKDIR}/${GRAPHENEOS[OTA_TARGET]}.zip"
+
+  local expected_key="${WORKDIR}/extracted/avb_pkmd.bin"
+  run_executable_tool() {
+    [[ "${1:-}" == 'avbroot' && "${2:-}" == 'ota' && "${3:-}" == 'extract' ]] ||
+      fail "unexpected AVB extraction command: $*"
+    [[ " $* " == *" --public-key-avb ${expected_key} "* ]] ||
+      fail "root vbmeta key extraction flag was not passed"
+    [[ " $* " == *" --all "* ]] ||
+      fail "legacy image extraction was dropped"
+    [[ " $* " == *" --input ${WORKDIR}/${GRAPHENEOS[OTA_TARGET]}.zip "* ]] ||
+      fail "the wrong OTA was passed for AVB extraction"
+    printf 'root-key-only' >"${expected_key}"
+  }
+  unzip() {
+    [[ "${1:-}" == "${WORKDIR}/${GRAPHENEOS[OTA_TARGET]}.zip" ]] ||
+      fail "unexpected OTA for certificate extraction"
+    mkdir -p "${WORKDIR}/extracted/ota/META-INF/com/android"
+    : >"${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
+  }
+
+  # A previous attempt may have left a malformed concatenated key.
+  mkdir -p "${WORKDIR}/extracted"
+  printf 'bad-previous-key' >"${expected_key}"
+  extract_official_keys
+  assert_equals 'root-key-only' "$(<"${expected_key}")" \
+    "root AVB key must come from the scoped extractor"
+  [[ -f "${WORKDIR}/extracted/ota/META-INF/com/android/otacert" ]] ||
+    fail "OTA certificate extraction changed"
+)
+
+test_official_key_extraction_rejects_missing_root_key() (
+  WORKDIR="${TEST_ROOT}/unsigned-key-extract"
+  GRAPHENEOS[OTA_TARGET]="lineage-test-signed"
+  mkdir -p "${WORKDIR}"
+  : >"${WORKDIR}/${GRAPHENEOS[OTA_TARGET]}.zip"
+
+  run_executable_tool() {
+    [[ "${1:-}" == 'avbroot' && "${2:-}" == 'ota' && "${3:-}" == 'extract' ]] ||
+      fail "unexpected AVB extraction command: $*"
+    local last='' value=''
+    for value in "$@"; do
+      if [[ "${last}" == '--public-key-avb' ]]; then
+        : >"${value}"
+        return
+      fi
+      last="${value}"
+    done
+    fail "root AVB output path is missing"
+  }
+  unzip() { fail "missing root key must fail before certificate extraction"; }
+
+  if extract_official_keys >/dev/null 2>&1; then
+    fail "a missing root vbmeta key was unexpectedly accepted"
+  fi
+)
+
+test_official_key_extraction_uses_root_vbmeta_only
+test_official_key_extraction_rejects_missing_root_key
 test_profiles_are_stable
 test_magisk_compatibility_defaults
 test_unknown_rom_fails_closed

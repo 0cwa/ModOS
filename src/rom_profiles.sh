@@ -8,6 +8,8 @@ declare -gA ROM_PROFILE
 
 _rom_profiles_source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_rom_profiles_source_dir}/ci/selection_variant.sh"
+source "${_rom_profiles_source_dir}/ci/pdx235_release_quarantine.sh"
+source "${_rom_profiles_source_dir}/development_profile.sh"
 unset _rom_profiles_source_dir
 
 function _require_profile_boolean() {
@@ -90,6 +92,13 @@ function enforce_output_policy() {
     ;;
   esac
 
+  validate_development_profile "${output_scope}" || return 1
+
+  # Block pdx235 releases *before* source download or signing. This remains
+  # independent of release-type, FORCE_UPDATE, module selections and root mode.
+  enforce_pdx235_care_map_quarantine \
+    "${ROM_FAMILY:-}" "${DEVICE_NAME:-}" "${output_scope}" || return 1
+
   if [[ "${ADDITIONALS[DEBUG]}" == 'true' &&
     "${output_scope}" != 'local-unpublished' ]]; then
     echo "Error: debug ADB output must remain local and unpublished." >&2
@@ -112,8 +121,8 @@ function enforce_publication_evidence() {
   fi
   enforce_output_policy "${output_scope}" || return 1
 
-  # No locked adapter currently has a reviewed source-delivery publication
-  # path. The helper report remains authoritative once such a path exists.
+  # F-Droid remains local-only until its source-delivery publication path is
+  # reviewed. The locked microG artifacts are Apache-2.0 and permit publication.
   if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
     echo "Error: locked-module publication evidence is unavailable." >&2
     return 1
@@ -184,8 +193,10 @@ function module_selection_fingerprint() {
     "bcr:BCR"
     "custota:CUSTOTA"
     "fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION"
+    "microg:MICROG"
     "msd:MSD"
     "oemunlockonboot:OEMUNLOCKONBOOT"
+    "disable-system-updater:DISABLE_SYSTEM_UPDATER"
   )
 
   resolve_rom_profile || return 1
@@ -226,6 +237,12 @@ function module_selection_fingerprint() {
     fi
   fi
 
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
+    "${ADDITIONALS[MICROG]}" == 'true' ]]; then
+    echo "Error: F-Droid locked mode and microG cannot share one helper lock/profile yet." >&2
+    return 1
+  fi
+
   if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
     lock_digest="$(_locked_input_digest "${FDROID_PRIVILEGED_EXTENSION_LOCK}")" || {
       echo "Error: the F-Droid lock is not clean and checked in." >&2
@@ -235,6 +252,12 @@ function module_selection_fingerprint() {
       echo "Error: the F-Droid profile is not clean and checked in." >&2
       return 1
     }
+  fi
+
+  if [[ "${ADDITIONALS[MICROG]}" == 'true' &&
+    "${ROM_FAMILY}" != 'lineageos' ]]; then
+    echo "Error: microG is supported only by the LineageOS profile." >&2
+    return 1
   fi
 
   SELECTION_ROM_FAMILY="${ROM_FAMILY}"
@@ -256,8 +279,10 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_BCR="${ADDITIONALS[BCR]}"
   SELECTION_MODULE_CUSTOTA="${ADDITIONALS[CUSTOTA]}"
   SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION="${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}"
+  SELECTION_MODULE_MICROG="${ADDITIONALS[MICROG]}"
   SELECTION_MODULE_MSD="${ADDITIONALS[MSD]}"
   SELECTION_MODULE_OEMUNLOCKONBOOT="${ADDITIONALS[OEMUNLOCKONBOOT]}"
+  SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
 

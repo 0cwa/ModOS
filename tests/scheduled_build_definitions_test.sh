@@ -37,7 +37,12 @@ check_definition() {
     [[ "$(toml_resolve_value force_update '')" == false ]] ||
       fail "${file}: scheduled force update must default to false"
 
-    for key in afsr alterinstaller bcr custota msd oemunlockonboot; do
+    local expected_microg=false
+    [[ "${expected_family}" != lineageos ]] || expected_microg=true
+    [[ "$(toml_resolve_value microg false)" == "${expected_microg}" ]] ||
+      fail "${file}: wrong scheduled microG selection"
+
+    for key in afsr alterinstaller bcr custota msd oemunlockonboot disable_system_updater; do
       [[ "$(toml_resolve_value "${key}" '')" == true ]] ||
         fail "${file}: ${key} must be enabled"
     done
@@ -74,8 +79,17 @@ check_loader() {
     fail "${file}: loader did not export paired root mode"
   grep -Fxq 'boot_animation=true' "${output_file}" ||
     fail "${file}: loader did not enable scheduled boot animation"
+  grep -Fxq 'ADDITIONALS_DISABLE_SYSTEM_UPDATER=true' "${env_file}" ||
+    fail "${file}: loader did not export stock updater removal"
   grep -Fxq 'ADDITIONALS_BOOT_ANIMATION=true' "${env_file}" ||
     fail "${file}: loader did not export boot animation to the job environment"
+
+  local expected_microg=false
+  [[ "${expected_family}" != lineageos ]] || expected_microg=true
+  grep -Fxq "microg=${expected_microg}" "${output_file}" ||
+    fail "${file}: loader emitted wrong microG selection"
+  grep -Fxq "ADDITIONALS_MICROG=${expected_microg}" "${env_file}" ||
+    fail "${file}: loader exported wrong microG selection"
 
   rm -f "${output_file}" "${env_file}"
 }
@@ -97,6 +111,11 @@ grep -Fq 'needs.preflight.outputs.root_mode' .github/workflows/release.yml ||
   fail "GrapheneOS scheduled root mode is not forwarded from the definition"
 grep -Fq 'needs.schedule_config.outputs.root_mode' .github/workflows/release-lineage.yml ||
   fail "LineageOS scheduled root mode is not forwarded from the definition"
+
+grep -Fq 'needs.preflight.outputs.disable_system_updater' .github/workflows/release.yml ||
+  fail "GrapheneOS scheduled updater removal is not forwarded from the definition"
+grep -Fq 'needs.schedule_config.outputs.disable_system_updater' .github/workflows/release-lineage.yml ||
+  fail "LineageOS scheduled updater removal is not forwarded from the definition"
 grep -Fq 'check_existing_pair.sh' .github/workflows/release.yml ||
   fail "GrapheneOS paired schedule is not protected by paired existing-build preflight"
 
@@ -111,3 +130,6 @@ else
 fi
 
 echo "scheduled build definition tests passed"
+
+grep -Fq "needs.schedule_config.outputs.microg == 'true'" .github/workflows/release-lineage.yml ||
+  fail 'LineageOS schedule does not forward microG'

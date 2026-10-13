@@ -19,6 +19,7 @@ function main() {
 
   resolve_rom_profile
   enforce_output_policy "${OUTPUT_SCOPE}"
+  activate_development_profile
   resolve_root_mode
 
   # Fetch the latest ROM version and Magisk

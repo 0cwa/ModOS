@@ -315,6 +315,18 @@ def install_runtime_payload(
             )
         target = PurePosixPath(raw_target)
         fs.mkdir(str(target.parent), mode=0o755, parents=True, exist_ok=True)
+        # Some source ROMs alias the dark archive to the light archive. ExtFs
+        # keeps existing entry types when opening a file, so replace that alias
+        # explicitly or AFSR would repack a symlink and discard our dark bytes.
+        entry = next((entry for entry in fs.info.entries if entry.path == target), None)
+        if entry is not None and entry.file_type == "Symlink":
+            tree_path = fs.tree / target.relative_to("/")
+            if tree_path.is_symlink():
+                tree_path.unlink()
+            entry.file_type = "RegularFile"
+            entry.file_mode = 0o644
+            entry.source = None
+            entry.symlink_target = None
         with fs.open(str(target), "wb", mode=0o644) as stream:
             stream.write(payload_by_target[raw_target])
 

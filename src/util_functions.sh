@@ -7,6 +7,7 @@
 source src/declarations.sh
 _util_functions_source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_util_functions_source_dir}/config_schema.sh"
+source "${_util_functions_source_dir}/source_care_map_policy.sh"
 unset _util_functions_source_dir
 source src/exchange.sh
 source src/fetcher.sh
@@ -184,6 +185,19 @@ function run_executable_tool() {
     run "${tool}" -- "$@"
 }
 
+# Serialize an exact argv prefix: the helper may change cwd and must never
+# resolve the locked tools through its own PATH lookup.
+function executable_tool_runner_prefix_json() {
+  local repository_root
+  repository_root="$(git rev-parse --show-toplevel)" || return 1
+  python3 -I -c '
+import json, os, sys
+print(json.dumps([os.path.abspath(sys.executable), "-E", "-s",
+                  os.path.join(sys.argv[1], "src", "bootstrap_executable_tools.py"),
+                  "--workdir", os.path.abspath(sys.argv[2]), "run"]))
+' "${repository_root}" "${WORKDIR}"
+}
+
 # Function to check the flag status
 # If flag for a tool is disabled, it is not downloaded
 function flag_check() {
@@ -218,6 +232,7 @@ function append_enabled_module_arguments() {
     "bcr:BCR"
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "alterinstaller:ALTERINSTALLER"
+    "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "boot-animation:BOOT_ANIMATION"
   )
 
@@ -316,6 +331,75 @@ function prepare_boot_animation_module() {
   export PIXENEOS_BOOT_ANIMATION_DARK_PATH="${dark_payload_path}"
 }
 
+# Register the local system-updater removal module in the pinned helper.
+# This mirrors the existing boot-animation registration and deliberately avoids
+# carrying a fork-only adapter inside my-avbroot-setup.
+function prepare_disable_system_updater_module() {
+  local helper_root="${1}"
+  local init_file registry_file module_source
+
+  if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" != 'true' ]]; then
+    return 0
+  fi
+
+  case "${ROM_FAMILY}" in
+    grapheneos|lineageos) ;;
+    *)
+      echo "Error: stock updater removal is unsupported for ROM family: ${ROM_FAMILY}" >&2
+      return 1
+      ;;
+  esac
+
+  init_file="${helper_root}/lib/modules/__init__.py"
+  registry_file="${helper_root}/lib/modules/registry.py"
+  module_source="${helper_root}/lib/modules/disable_system_updater.py"
+
+  if [[ ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ]]; then
+    echo "Error: pinned patch helper lacks a safe module registry." >&2
+    return 1
+  fi
+  if [[ -L "${module_source}" ]]; then
+    echo "Error: pinned patch helper has an unsafe updater module path." >&2
+    return 1
+  fi
+
+  cp -- src/disable_system_updater.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+
+  if ! grep -Fq 'from lib.modules.disable_system_updater import DisableSystemUpdaterMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.disable_system_updater import DisableSystemUpdaterMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(DisableSystemUpdaterMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(DisableSystemUpdaterMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
+  : >"${WORKDIR}/modules/disable-system-updater.zip"
+  : >"${WORKDIR}/signatures/disable-system-updater.zip.sig"
+  export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+}
+
 # Resolve and acquire the locked F-Droid inputs before exposing them to the
 # patch command. Artifact URLs and versions belong exclusively to the lock.
 function prepare_fdroid_privileged_extension() {
@@ -362,6 +446,71 @@ function prepare_fdroid_privileged_extension() {
     echo "Error: F-Droid locked artifact verification failed." >&2
     return 1
   fi
+
+  args_ref+=(
+    "--module-lock" "${lock_path}"
+    "--module-profile" "${profile_path}"
+    "--module-cache" "${cache_path}"
+    "--patch-report" "${report_path}"
+  )
+}
+
+function write_microg_resolution_profile() {
+  local profile_path="${1}"
+  local root_mode='rootless'
+
+  resolve_root_mode >/dev/null || return 1
+  [[ "${RESOLVED_ROOT_MODE}" != 'magisk' ]] || root_mode='rooted'
+
+  mkdir -p -- "$(dirname -- "${profile_path}")" || return 1
+  cat >"${profile_path}" <<EOF
+schema_version = 1
+id = 'lineageos-microg-${root_mode}'
+rom_family = 'lineageos'
+root_mode = '${root_mode}'
+abi = 'arm64-v8a'
+api_level = 36
+output_scope = '${OUTPUT_SCOPE}'
+enabled_modules = ['microg']
+acknowledgements = []
+experimental_acknowledgements = []
+
+[capabilities]
+root_providers = []
+zygisk_providers = []
+selective_signature_spoofing = true
+product_priv_app = true
+custom_init_selinux = false
+EOF
+}
+
+function prepare_microg() {
+  local args_name="${1}"
+  local helper_root="${2}"
+  local -n args_ref="${args_name}"
+  local lock_path="${helper_root}/locks/microg-${VERSION[MICROG]}.json"
+  local cache_path="${WORKDIR}/locked-artifacts"
+  local profile_path="${WORKDIR}/locked-profiles/microg.toml"
+  local report_path="${OUTPUTS[PATCHED_OTA]}.microg-patch-report.json"
+  local module_tool="${helper_root}/module-tool.py"
+
+  if [[ "${ADDITIONALS[MICROG]}" != 'true' ]]; then
+    return 0
+  fi
+  if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
+    echo "Error: microG is supported only for LineageOS." >&2
+    return 1
+  fi
+  if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
+    ! -f "${module_tool}" || -L "${module_tool}" ]]; then
+    echo "Error: pinned helper lacks the reviewed microG lock/module tool." >&2
+    return 1
+  fi
+  write_microg_resolution_profile "${profile_path}" || return 1
+  python "${module_tool}" artifacts fetch \
+    --lock "${lock_path}" \
+    --cache "${cache_path}" \
+    --module microg >/dev/null || return 1
 
   args_ref+=(
     "--module-lock" "${lock_path}"
@@ -446,7 +595,7 @@ function generate_keys() {
 
   # Convert the public key portion of the AVB signing key to the AVB public key metadata format
   # This is the format that the bootloader requires when setting the custom root of trust
-  run_executable_tool avbroot key extract-avb \
+  run_executable_tool avbroot key encode-avb \
     -k "${KEYS[AVB]}" -o "${KEYS[PKMD]}" || return 1
 
   # Generate a self-signed certificate for the OTA signing key
@@ -486,6 +635,12 @@ function patch_ota() {
     enable_venv || return 1
   fi
 
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
+    "${ADDITIONALS[MICROG]}" == 'true' ]]; then
+    echo "Error: multiple locked module bundles are not supported in one build." >&2
+    return 1
+  fi
+
   # Locked module artifacts must be resolved, fetched, and verified before any
   # OTA contents are unpacked. Keep the disabled path on its legacy ordering.
   if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
@@ -496,11 +651,34 @@ function patch_ota() {
     fi
   fi
 
-  # Extract the official public keys and certificates if not found
+  # Extract the official public keys and certificates if not found.
+  # An extraction failure must terminate the patch request.
   if [[ ! -e "${grapheneos_pkmd}" || ! -e "${grapheneos_otacert}" ]]; then
     echo "Extracting official keys..."
-    extract_official_keys
+    extract_official_keys || return 1
   fi
+
+  # The normal strict verifier receives a certificate extracted from the OTA.
+  # For pdx235, independently match that certificate to the pinned LineageOS
+  # publisher and to this exact downloaded source ZIP, whether or not any
+  # source care-map exception is requested. The helper subsequently performs
+  # full OTA signature and payload/AVB verification with that certificate.
+  source_care_map_require_lineageos_pdx235_publisher \
+    "${ROM_FAMILY}" "${DEVICE_NAME:-}" "${ota_zip}.zip" \
+    "${grapheneos_otacert}" || return 1
+
+  # Do not take the historical "output already exists" success path for this
+  # affected device: it skips both helper cryptographic and care-map postflight.
+  # Fail closed on pre-existing rootless/Magisk bytes or sidecars. A future
+  # independently reviewed implementation may replace this with mandatory
+  # fresh verification of *every* signed output, including the secondary.
+  local secondary_ota=''
+  if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
+    secondary_ota="${OUTPUTS[PATCHED_OTA_MAGISK]}"
+  fi
+  reject_pdx235_preexisting_outputs \
+    "${ROM_FAMILY}" "${DEVICE_NAME:-}" "${RESOLVED_ROOT_MODE}" \
+    "${OUTPUTS[PATCHED_OTA]}" "${secondary_ota}" || return 1
 
   # Legacy output markers do not encode a locked module selection. Never reuse
   # one for an enabled F-Droid build. A dual build is reusable only when both
@@ -525,6 +703,14 @@ function patch_ota() {
   else
     echo -e "Patching OTA..."
     local args=()
+    local tool_runner_prefix
+    if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+      activate_development_profile || return 1
+      args+=("--runtime-care-map")
+    else
+      tool_runner_prefix="$(executable_tool_runner_prefix_json)" || return 1
+      args+=("--tool-runner-prefix-json" "${tool_runner_prefix}")
+    fi
 
     # OTA input and output
     args+=("--input" "${ota_zip}.zip")
@@ -533,6 +719,24 @@ function patch_ota() {
     # GrapheneOS public key metadata and certificate
     args+=("--verify-public-key-avb" "${grapheneos_pkmd}")
     args+=("--verify-cert-ota" "${grapheneos_otacert}")
+
+    # Never enable the exception just because this is LineageOS/pdx235.
+    # The October 9 source publisher and filesystem fingerprints have been
+    # authenticated, but corrected output/runtime verification remains
+    # unresolved; the checked-in pin is intentionally empty (strict default).
+    # If a source is ever independently reviewed and pinned, also require the
+    # exact source bytes, release filename, device and avbroot version.
+    if [[ -n "${_SOURCE_CARE_MAP_PDX235_20261009_SHA256}" &&
+      "${ROM_FAMILY}" == 'lineageos' && "${DEVICE_NAME:-}" == 'pdx235' ]]; then
+      local active_avbroot_version
+      if active_avbroot_version="$(run_executable_tool avbroot --version)" &&
+        source_care_map_exception_allowed \
+          "${ROM_FAMILY}" "${DEVICE_NAME}" "${GRAPHENEOS[OTA_TARGET]}" \
+          "${ota_zip}.zip" "${active_avbroot_version}" \
+          "${grapheneos_otacert}"; then
+        args+=("--allow-source-care-map-mismatch")
+      fi
+    fi
 
     # PixeneOS decoded keys and certificates
     args+=("--sign-key-avb" "${KEYS[AVB]}")
@@ -555,9 +759,15 @@ function patch_ota() {
       ! prepare_boot_animation_module "${my_avbroot_setup}"; then
       return 1
     fi
+    if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" == 'true' ]] &&
+      ! prepare_disable_system_updater_module "${my_avbroot_setup}"; then
+      return 1
+    fi
     append_enabled_module_arguments args
     if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
       args+=("${locked_module_args[@]}")
+    elif [[ "${ADDITIONALS[MICROG]}" == 'true' ]]; then
+      prepare_microg args "${my_avbroot_setup}" || return 1
     elif ! prepare_fdroid_privileged_extension args "${my_avbroot_setup}"; then
       return 1
     fi
@@ -606,11 +816,35 @@ function patch_ota() {
         args+=("--secondary-patch-arg" "${magisk_path}")
         args+=("--secondary-patch-arg=--magisk-preinit-device")
         args+=("--secondary-patch-arg" "${MAGISK[PREINIT]}")
+        # LineageOS vbmeta commonly ships with verification-disabled flags.
+        # The rootless plan already clears them; the Magisk secondary plan
+        # must receive the same profile-wide requirement independently.
+        if [[ "${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}" == 'true' ]]; then
+          args+=("--secondary-patch-arg=--clear-vbmeta-flags")
+        fi
         ;;
     esac
 
-    # Python command to run the patch script
-    python "${my_avbroot_setup}/patch.py" "${args[@]}" || return 1
+    # Keep large helper images on the build filesystem rather than a small
+    # host /tmp tmpfs. Only the child inherits this private scratch location.
+    local -a helper_command=(python "${my_avbroot_setup}/patch.py")
+    if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+      local repository_root build_parent
+      repository_root="$(git rev-parse --show-toplevel)" || return 1
+      build_parent="$(mktemp -d "${WORKDIR}/care-map-source-build.XXXXXX")" || return 1
+      helper_command=(python "${my_avbroot_setup}/tools/care-map/build_and_run.py" \
+        --modos-repo "${repository_root}" \
+        --bootstrap-workdir "$(realpath -- "${WORKDIR}")" \
+        --build-workdir "$(realpath -- "${build_parent}")/build" \
+        --)
+    fi
+    local helper_scratch helper_status=0
+    helper_scratch="$(mktemp -d "$(realpath -- "${WORKDIR}")/helper-scratch.XXXXXX")" || return 1
+    TMPDIR="${helper_scratch}" "${helper_command[@]}" "${args[@]}" || helper_status=$?
+    # Python owns cleanup of its nested temporary directories. Remove only an
+    # empty parent; preserve debugging contents for the normal WORKDIR lifecycle.
+    rmdir -- "${helper_scratch}" 2>/dev/null || :
+    [[ "${helper_status}" -eq 0 ]] || return "${helper_status}"
 
     # A Magisk label is publication metadata, not proof of a working runtime
     # root environment. Static CI can verify the Magisk boot patch and paired
@@ -669,7 +903,7 @@ function extract_ota_boot_target() {
 
 function verify_boot_animation_ota() {
   local ota_path="${1}"
-  local temp_dir payload_path dark_payload_path avbroot_bin afsr_bin ota_abs
+  local temp_dir payload_path dark_payload_path ota_abs
   local extract_dir unpack_dir image_path raw_image
 
   [[ -f "${ota_path}" ]] || {
@@ -686,22 +920,6 @@ function verify_boot_animation_ota() {
     rm -rf -- "${temp_dir}"
     return 1
   }
-  avbroot_bin="$(resolve_executable_tool avbroot)" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
-  afsr_bin="$(resolve_executable_tool afsr)" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
-  avbroot_bin="$(realpath -- "${avbroot_bin}")" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
-  afsr_bin="$(realpath -- "${afsr_bin}")" || {
-    rm -rf -- "${temp_dir}"
-    return 1
-  }
 
   extract_dir="${temp_dir}/extract-product"
   unpack_dir="${temp_dir}/unpack-product"
@@ -710,7 +928,7 @@ function verify_boot_animation_ota() {
     return 1
   }
 
-  if ! "${avbroot_bin}" ota extract \
+  if ! run_executable_tool avbroot ota extract \
     --input "${ota_abs}" \
     --directory "${extract_dir}" \
     --partition product >/dev/null; then
@@ -729,12 +947,14 @@ function verify_boot_animation_ota() {
     return 1
   }
 
-  if ! (
-    cd -- "${unpack_dir}" &&
-      "${avbroot_bin}" avb unpack --quiet --input "${image_path}" &&
-      raw_image="$(realpath -- raw.img)" &&
-      "${afsr_bin}" unpack --input "${raw_image}"
-  ); then
+  raw_image="${unpack_dir}/raw.img"
+  if ! run_executable_tool avbroot avb unpack --quiet \
+    --input "${image_path}" \
+    --output-info "${unpack_dir}/avb.toml" \
+    --output-raw "${raw_image}" ||
+    ! run_executable_tool afsr unpack --input "${raw_image}" \
+      --output-metadata "${unpack_dir}/fs_metadata.toml" \
+      --output-tree "${unpack_dir}/fs_tree"; then
     rm -rf -- "${temp_dir}"
     return 1
   fi
@@ -943,6 +1163,12 @@ function my_avbroot_setup() {
   local compatibility_helper="tools/compat/avbroot_setup_compat.py"
   local helper_source="${PIXENEOS_AVBROOT_SETUP_SOURCE:-${DOMAIN}/0cwa/my-avbroot-setup}"
   local location_path
+  local -a compatibility_args=()
+  if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+    activate_development_profile || return 1
+    helper_source="${PIXENEOS_AVBROOT_SETUP_SOURCE}"
+    compatibility_args+=("--manifest" "${PIXENEOS_DEVELOPMENT_COMPAT_MANIFEST}")
+  fi
 
   if [[ -n "${PIXENEOS_RELEASE_BASE_URL}" ]]; then
     location_path="${PIXENEOS_RELEASE_BASE_URL%/}/${OUTPUTS[PATCHED_OTA]}"
@@ -951,7 +1177,7 @@ function my_avbroot_setup() {
   fi
 
   echo -e "Running script modifications..."
-  python3 "${compatibility_helper}" \
+  python3 "${compatibility_helper}" "${compatibility_args[@]}" \
     --source "${helper_source}" \
     "${helper_root}" \
     "${location_path}" \
@@ -1064,8 +1290,8 @@ function env_setup() {
     executable_directories+=("$(dirname -- "${executable}")")
   done
 
-  # The pinned helper currently resolves these names through PATH. Track the
-  # exact injected prefix so a later setup can restore the caller's base PATH.
+  # Keep compatibility paths for callers; helper tool execution uses the
+  # authenticated runner prefix. Track this prefix for repeated setup.
   if ((${#executable_directories[@]})); then
     path_prefix="$(IFS=:; echo "${executable_directories[*]}")"
     PIXENEOS_EXECUTABLE_BASE_PATH="${PATH}"
@@ -1197,37 +1423,34 @@ function download_dependencies() {
   fi
 }
 
-# Function to extract the official GrapheneOS keys from the OTA
+# Extract the OTA's embedded verification certificate and root vbmeta AVB
+# public key. Use avbroot's structured extractor: the old "avb info | sed"
+# pipeline also matched chained-partition public_key fields, concatenating
+# multiple independent keys into one invalid AVB key file.
 function extract_official_keys() {
-  # https://github.com/chenxiaolong/my-avbroot-setup/issues/1#issuecomment-2270286453
-  # AVB: Extract vbmeta.img, run avbroot avb info -i vbmeta.img.
-  #   The public_key field is avb_pkmd.bin encoded as hex.
-  #   Verify that the key is official by comparing its sha256 checksum with grapheneos.org/articles/attestation-compatibility-guide.
-  # OTA: Extract META-INF/com/android/otacert from the OTA.
-  #   (Or from otacerts.zip inside system.img or vendor_boot.img. All 3 files are identical.)
   local ota_zip="${WORKDIR}/${GRAPHENEOS[OTA_TARGET]}.zip"
-  local avb_info
+  local public_key="${WORKDIR}/extracted/avb_pkmd.bin"
 
-  # Extract OTA
+  mkdir -p -- "${WORKDIR}/extracted" "${WORKDIR}/extracted/extracts" || return 1
+  rm -f -- "${public_key}" || return 1
+
+  # The pinned avbroot 3.34.1 extracts only the root vbmeta header's key;
+  # chained descriptors are never included. Retain the existing --all image
+  # extraction for compatibility with downstream consumers.
   run_executable_tool avbroot ota extract \
     --input "${ota_zip}" \
     --directory "${WORKDIR}/extracted/extracts" \
-    --all || return 1
+    --all \
+    --public-key-avb "${public_key}" || return 1
 
-  # Extract vbmeta.img
-  # To verify, execute sha256sum avb_pkmd.bin in terminal
-  # compare the output with base16-encoded verified boot key fingerprints
-  # mentioned at https://grapheneos.org/articles/attestation-compatibility-guide for the respective device
-  avb_info="$(run_executable_tool avbroot avb info \
-    -i "${WORKDIR}/extracted/extracts/vbmeta.img")" || return 1
-  local public_key_hex
-  public_key_hex="$(printf '%s\n' "${avb_info}" | sed -n 's/.*public_key: "\(.*\)".*/\1/p' | tr -d '[:space:]')" || return 1
-  [[ -n "${public_key_hex}" ]] || return 1
-  printf '%s' "${public_key_hex}" | xxd -r -p >"${WORKDIR}/extracted/avb_pkmd.bin" || return 1
-  [[ -s "${WORKDIR}/extracted/avb_pkmd.bin" ]] || return 1
+  if [[ ! -s "${public_key}" ]]; then
+    echo "Error: the source OTA has no root vbmeta AVB public key; refusing to patch without verification." >&2
+    return 1
+  fi
 
-  # Extract META-INF/com/android/otacert from OTA or otacerts.zip from either vendor_boot.img or system.img
-  unzip "${ota_zip}" -d "${WORKDIR}/extracted/ota"
+  # Preserve the existing OTA certificate extraction path. The helper uses
+  # this certificate to validate the source OTA and recovery consistency.
+  unzip "${ota_zip}" -d "${WORKDIR}/extracted/ota" || return 1
 }
 
 function dirty_suffix() {

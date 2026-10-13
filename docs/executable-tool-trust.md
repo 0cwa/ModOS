@@ -153,13 +153,18 @@ anonymous file descriptor, sets the locked mode, seals the snapshot against
 content changes, and rechecks its digest and mode after sealing. It executes
 that sealed descriptor without resolving the executable pathname again.
 
-The `resolve` command and digest-addressed executable paths exist only for
-compatibility with the pinned helper. A successful resolution does not itself
-authorize execution. The helper still resolves `avbroot`, `afsr`, and
-`custota-tool` through `PATH`; PixeneOS places only enabled digest-addressed
-directories at the front of that path, but the helper's later pathname lookup
-remains an open execution boundary. Close it with the planned trusted-prefix
-`ToolRunner` integration before treating helper execution as inode-bound.
+The `resolve` command and digest-addressed executable paths remain for
+compatibility and enabled-tool setup validation. A successful resolution does
+not itself authorize execution. PixeneOS supplies the helper's
+`--tool-runner-prefix-json` with an exact argument array containing the absolute
+Python interpreter, flags disabling Python environment overrides and user
+site packages, absolute bootstrap script path, absolute work directory, and
+`run` subcommand. The helper appends the allowlisted
+tool ID, `--`, and tool arguments without shell parsing. Its tool invocations
+therefore pass through the same post-seal-verified descriptor execution as
+direct PixeneOS calls, even when the helper changes its working directory or
+an executable with the same name exists on `PATH`. Compatibility directories
+on `PATH` do not authorize helper execution.
 
 The canonical JSON report contains stable tool identity, version, architecture,
 archive and member sizes/digests, and signer verification results. It omits
@@ -170,14 +175,112 @@ succeeds.
 The offline lock validator by itself still does **not** authorize extraction,
 permission changes, or execution. A successful runtime transaction authorizes
 authenticated installation, and the `run` command authorizes direct PixeneOS
-execution only through its post-seal-verified anonymous file descriptor. It
-does not authorize the helper's compatibility PATH execution. Run acquisition
-through `check_and_download_dependencies`; do not call the legacy downloader
-for these three executable tools. Real OTA integration remains blocked until
-the helper uses the trusted runner and the other documented host-code
-supply-chain gates are closed.
+and helper execution only through its post-seal-verified anonymous file
+descriptor. Run acquisition through `check_and_download_dependencies`; do not call the legacy downloader
+for these three executable tools. Real OTA integration remains subject to
+the other documented host-code supply-chain gates.
+
+## Current integration evidence
+
+The earlier helper PATH execution gap is closed in the goal integration:
+direct ModOS and helper calls use the exact authenticated runner prefix and
+post-seal-verified descriptor execution described above. Ordinary build-only
+jobs enforce read-only repository permissions and use disposable signing material;
+the separately selected repository-signer device candidate forwards only its
+signing inputs, with publishing still disabled.
+
+The strict care-map source engine at
+`6107d7e92c35b81cac0d28aec3806b45c8cb1f59` and helper passed actual October 9
+source verification and disposable-key rootless/Magisk output pairs with microG
+off and on. The genuine complete enabled-module profile has also passed
+rootless/Magisk postflight, with module archives verified through the pinned SSH signer.
+[The review receipt](evidence/pdx235-20261012.json) records exact complete-profile
+outputs and selected modules. Independent inspection passed for genuine module
+payloads, compatible policy labels, both regular boot variants, updater removal
+and shared images/root distinctions. Retained inert updater caches are recorded
+without adding another gate. The real read-only source-build/repository-signing workflow and independent
+verification of its exact retrieved encrypted candidate have now also passed.
+[Acceptance](pdx235-care-map-integration.md) and the receipt's
+`repository_candidate` section record the exact run, archive and output identities.
+The public PKMD is authenticated by configured-key workflow provenance; physical
+enrolled-key matching, boot/persistence and production lock promotion remain
+separate and unobserved.
+
+## Explicit source-build development profile
+
+The manual LineageOS workflow may select `development-profile=care-map-pdx235`
+for `build-only`. This profile requires LineageOS/pdx235 and
+`local-unpublished` output scope. It uses the common acquisition, module,
+root-mode, signing, and output-verification pipeline, with one checked-in
+candidate helper contract at
+`tools/compat/avbroot_setup_care_map_pdx235.json`. Missing or modified candidate
+metadata rejects activation. Production helper and executable pins remain
+unchanged; ordinary build-only signing remains disposable.
+
+The prepared candidate helper's `tools/care-map/build_and_run.py` reads tracked,
+clean source inputs from the captured helper commit, verifies its fixed patch
+and Cargo.lock hashes, obtains a fresh exact upstream checkout and builds with
+`cargo build --release --locked`. Signing secrets and GitHub credentials are
+excluded from compiler processes. The parent retains the newly compiled binary
+digest/size in memory and supplies its own sealed runner to the helper with
+`--runtime-care-map`; a saved receipt never authorizes execution. ModOS's
+existing `open_sealed_executable` binds each execution to those measured bytes.
+This development path assumes a trusted compiler/host/dependency cache and is
+repository-reviewed source authorization, not a chenxiaolong-signed executable
+release. Historical measured binary digests are evidence, not mutable replacement
+trust pins. afsr and Custota continue through the official executable lock. The pdx235 publication quarantine
+remains unchanged. A separate, default-off `export-device-candidate` request
+permits device-acceptance artifacts only with this profile,
+`signing-mode=repository`, `release-type=build-only`, and no publication.
+With an empty `device-candidate-recipient-base64`, the `device-candidate`
+artifact contains normal signed OTA ZIPs, their selection metadata, the primary
+microG report when enabled, and the designated public AVB key. GitHub wraps
+these files in an artifact ZIP: extract that outer ZIP once, then pass the
+selected OTA ZIP to `adb sideload` without extracting the OTA itself.
+These artifacts follow the repository's normal artifact visibility.
+
+Supplying a public recipient certificate selects `encrypted-device-candidate`
+instead. The certificate is validated before signing; this artifact contains
+one CMS AES-256-GCM envelope per OTA and one nonsecret transport manifest.
+Both modes use the same final-output allowlist. Private signing material and
+raw working directories are never exported. Candidate artifact delivery does
+not publish a GitHub release or lift the Custota publication quarantine.
+
+Separate envelopes keep the paired output out of OpenSSL's combined-object
+ASN.1 size limit; the public AVB key appears identically in both, and the microG
+report belongs to the primary OTA envelope.
+
+The recipient decrypts each envelope to a temporary archive and extracts only after OpenSSL
+reports success. For example:
+
+```sh
+openssl cms -decrypt -binary -inform DER -in candidate-1.cms.der \
+  -recip recipient.crt -inkey recipient.key -out candidate.tar.tmp &&
+  mv candidate.tar.tmp candidate.tar
+```
+
+Keep the recipient private key outside the repository and GitHub workflow;
+supply only the base64-encoded public certificate. GitHub artifact delivery is
+private device-acceptance transport, not release or updater publication.
 
 [signing-guide]: https://github.com/chenxiaolong/chenxiaolong/blob/master/VERIFY_SSH_SIGNATURES.md
 [afsr-release]: https://github.com/chenxiaolong/afsr/releases/tag/v1.0.4
 [avbroot-release]: https://github.com/chenxiaolong/avbroot/releases/tag/v3.34.1
 [custota-release]: https://github.com/chenxiaolong/Custota/releases/tag/v6.4
+
+The reusable ROM publisher inherits its calling job's permissions. Publishing
+callers explicitly grant `contents: write`; the shared workflow does not request
+write itself, because GitHub validates skipped reusable jobs against a read-only
+caller's ceiling before evaluating their conditions. The executed build-only
+job explicitly requests `contents: read`, including under a write-capable caller.
+
+The same Lineage workflow can retransport an existing encrypted candidate by
+supplying `source-artifact-id` and `expected-source-zip-sha256`. This mode skips
+all build, signing, and publication jobs. Read-only jobs verify GitHub's artifact
+digest and successful same-repository source run, then fetch exact 256 MiB byte
+ranges with a nonsecret part manifest. GitHub authorization is withheld from
+the signed artifact-storage request. Reassemble the parts in index order and
+verify the original ZIP digest before normal envelope decryption and OTA
+verification. Splitting addresses the client's artifact-download limit; it
+does not change the encrypted payload or establish OTA acceptance. The source
+run and commit are preserved in each manifest, independent of the transport run.

@@ -34,7 +34,7 @@ mock_magisk_tags() {
 }
 
 reset_acquisition_fixture() {
-  unset GRAPHENEOS_VERSION GRAPHENEOS_UPDATE_CHANNEL ROM_UPDATE_TYPE
+  unset GRAPHENEOS_VERSION GRAPHENEOS_UPDATE_CHANNEL ROM_UPDATE_TYPE PIXENEOS_DEVELOPMENT_PROFILE
   VERSION[GRAPHENEOS]=""
   VERSION[MAGISK]=""
   GRAPHENEOS[OTA_URL]=""
@@ -218,6 +218,60 @@ test_unsafe_lineageos_metadata_fails_closed() (
   fi
 )
 
+test_development_source_does_not_follow_major_upgrade() (
+  reset_acquisition_fixture
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  PIXENEOS_DEVELOPMENT_PROFILE=care-map-pdx235
+  git() { mock_magisk_tags "$@"; }
+  curl() {
+    printf '%s\n' '[
+      {"type":"nightly","datetime":1791814447,"files":[{
+        "filename":"lineage-24.0-20261012-nightly-pdx235-signed.zip",
+        "type":"nightly","sha256":"29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820",
+        "url":"https://mirrorbits.lineageos.org/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip"}]},
+      {"type":"nightly","datetime":1791520682,"files":[{
+        "filename":"lineage-23.2-20261009-nightly-pdx235-signed.zip",
+        "type":"nightly","sha256":"b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8",
+        "url":"https://mirrorbits.lineageos.org/full/pdx235/20261009/lineage-23.2-20261009-nightly-pdx235-signed.zip"}]}]'
+  }
+  get_latest_version >/dev/null
+  assert_equals 20261009 "${VERSION[GRAPHENEOS]}" 'reviewed development source'
+  assert_equals lineage-23.2-20261009-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" 'development target'
+  unset PIXENEOS_DEVELOPMENT_PROFILE
+  get_latest_version >/dev/null
+  assert_equals 20261012 "${VERSION[GRAPHENEOS]}" 'ordinary provider still selects latest'
+)
+
+test_missing_development_source_fails_closed() (
+  reset_acquisition_fixture
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  PIXENEOS_DEVELOPMENT_PROFILE=care-map-pdx235
+  git() { mock_magisk_tags "$@"; }
+  curl() { printf '%s\n' '[]'; }
+  if get_latest_version >/dev/null 2>&1; then
+    fail 'missing development fixture unexpectedly fell back to latest'
+  fi
+)
+
+test_changed_development_source_digest_fails_closed() (
+  reset_acquisition_fixture
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  PIXENEOS_DEVELOPMENT_PROFILE=care-map-pdx235
+  git() { mock_magisk_tags "$@"; }
+  curl() {
+    printf '%s\n' '[{"type":"nightly","files":[{
+      "filename":"lineage-23.2-20261009-nightly-pdx235-signed.zip",
+      "type":"nightly","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "url":"https://mirrorbits.lineageos.org/full/pdx235/20261009/lineage-23.2-20261009-nightly-pdx235-signed.zip"}]}]'
+  }
+  if get_latest_version >/dev/null 2>&1; then
+    fail 'changed development fixture digest unexpectedly succeeded'
+  fi
+)
+
 test_pinned_magisk_version_skips_tag_discovery
 test_grapheneos_text_metadata
 test_lineageos_v2_metadata
@@ -225,5 +279,9 @@ test_lineageos_digest_verification
 test_invalid_grapheneos_metadata_fails_closed
 test_unsafe_grapheneos_device_fails_closed
 test_unsafe_lineageos_metadata_fails_closed
+
+test_development_source_does_not_follow_major_upgrade
+test_missing_development_source_fails_closed
+test_changed_development_source_digest_fails_closed
 
 echo "Provider acquisition tests passed"

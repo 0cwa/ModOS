@@ -44,6 +44,18 @@ verify_checked_in_locked_input() {
   [[ "${LOCKED_INPUTS_VALID}" == "true" ]]
 }
 
+# This suite verifies orchestration/argv ordering without a full signed OTA.
+# Actual independent publisher/SPKI/ZIP-byte checks run in the separate
+# pdx235_source_publisher_test.sh and production policy.
+declare -a PUBLISHER_CHECKS=()
+PUBLISHER_CHECK_FAILURE=false
+source_care_map_require_lineageos_pdx235_publisher() {
+  if [[ "$1" == 'lineageos' && "$2" == 'pdx235' ]]; then
+    PUBLISHER_CHECKS+=("$1|$2|$3|$4")
+    [[ "${PUBLISHER_CHECK_FAILURE}" != 'true' ]]
+  fi
+}
+
 deactivate() {
   :
 }
@@ -58,6 +70,10 @@ verify_requested_root_outputs() {
 
 verify_requested_boot_animation_outputs() {
   :
+}
+
+generate_custota_variant_sidecars() {
+  : # Capture patch argv without requiring signed OTA fixtures in paired tests.
 }
 
 fail() {
@@ -157,6 +173,8 @@ reset_fixture() {
     "${WORKDIR}/extracted/ota/META-INF/com/android/otacert" \
     "${WORKDIR}/tools/my-avbroot-setup/module-tool.py"
 
+  ROM_FAMILY="grapheneos"
+  DEVICE_NAME="shiba"
   GRAPHENEOS[OTA_TARGET]="fixture-ota"
   OUTPUTS[PATCHED_OTA]="${WORKDIR}/patched.zip"
   KEYS[AVB]="${WORKDIR}/keys/avb.key"
@@ -172,8 +190,10 @@ reset_fixture() {
   ADDITIONALS[BCR]="true"
   ADDITIONALS[OEMUNLOCKONBOOT]="true"
   ADDITIONALS[ALTERINSTALLER]="true"
+  ADDITIONALS[DISABLE_SYSTEM_UPDATER]="false"
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
+  ADDITIONALS[MICROG]="false"
   ADDITIONALS[DEBUG]="false"
   ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]="false"
   ADDITIONALS[ROOT]="false"
@@ -188,11 +208,14 @@ reset_fixture() {
 
   CAPTURED_ARGS=()
   PREPARE_STAGES=()
+  PUBLISHER_CHECKS=()
+  PUBLISHER_CHECK_FAILURE=false
 }
 
 set_default_expected_args() {
   EXPECTED_ARGS=(
     "${WORKDIR}/tools/my-avbroot-setup/patch.py"
+    "--tool-runner-prefix-json" "$(executable_tool_runner_prefix_json)"
     "--input" "${WORKDIR}/fixture-ota.zip"
     "--output" "${WORKDIR}/patched.zip"
     "--verify-public-key-avb" "${WORKDIR}/extracted/avb_pkmd.bin"
@@ -317,6 +340,16 @@ test_special_cases_remain_available() {
   assert_contains "--patch-arg=--rootless" "debug"
 }
 
+test_disable_system_updater_module_is_optional() {
+  reset_fixture disable-system-updater-enabled
+  ADDITIONALS[DISABLE_SYSTEM_UPDATER]="true"
+  prepare_disable_system_updater_module() { :; }
+
+  run_patch
+  assert_pair     "--module-disable-system-updater"     "${WORKDIR}/modules/disable-system-updater.zip"     "disable system updater"
+  assert_pair     "--module-disable-system-updater-sig"     "${WORKDIR}/signatures/disable-system-updater.zip.sig"     "disable system updater"
+}
+
 test_boot_animation_module_is_optional_and_ordered() {
   local value
   local -a ordered=()
@@ -325,9 +358,9 @@ test_boot_animation_module_is_optional_and_ordered() {
   prepare_boot_animation_module() { :; }
   set_default_expected_args
   EXPECTED_ARGS=(
-    "${EXPECTED_ARGS[@]:0:29}"
+    "${EXPECTED_ARGS[@]:0:31}"
     "--module-boot-animation" "${WORKDIR}/modules/boot-animation.zip"
-    "${EXPECTED_ARGS[@]:29}"
+    "${EXPECTED_ARGS[@]:31}"
   )
   for value in "${EXPECTED_ARGS[@]}"; do
     if [[ "${value}" == "--patch-arg=--rootless" ]]; then
@@ -341,6 +374,197 @@ test_boot_animation_module_is_optional_and_ordered() {
   EXPECTED_ARGS=("${ordered[@]}")
   run_patch
   assert_array_equals EXPECTED_ARGS CAPTURED_ARGS "boot-animation module ordering"
+}
+
+enable_microg_fixture() {
+  ADDITIONALS[MICROG]="true"
+  ROM_FAMILY="lineageos"
+  DEVICE_NAME="pdx235"
+  OUTPUT_SCOPE="local-unpublished"
+  ROOT_MODE=""
+  RESOLVED_ROOT_MODE=""
+  mkdir -p "${WORKDIR}/tools/my-avbroot-setup/locks"
+  touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json"
+}
+
+test_microg_locked_preparation_and_arguments() {
+  reset_fixture microg-enabled
+  enable_microg_fixture
+
+  run_patch
+
+  assert_pair "--module-lock" "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json" "microG"
+  assert_pair     "--module-profile"     "${WORKDIR}/locked-profiles/microg.toml"     "microG"
+  assert_pair "--module-cache" "${WORKDIR}/locked-artifacts" "microG"
+  assert_pair     "--patch-report"     "${WORKDIR}/patched.zip.microg-patch-report.json"     "microG"
+  assert_not_contains "--allow-source-care-map-mismatch" "pdx235 microG cannot authorize unreviewed source"
+  assert_not_contains "--module-microg" "microG legacy module"
+  assert_prepare_stages "microG preparation" artifacts-fetch
+
+  grep -Fxq "rom_family = 'lineageos'"     "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile did not bind LineageOS"
+  grep -Fxq "selective_signature_spoofing = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile lacks restricted spoofing capability"
+  grep -Fxq "product_priv_app = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile lacks product priv-app capability"
+}
+
+test_lineage_both_modes_clear_vbmeta_flags() {
+  reset_fixture lineage-paired-clear-flags
+  ROM_FAMILY="lineageos"
+  DEVICE_NAME="pdx235"
+  ROOT_MODE="both"
+  RESOLVED_ROOT_MODE=""
+  MAGISK[PREINIT]="sda47"
+  ROM_PROFILE[CLEAR_VBMETA_FLAGS]="true"
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  run_patch
+  assert_contains "--patch-arg=--clear-vbmeta-flags" "Lineage rootless vbmeta flags"
+  assert_contains "--secondary-patch-arg=--clear-vbmeta-flags" "Lineage Magisk vbmeta flags"
+  assert_pair "--secondary-output" "${OUTPUTS[PATCHED_OTA_MAGISK]}" "paired Lineage output"
+
+  reset_fixture graphene-paired-no-clear
+  ROM_FAMILY="grapheneos"
+  DEVICE_NAME="shiba"
+  ROOT_MODE="both"
+  RESOLVED_ROOT_MODE=""
+  MAGISK[PREINIT]="sda47"
+  ROM_PROFILE[CLEAR_VBMETA_FLAGS]="false"
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  run_patch
+  assert_not_contains "--patch-arg=--clear-vbmeta-flags" "Graphene rootless vbmeta flags"
+  assert_not_contains "--secondary-patch-arg=--clear-vbmeta-flags" "Graphene Magisk vbmeta flags"
+}
+
+test_care_map_compatibility_scope() {
+  # The exception is a SOURCE policy, not a microG capability. Neither
+  # pdx235 rootless nor microG builds have a reviewed source pin yet.
+  reset_fixture lineage-pdx235-no-microg
+  ROM_FAMILY="lineageos"
+  DEVICE_NAME="pdx235"
+  run_patch
+  assert_not_contains "--allow-source-care-map-mismatch" "unreviewed pdx235 source (microG off)"
+
+  reset_fixture lineage-non-pdx235
+  ROM_FAMILY="lineageos"
+  DEVICE_NAME="other_device"
+  run_patch
+  assert_not_contains "--allow-source-care-map-mismatch" "other LineageOS devices must not bypass care-map enforcement"
+
+  reset_fixture graphene-pdx235
+  ROM_FAMILY="grapheneos"
+  DEVICE_NAME="pdx235"
+  run_patch
+  assert_not_contains "--allow-source-care-map-mismatch" "GrapheneOS must retain strict verification"
+}
+
+test_pdx235_publisher_preflight() {
+  reset_fixture lineage-publisher-required
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  run_patch
+  [[ "${#PUBLISHER_CHECKS[@]}" -eq 1 ]] ||
+    fail "pdx235 did not independently preflight the source publisher once"
+  [[ "${PUBLISHER_CHECKS[0]}" == "lineageos|pdx235|${WORKDIR}/fixture-ota.zip|${WORKDIR}/extracted/ota/META-INF/com/android/otacert" ]] ||
+    fail "pdx235 preflight received wrong source ZIP or extracted certificate"
+
+  reset_fixture lineage-publisher-rejected
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  PUBLISHER_CHECK_FAILURE=true
+  assert_patch_fails_before_execution "untrusted LineageOS publisher certificate"
+  [[ "${#PUBLISHER_CHECKS[@]}" -eq 1 ]] ||
+    fail "untrusted-publisher case never invoked the independent gate"
+
+  reset_fixture other-lineage-publisher-not-forced
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=other_device
+  run_patch
+  [[ "${#PUBLISHER_CHECKS[@]}" -eq 0 ]] ||
+    fail "source publisher guard changed a non-pdx235 path"
+}
+
+# A local ZIP/sidecar must not make pdx235 patch_ota return success without
+# authenticating the current source and freshly verifying the signed output.
+test_pdx235_existing_output_prevents_patch_skip() {
+  reset_fixture lineage-stale-primary
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  touch -- "${OUTPUTS[PATCHED_OTA]}"
+  assert_patch_fails_before_execution "pdx235 stale primary OTA cannot skip patch"
+
+  reset_fixture lineage-stale-secondary
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  ROOT_MODE=both
+  MAGISK[PREINIT]=sda47
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  touch -- "${OUTPUTS[PATCHED_OTA_MAGISK]}.csig"
+  assert_patch_fails_before_execution "pdx235 stale secondary signature cannot skip patch"
+}
+
+# Even when the helper patch invocation returned successfully, a failed
+# secondary root/AVB postflight must terminate before generating any sidecar.
+test_pdx235_secondary_verification_failure_blocks_sidecars() (
+  reset_fixture lineage-secondary-verification-failure
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  ROOT_MODE=both
+  MAGISK[PREINIT]=sda47
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  verify_requested_root_outputs() {
+    return 1
+  }
+  generate_custota_variant_sidecars() {
+    touch -- "${WORKDIR}/unexpected-publishable-sidecar"
+    return 0
+  }
+  if patch_ota >/dev/null 2>&1; then
+    fail "failed secondary root verifier allowed paired patch completion"
+  fi
+  [[ "${#CAPTURED_ARGS[@]}" -ne 0 ]] ||
+    fail "secondary verification failure test did not reach helper boundary"
+  [[ ! -e "${WORKDIR}/unexpected-publishable-sidecar" ]] ||
+    fail "sidecar generated after secondary verification failure"
+)
+
+# Exercise an actual Python child: its temporary directory must live below
+# WORKDIR and the caller's temporary-directory preference must remain intact.
+test_helper_uses_build_filesystem_scratch() (
+  reset_fixture 'helper scratch environment'
+  local caller_tmpdir="${TEST_ROOT}/caller-tmp"
+  mkdir -p "${caller_tmpdir}"
+  export TMPDIR="${caller_tmpdir}"
+  cat > "${WORKDIR}/tools/my-avbroot-setup/patch.py" <<'PYTHON'
+import json, os, pathlib, stat, sys, tempfile
+output = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+scratch = pathlib.Path(os.environ['TMPDIR'])
+with tempfile.TemporaryDirectory() as child:
+    receipt = {'scratch': str(scratch), 'child': child,
+               'mode': stat.S_IMODE(scratch.stat().st_mode)}
+output.with_suffix('.scratch.json').write_text(json.dumps(receipt))
+PYTHON
+  python() { command python3 "$@"; }
+  patch_ota >/dev/null
+  [[ "${TMPDIR}" == "${caller_tmpdir}" ]] || fail 'Helper changed caller TMPDIR'
+  python3 - "${WORKDIR}" "${OUTPUTS[PATCHED_OTA]%.*}.scratch.json" <<'PYTHON'
+import json, pathlib, sys
+workdir = pathlib.Path(sys.argv[1]).resolve()
+receipt = json.loads(pathlib.Path(sys.argv[2]).read_text())
+scratch = pathlib.Path(receipt['scratch'])
+assert scratch.is_absolute() and scratch.parent == workdir
+assert pathlib.Path(receipt['child']).parent == scratch
+assert receipt['mode'] == 0o700
+assert not scratch.exists(), 'Empty helper scratch parent was retained'
+PYTHON
+)
+
+test_microg_and_fdroid_locked_modes_conflict() {
+  reset_fixture microg-fdroid-conflict
+  enable_microg_fixture
+  enable_fdroid_fixture
+
+  assert_patch_fails_before_execution "microG/F-Droid locked bundle conflict"
 }
 
 enable_fdroid_fixture() {
@@ -552,7 +776,16 @@ test_default_arguments
 test_each_module_can_be_disabled
 test_all_modules_can_be_disabled
 test_special_cases_remain_available
+test_disable_system_updater_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
+test_microg_locked_preparation_and_arguments
+test_lineage_both_modes_clear_vbmeta_flags
+test_care_map_compatibility_scope
+test_pdx235_publisher_preflight
+test_pdx235_existing_output_prevents_patch_skip
+test_pdx235_secondary_verification_failure_blocks_sidecars
+test_helper_uses_build_filesystem_scratch
+test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments
 test_fdroid_missing_or_untracked_inputs_fail_closed
 test_fdroid_preparation_precedes_ota_extraction

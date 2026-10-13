@@ -4,8 +4,9 @@ on:
   workflow_call:
     inputs:
       rom-family:
-        required: true
+        required: false
         type: string
+        default: grapheneos
       device-id:
         required: true
         type: string
@@ -44,6 +45,14 @@ on:
         required: false
         type: boolean
         default: true
+      microg:
+        required: false
+        type: boolean
+        default: false
+      disable-system-updater:
+        required: false
+        type: boolean
+        default: false
       fdroid-privileged-extension:
         required: false
         type: boolean
@@ -64,20 +73,41 @@ on:
       release-type:
         required: true
         type: string
-      publish:
-        required: true
+      export-device-candidate:
+        description: Export the explicit device candidate as OTA ZIPs; optionally encrypt for a recipient
+        required: false
         type: boolean
+        default: false
+      device-candidate-recipient-base64:
+        description: Optional base64 public PEM certificate; leave empty for normal OTA ZIP artifacts
+        required: false
+        type: string
+        default: ""
+      development-profile:
+        description: Explicit source-build development profile (none or care-map-pdx235)
+        required: false
+        type: string
+        default: none
+      signing-mode:
+        description: Build-only signer (disposable or repository); publication uses repository keys
+        required: false
+        type: string
+        default: disposable
+      publish:
+        required: false
+        type: boolean
+        default: false
     secrets:
       AVB_KEY:
-        required: true
+        required: false
       CERT_OTA:
-        required: true
+        required: false
       OTA_KEY:
-        required: true
+        required: false
       PASSPHRASE_AVB:
-        required: true
+        required: false
       PASSPHRASE_OTA:
-        required: true
+        required: false
       GH_TOKEN:
         required: false
       EMAIL:
@@ -89,7 +119,9 @@ env:
   ROM_FAMILY: ${{ inputs.rom-family }}
   GRAPHENEOS_UPDATE_CHANNEL: ${{ inputs.update-channel }}
   OUTPUT_SCOPE: ${{ inputs.publish && inputs.release-type != 'build-only' && 'published' || 'local-unpublished' }}
-  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  # Build-only runs must not receive the separate release-API credential.
+  GH_TOKEN: ${{ inputs.publish && inputs.release-type != 'build-only' && secrets.GH_TOKEN || '' }}
+  PIXENEOS_DEVELOPMENT_PROFILE: ${{ inputs.development-profile }}
   RELEASE_TYPE: ${{ inputs.release-type }}
   ROOT_MODE: ${{ inputs.root-mode }}
   ADDITIONALS_AFSR: ${{ inputs.afsr }}
@@ -98,19 +130,21 @@ env:
   ADDITIONALS_CUSTOTA: ${{ inputs.custota }}
   ADDITIONALS_MSD: ${{ inputs.msd }}
   ADDITIONALS_OEMUNLOCKONBOOT: ${{ inputs.oemunlockonboot }}
+  ADDITIONALS_MICROG: ${{ inputs.microg }}
+  ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ inputs.disable-system-updater }}
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 
+# Publishing inherits the caller job's permission ceiling. A reusable
+# publishing job cannot request write even when skipped by a read-only caller.
 jobs:
   build:
+    if: inputs.publish && inputs.release-type != 'build-only'
     runs-on: ubuntu-latest
     concurrency:
       group: gh-pages
       cancel-in-progress: false
-    permissions:
-      contents: write
-
-    steps:
+    steps: &rom-build-steps
       - name: Validate build request
         shell: bash
         env:
@@ -119,7 +153,24 @@ jobs:
           ADDITIONALS_ROOT: ${{ inputs.root }}
           MAGISK_PREINIT_REQUEST: ${{ inputs.magisk-preinit-device }}
           ROOT_MODE_INPUT: ${{ inputs.root-mode }}
+          SIGNING_MODE: ${{ inputs.signing-mode }}
+          EXPORT_DEVICE_CANDIDATE: ${{ inputs.export-device-candidate }}
+          DEVELOPMENT_PROFILE: ${{ inputs.development-profile }}
+          DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
+          PUBLISH_REQUEST: ${{ inputs.publish }}
         run: |
+          if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
+            [[ "${DEVELOPMENT_PROFILE}" == care-map-pdx235 &&
+              "${SIGNING_MODE}" == repository && "${RELEASE_TYPE}" == build-only &&
+              "${PUBLISH_REQUEST}" == false ]] || {
+              echo '::error::Candidate export requires an explicit nonpublishing repository-signed development candidate'
+              exit 1
+            }
+          fi
+          case "${SIGNING_MODE}" in
+            disposable|repository) ;;
+            *) echo "::error::signing-mode must be disposable or repository"; exit 1 ;;
+          esac
           root_mode="${ROOT_MODE_INPUT}"
           if [[ -z "${root_mode}" ]]; then
             if [[ "${ADDITIONALS_ROOT}" == "true" ]]; then
@@ -147,10 +198,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: ${{ inputs.publish && inputs.release-type != 'build-only' }}
 
       - name: Enforce profile output policy
         shell: bash
         env:
+          EXPORT_DEVICE_CANDIDATE: ${{ inputs.export-device-candidate }}
+          SIGNING_MODE: ${{ inputs.signing-mode }}
+          PUBLISH: ${{ inputs.publish }}
+          DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
           ADDITIONALS_DEBUG: ${{ inputs.allow-unauthorized-adb }}
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ inputs.compatible-sepolicy-patching }}
           ADDITIONALS_ROOT: ${{ inputs.root }}
@@ -159,6 +215,15 @@ jobs:
           source src/rom_profiles.sh
           resolve_rom_profile
           enforce_output_policy "${OUTPUT_SCOPE}"
+          activate_development_profile
+          if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
+            python3 src/ci/encrypt_device_candidate.py --validate-request
+          fi
+
+      - name: Configure Android APK verification tools
+        if: inputs.microg || inputs.fdroid-privileged-extension
+        shell: bash
+        run: bash src/ci/configure_android_apk_tools.sh
 
       - name: Install Python
         uses: actions/setup-python@v7
@@ -166,12 +231,17 @@ jobs:
           python-version: "3.12.11"
 
       - name: Setup signing environment
+        if: (inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository'
         shell: bash
         env:
           AVB_KEY: ${{ secrets.AVB_KEY }}
           CERT_OTA: ${{ secrets.CERT_OTA }}
           OTA_KEY: ${{ secrets.OTA_KEY }}
         run: |
+          [[ -n "${AVB_KEY}" && -n "${CERT_OTA}" && -n "${OTA_KEY}" ]] || {
+            echo "::error::Repository signing requires configured signing material"
+            exit 1
+          }
           delimiter="$(openssl rand -hex 16)"
           {
             echo "KEYS_AVB_BASE64<<${delimiter}"
@@ -185,6 +255,11 @@ jobs:
             echo "${delimiter}"
           } >> "${GITHUB_ENV}"
 
+      - name: Generate disposable build-only signing keys
+        if: (!inputs.publish || inputs.release-type == 'build-only') && inputs.signing-mode != 'repository'
+        shell: bash
+        run: bash src/ci/setup_test_signing.sh
+
       - name: Patch OTA
         shell: bash
         env:
@@ -192,11 +267,29 @@ jobs:
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ inputs.compatible-sepolicy-patching }}
           ADDITIONALS_ROOT: ${{ inputs.root }}
           CLEANUP: true
+          EXPORT_DEVICE_CANDIDATE: ${{ inputs.export-device-candidate }}
           MAGISK_PREINIT: ${{ inputs.magisk-preinit-device }}
-          PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
-          PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
+          PASSPHRASE_AVB: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_AVB || '' }}
+          PASSPHRASE_OTA: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_OTA || '' }}
         run: |
           source src/main.sh
+          if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
+            public_pkmd="${WORKDIR}/device-candidate-avb_pkmd.bin"
+            run_executable_tool avbroot key encode-avb \
+              -k "${KEYS[AVB]}" --pass-env-var PASSPHRASE_AVB -o "${public_pkmd}"
+            echo "DEVICE_CANDIDATE_PKMD=${public_pkmd}" >> "${GITHUB_ENV}"
+            # The signing inputs were decoded into this job's private workdir.
+            # Transport stages need only the verified outputs and public key.
+            for private_key in "${KEYS[AVB]}" "${KEYS[OTA]}"; do
+              case "${private_key}" in
+                "${WORKDIR}/.keys/"*) rm -f -- "${private_key}" ;;
+                *) echo '::error::Unexpected candidate signing-key storage'; exit 1 ;;
+              esac
+            done
+            for binding in KEYS_AVB_BASE64 KEYS_OTA_BASE64 KEYS_CERT_OTA_BASE64; do
+              printf '%s=\n' "${binding}" >> "${GITHUB_ENV}"
+            done
+          fi
           {
             echo "GRAPHENEOS_OTA_TARGET=${GRAPHENEOS[OTA_TARGET]}"
             echo "GRAPHENEOS_VERSION=${VERSION[GRAPHENEOS]}"
@@ -286,6 +379,45 @@ jobs:
             fi
             echo "Output scope: ${OUTPUT_SCOPE}"
           } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Stage device candidate
+        if: inputs.export-device-candidate
+        id: candidate_export
+        shell: bash
+        env:
+          SIGNING_MODE: ${{ inputs.signing-mode }}
+          PUBLISH: ${{ inputs.publish }}
+          DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
+        run: |
+          stage_parent="$(mktemp -d "${RUNNER_TEMP}/device-candidate-export.XXXXXX")"
+          stage="${stage_parent}/payload"
+          candidate_args=(--workspace "${GITHUB_WORKSPACE}" --stage "${stage}" \
+            --public-key "${DEVICE_CANDIDATE_PKMD}")
+          if [[ "${ROOT_MODE_RESOLVED}" == both ]]; then
+            candidate_args+=(--ota "${OUTPUTS_PATCHED_OTA_ROOTLESS}" --ota "${OUTPUTS_PATCHED_OTA_MAGISK}")
+          else
+            candidate_args+=(--ota "${OUTPUTS_PATCHED_OTA}")
+          fi
+          if [[ "${ADDITIONALS_MICROG}" == true ]]; then
+            candidate_args+=(--microg)
+          fi
+          python3 src/ci/encrypt_device_candidate.py "${candidate_args[@]}"
+          echo "stage=${stage}" >> "${GITHUB_OUTPUT}"
+          if [[ -n "${DEVICE_CANDIDATE_RECIPIENT_BASE64}" ]]; then
+            echo 'artifact-name=encrypted-device-candidate' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'artifact-name=device-candidate' >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Upload device candidate
+        if: inputs.export-device-candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.candidate_export.outputs.artifact-name }}
+          path: ${{ steps.candidate_export.outputs.stage }}
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
 
       - name: Re-enforce publication policy
         if: inputs.publish && inputs.release-type != 'build-only'
@@ -405,3 +537,12 @@ jobs:
           MAGISK_MODULE_SELECTION_FINGERPRINT: ${{ env.MODULE_SELECTION_FINGERPRINT_MAGISK }}
         run: |
           bash src/ci/publish_ota_pair.sh
+
+  build_only:
+    if: "!inputs.publish || inputs.release-type == 'build-only'"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # The common pipeline defaults to disposable keys. An explicit device
+    # candidate may retain repository signing identity; every publisher skips.
+    steps: *rom-build-steps

@@ -46,6 +46,11 @@ on:
         required: false
         type: boolean
         default: true
+      disable-system-updater:
+        description: Remove the stock ROM updater app (use with Custota)
+        required: false
+        type: boolean
+        default: false
       fdroid-privileged-extension:
         description: Include the locked F-Droid Privileged Extension
         required: false
@@ -81,7 +86,7 @@ on:
         default: default
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   matrix:
@@ -145,13 +150,16 @@ jobs:
           echo "devices=${devices}" >>"${GITHUB_OUTPUT}"
 
   release:
+    if: inputs.release-type != 'build-only'
+    permissions:
+      contents: write
     needs: matrix
-    strategy:
+    strategy: &device-strategy
       fail-fast: false
       matrix:
         target: ${{ fromJSON(needs.matrix.outputs.devices) }}
     uses: ./.github/workflows/release.yml
-    with:
+    with: &multi-build-inputs
       device-id: ${{ matrix.target.device }}
       root: ${{ inputs.root }}
       root-mode: ${{ inputs.root-mode }}
@@ -163,9 +171,21 @@ jobs:
       custota: ${{ inputs.custota }}
       msd: ${{ inputs.msd }}
       oemunlockonboot: ${{ inputs.oemunlockonboot }}
+      disable-system-updater: ${{ inputs.disable-system-updater }}
       fdroid-privileged-extension: ${{ inputs.fdroid-privileged-extension }}
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
       boot-animation: ${{ inputs.boot-animation }}
       release-type: ${{ inputs.release-type }}
     secrets: inherit
+
+  build_only:
+    if: inputs.release-type == 'build-only'
+    permissions:
+      contents: read
+    needs: matrix
+    strategy: *device-strategy
+    # Skip the publishing wrapper and its write-permission preflight branch.
+    # The shared builder defaults to GrapheneOS with publishing disabled.
+    uses: ./.github/workflows/build-rom.yml
+    with: *multi-build-inputs

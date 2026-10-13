@@ -10,7 +10,8 @@ import stat
 import sys
 import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -56,6 +57,7 @@ def assert_rejected(path: Path, context: str) -> None:
 class FakeExtFs:
     def __init__(self, root: Path) -> None:
         self.root = root
+        self.info = SimpleNamespace(entries=[])
         self.mkdir_calls: list[tuple[str, int, bool, bool]] = []
         self.open_calls: list[tuple[str, str, int]] = []
         self.contexts = [
@@ -64,7 +66,7 @@ class FakeExtFs:
 
     @property
     def tree(self) -> Path:
-        raise AssertionError("boot animation injection bypassed ExtFs metadata APIs")
+        return self.root
 
     def mkdir(
         self,
@@ -151,6 +153,19 @@ def test_runtime_payload_installation() -> None:
         write_valid(dark_source, frame=b"dark-frame")
         dark_runtime = build_runtime_payload(dark_source)
         themed_product = FakeExtFs(root / "themed-product-fs")
+        # Authentic Lineage product metadata aliases dark to light; unpackers
+        # may represent that only in metadata or also create a tree symlink.
+        media = themed_product.root / "media"
+        media.mkdir(parents=True)
+        (media / "bootanimation.zip").write_bytes(b"stock light")
+        (media / "bootanimation-dark.zip").symlink_to("bootanimation.zip")
+        label = {"security.selinux": "u:object_r:system_file:s0\0"}
+        dark_entry = SimpleNamespace(
+            path=PurePosixPath("/media/bootanimation-dark.zip"),
+            file_type="Symlink", file_mode=0o777, source=Path("old-source"),
+            symlink_target="bootanimation.zip", uid=0, gid=0, xattrs=label,
+        )
+        themed_product.info.entries.append(dark_entry)
         resolved_light, resolved_dark = resolve_runtime_payloads(source, dark_source)
         assert resolved_light == runtime
         assert resolved_dark == dark_runtime
@@ -159,6 +174,12 @@ def test_runtime_payload_installation() -> None:
             resolved_light,
             resolved_dark,
         )
+        assert dark_entry.file_type == "RegularFile"
+        assert dark_entry.file_mode == 0o644
+        assert dark_entry.source is None and dark_entry.symlink_target is None
+        assert (dark_entry.uid, dark_entry.gid, dark_entry.xattrs) == (0, 0, label)
+        assert not (media / "bootanimation-dark.zip").is_symlink()
+        assert [call[0] for call in themed_product.open_calls] == expected_targets
         assert (
             themed_product.root / "media/bootanimation.zip"
         ).read_bytes() == runtime
@@ -171,6 +192,16 @@ def test_runtime_payload_installation() -> None:
             themed_product.root / "media/bootanimation.zip",
             themed_product.root / "media/bootanimation-dark.zip",
         )
+
+        # AFSR can leave symlinks exclusively in metadata. The same conversion
+        # must create a real dark archive without requiring a tree symlink.
+        (media / "bootanimation-dark.zip").unlink()
+        dark_entry.file_type = "Symlink"
+        dark_entry.symlink_target = "bootanimation.zip"
+        install_runtime_payload({"product": themed_product}, resolved_light, resolved_dark)
+        assert dark_entry.file_type == "RegularFile" and dark_entry.symlink_target is None
+        assert (media / "bootanimation.zip").read_bytes() == runtime
+        assert (media / "bootanimation-dark.zip").read_bytes() == dark_runtime
 
         dark_only_light, dark_only_dark = resolve_runtime_payloads(None, dark_source)
         assert dark_only_light == dark_only_dark == dark_runtime

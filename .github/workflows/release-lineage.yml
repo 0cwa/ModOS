@@ -5,6 +5,14 @@ on:
     - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
+      source-artifact-id:
+        description: Optional encrypted artifact to transport only (no build or signing)
+        required: false
+        default: ""
+      expected-source-zip-sha256:
+        description: Required immutable ZIP digest for transport-only requests
+        required: false
+        default: ""
       device-id:
         description: Device code name
         required: true
@@ -37,11 +45,46 @@ on:
         required: false
         type: boolean
         default: false
+      microg:
+        description: Include locked official microG Services and Companion
+        required: false
+        type: boolean
+        default: false
+      disable-system-updater:
+        description: Remove the stock ROM updater app (use with Custota)
+        required: false
+        type: boolean
+        default: false
       boot-animation:
         description: Include the local custom boot animation
         required: false
         type: boolean
         default: true
+      export-device-candidate:
+        description: Export repository-signed development OTA ZIPs; optionally encrypt for a recipient
+        required: false
+        type: boolean
+        default: false
+      device-candidate-recipient-base64:
+        description: Optional base64 public PEM certificate; leave empty for normal OTA ZIP artifacts
+        required: false
+        default: ""
+      development-profile:
+        description: Explicit build-only source experiment; production pins stay unchanged
+        required: false
+        type: choice
+        default: none
+        options:
+          - none
+          - care-map-pdx235
+      signing-mode:
+        description: Build-only signing identity; repository preserves existing device keys
+        required: false
+        type: choice
+        default: disposable
+        options:
+          - disposable
+          - repository
       release-type:
         description: Release behavior
         required: true
@@ -53,7 +96,7 @@ on:
         default: default
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   schedule_config:
@@ -74,6 +117,8 @@ jobs:
       custota: ${{ steps.definition.outputs.custota }}
       msd: ${{ steps.definition.outputs.msd }}
       oemunlockonboot: ${{ steps.definition.outputs.oemunlockonboot }}
+      disable_system_updater: ${{ steps.definition.outputs.disable_system_updater }}
+      microg: ${{ steps.definition.outputs.microg }}
       fdroid_privileged_extension: ${{ steps.definition.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
@@ -90,7 +135,9 @@ jobs:
         run: bash src/ci/load_schedule_definition.sh
 
   scheduled_build:
-    if: github.event_name == 'schedule'
+    permissions:
+      contents: write
+    if: github.event_name == 'schedule' && inputs.source-artifact-id == ''
     needs: schedule_config
     uses: ./.github/workflows/build-rom.yml
     with:
@@ -106,6 +153,8 @@ jobs:
       custota: ${{ needs.schedule_config.outputs.custota == 'true' }}
       msd: ${{ needs.schedule_config.outputs.msd == 'true' }}
       oemunlockonboot: ${{ needs.schedule_config.outputs.oemunlockonboot == 'true' }}
+      disable-system-updater: ${{ needs.schedule_config.outputs.disable_system_updater == 'true' }}
+      microg: ${{ needs.schedule_config.outputs.microg == 'true' }}
       fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
       allow-unauthorized-adb: false
@@ -115,9 +164,11 @@ jobs:
     secrets: inherit
 
   manual_build:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type != 'build-only' && inputs.source-artifact-id == ''
+    permissions:
+      contents: write
     uses: ./.github/workflows/build-rom.yml
-    with:
+    with: &lineage-build-inputs
       rom-family: lineageos
       device-id: ${{ inputs.device-id }}
       root: ${{ inputs.root }}
@@ -126,7 +177,88 @@ jobs:
       update-channel: ${{ inputs.update-channel }}
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
+      microg: ${{ inputs.microg }}
+      disable-system-updater: ${{ inputs.disable-system-updater }}
       boot-animation: ${{ inputs.boot-animation }}
+      export-device-candidate: ${{ inputs.export-device-candidate }}
+      device-candidate-recipient-base64: ${{ inputs.device-candidate-recipient-base64 }}
+      development-profile: ${{ inputs.development-profile }}
+      signing-mode: ${{ inputs.signing-mode }}
       release-type: ${{ inputs.release-type }}
       publish: ${{ inputs.release-type != 'build-only' }}
     secrets: inherit
+
+  manual_build_only:
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode != 'repository' && inputs.source-artifact-id == ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with: *lineage-build-inputs
+
+  manual_device_candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.release-type == 'build-only' && inputs.signing-mode == 'repository' && inputs.source-artifact-id == ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with: *lineage-build-inputs
+    # Preserve the installed signing identity without forwarding release/API
+    # credentials. This prepares signing only; acquisition/postflight and the
+    # publication quarantine remain unchanged.
+    secrets:
+      AVB_KEY: ${{ secrets.AVB_KEY }}
+      CERT_OTA: ${{ secrets.CERT_OTA }}
+      OTA_KEY: ${{ secrets.OTA_KEY }}
+      PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
+      PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
+
+  transport_plan:
+    if: github.event_name == 'workflow_dispatch' && inputs.source-artifact-id != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Plan existing encrypted candidate transport
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ARTIFACT_ID: ${{ inputs.source-artifact-id }}
+          EXPECTED_SOURCE_ZIP_SHA256: ${{ inputs.expected-source-zip-sha256 }}
+        run: python3 src/ci/transport_candidate_artifact.py plan
+
+  transport_part:
+    needs: transport_plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: true
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.transport_plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Fetch exact encrypted ZIP part
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ARTIFACT_ID: ${{ inputs.source-artifact-id }}
+          EXPECTED_SOURCE_ZIP_SHA256: ${{ inputs.expected-source-zip-sha256 }}
+          PART_INDEX: ${{ matrix.index }}
+        run: |
+          python3 src/ci/transport_candidate_artifact.py fetch-part \
+            --part-index "${PART_INDEX}" --output-dir "${RUNNER_TEMP}/encrypted-part"
+      - name: Upload encrypted ZIP part
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: encrypted-device-candidate-part-${{ matrix.index }}
+          path: ${{ runner.temp }}/encrypted-part
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

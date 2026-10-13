@@ -31,8 +31,10 @@ function selection_variant_manifest() {
     SELECTION_MODULE_BCR
     SELECTION_MODULE_CUSTOTA
     SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION
+    SELECTION_MODULE_MICROG
     SELECTION_MODULE_MSD
     SELECTION_MODULE_OEMUNLOCKONBOOT
+    SELECTION_DISABLE_SYSTEM_UPDATER
     SELECTION_BOOT_ANIMATION
   )
 
@@ -54,8 +56,10 @@ function selection_variant_manifest() {
     SELECTION_MODULE_BCR \
     SELECTION_MODULE_CUSTOTA \
     SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION \
+    SELECTION_MODULE_MICROG \
     SELECTION_MODULE_MSD \
     SELECTION_MODULE_OEMUNLOCKONBOOT \
+    SELECTION_DISABLE_SYSTEM_UPDATER \
     SELECTION_BOOT_ANIMATION; do
     value="${!field}"
     if [[ "${value}" != 'true' && "${value}" != 'false' ]]; then
@@ -98,8 +102,10 @@ function selection_variant_manifest() {
     "module.bcr=${SELECTION_MODULE_BCR}" \
     "module.custota=${SELECTION_MODULE_CUSTOTA}" \
     "module.fdroid-privileged-extension=${SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION}" \
+    "module.microg=${SELECTION_MODULE_MICROG}" \
     "module.msd=${SELECTION_MODULE_MSD}" \
-    "module.oemunlockonboot=${SELECTION_MODULE_OEMUNLOCKONBOOT}"
+    "module.oemunlockonboot=${SELECTION_MODULE_OEMUNLOCKONBOOT}" \
+    "disable_system_updater=${SELECTION_DISABLE_SYSTEM_UPDATER}"
 
   if [[ "${SELECTION_ROOT}" == 'true' ]]; then
     if [[ ! "${SELECTION_MAGISK_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
