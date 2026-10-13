@@ -1,5 +1,8 @@
 name: Transport pdx235 repair as an exact binary delta
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - ops/pdx235-repair-delta-20261013
 permissions:
   contents: read
   actions: read
