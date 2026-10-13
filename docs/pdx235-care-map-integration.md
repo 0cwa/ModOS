@@ -203,3 +203,19 @@ spelling, workflow inventory and behavior already checked elsewhere.
 Keep one authoritative test for each behavior and focused negative cases.
 Independent helper conformance owns binary semantics; signed-output checks
 own authenticity; device acceptance owns runtime results.
+
+## Guarded source qualification on October 13
+
+The maintained helper now builds the guarded development engine from avbroot
+3.35.0, at upstream commit `4d678ffe8955de49403e593960626dfa48bd0cce`.
+The existing explicit-key rejection and expected-care-map logic are unchanged.
+The frozen source build and full source tests passed, followed by successful
+verification of the previously accepted October 9 OTA. Wrong keys, unsigned
+images with an explicit expected key, tampering, and a wrong expected-map
+fingerprint were rejected. See [qualification evidence](evidence/avbroot-20261013.json).
+
+The official prebuilt executable lock remains at 3.34.1: the signed upstream
+3.35.0 binary accepted an unsigned AVB header despite an explicit expected key.
+The guarded source engine closes that gap. These are regression checks on a
+frozen accepted fixture; new firmware still needs fresh verification and device
+acceptance. The pdx235 publication quarantine remains active.
