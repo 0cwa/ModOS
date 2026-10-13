@@ -1,0 +1,65 @@
+name: Transport pdx235 repair as an exact binary delta
+on: workflow_dispatch
+permissions:
+  contents: read
+  actions: read
+jobs:
+  delta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Verify source artifacts and construct exact delta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          zstd --version
+          mkdir output
+          python3 - <<'PYTHON'
+          import hashlib, json, subprocess, zipfile
+          from pathlib import Path
+          def digest(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+          def fetch(run, suffix, expected=None):
+              artifacts = json.loads(subprocess.check_output(['gh','api',f'repos/0cwa/ModOS/actions/runs/{run}/artifacts']))['artifacts']
+              artifact, = [a for a in artifacts if a['name'] == 'device-candidate' and not a['expired']]
+              wrapper = Path(f'{run}.zip')
+              with wrapper.open('wb') as stream:
+                  subprocess.run(['gh','api',f"repos/0cwa/ModOS/actions/artifacts/{artifact['id']}/zip"],stdout=stream,check=True)
+              assert digest(wrapper) == artifact['digest'].removeprefix('sha256:')
+              assert wrapper.stat().st_size == artifact['size_in_bytes']
+              dest = Path(str(run)); dest.mkdir()
+              with zipfile.ZipFile(wrapper) as archive:
+                  ota, = [n for n in archive.namelist() if '-rootless-' in n and n.endswith(suffix)]
+                  assert Path(ota).name == ota
+                  archive.extract(ota,dest)
+                  if expected is None:
+                      for n in (ota+'.selection.json',ota+'.microg-patch-report.json','device-candidate-avb_pkmd.bin'):
+                          archive.extract(n,Path('output'))
+              wrapper.unlink()
+              target = dest/ota
+              if expected: assert digest(target) == expected
+              return target
+          old = fetch(38318273364,'-b8b2a1e.zip','cf2ca3e77fdb9c4814cae4824b6211cd0af673ecdb164edc9c32e4f6e862fa35')
+          new = fetch(38391680781,'-8aabc81.zip')
+          assert new.name.startswith('pdx235-20261009-rootless-')
+          key = Path('output/device-candidate-avb_pkmd.bin')
+          assert digest(key) == 'a7f6fd272a397c28451c131467d51cf1097d2e44c08579dab5784cfbaa3bf2bc'
+          delta = Path('output/candidate.delta.zst')
+          subprocess.run(['zstd','-3','--long=31',f'--patch-from={old}',str(new),'-o',str(delta)],check=True)
+          restored = Path('restored.zip')
+          subprocess.run(['zstd','-d','--long=31',f'--patch-from={old}',str(delta),'-o',str(restored)],check=True)
+          assert digest(restored) == digest(new)
+          manifest = {'base_filename':old.name,'base_sha256':digest(old),'output_filename':new.name,'output_sha256':digest(new),'output_size':new.stat().st_size,'delta_sha256':digest(delta),'delta_size':delta.stat().st_size,'source_run':38391680781,'source_commit':'8aabc81362851273c4a509e65541381c28c6d9e6','helper_commit':'b269609850aae9a855fb0c94ba0a45eede4d3a3f'}
+          Path('output/delta.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          print(json.dumps(manifest,indent=2))
+          PYTHON
+      - name: Upload exact delta and public candidate metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: candidate-delta
+          path: output/
+          compression-level: 0
+          retention-days: 3
