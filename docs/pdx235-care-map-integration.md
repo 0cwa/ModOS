@@ -5,6 +5,16 @@ order, responsible code boundaries, and check consolidation. This document
 specifies the acceptance boundary for
 [ModOS #114](https://github.com/0cwa/ModOS/issues/114).
 
+## Physical failure discovered October 13
+
+The `b8b2a1e` rootless device candidate failed Android startup because compatible
+SELinux patching duplicated MSD app selectors in vendor and ODM context files.
+The phone recovered by booting its previous slot. The development helper now
+keeps module app contexts in the platform file only; binary/CIL patches remain.
+See [the failure and repair record](pdx235-bootloop-20261013.md). Earlier artifact
+checks below do not establish that the original candidate can boot. Fresh device
+acceptance is required for the corrected candidate; publication stays quarantined.
+
 ## Current state
 
 The October 9 source OTA has been independently authenticated with the
