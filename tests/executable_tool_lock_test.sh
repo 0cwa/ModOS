@@ -217,12 +217,12 @@ expected = {
         ),
     },
     "custota-tool": {
-        "version": "6.5",
-        "artifact": "custota-tool-6.5-x86_64-unknown-linux-gnu.zip",
+        "version": "6.6",
+        "artifact": "custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
         "layout": {"custota-tool": "0755"},
         "url": (
             "https://github.com/chenxiaolong/Custota/releases/download/"
-            "v6.5/custota-tool-6.5-x86_64-unknown-linux-gnu.zip"
+            "v6.6/custota-tool-6.6-x86_64-unknown-linux-gnu.zip"
         ),
     },
 }

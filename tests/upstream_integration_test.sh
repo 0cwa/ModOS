@@ -9,7 +9,7 @@ grep -Fq "_config_schema_define devices DEVICES" src/config_schema.sh || fail "D
 grep -Fq "Remove superseded release assets" .github/workflows/build-rom.yml || fail "build workflow does not prune superseded assets"
 grep -Fq 'MODULE_SELECTION_FINGERPRINT' src/ci/remove_superseded_assets.sh || fail "asset cleanup is not selection-aware"
 grep -Fq 'VERSION[BCR]="${VERSION[BCR]:-3.9}"' src/declarations.sh || fail "BCR pin is not 3.9"
-grep -Fq 'VERSION[CUSTOTA]="${VERSION[CUSTOTA]:-6.5}"' src/declarations.sh || fail "Custota pin is not 6.5"
+grep -Fq 'VERSION[CUSTOTA]="${VERSION[CUSTOTA]:-6.6}"' src/declarations.sh || fail "Custota pin is not 6.6"
 grep -Fq 'VERSION[AVBROOT_SETUP]="f263fa745872d5853f4535aa306a4eb1783c5601"' src/declarations.sh || fail "maintained helper pin is unexpected"
 grep -Fq '"version": "2.0.0"' locks/executable-tools-v1.json || fail "AFSR 2.0 lock entry is missing"
 grep -Fq "topjohnwu/Magisk" src/config_schema.sh || fail "official Magisk default is missing"
