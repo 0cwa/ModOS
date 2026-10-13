@@ -141,9 +141,11 @@ Explicit `export-device-candidate=true` permits normal signed OTA ZIPs in the
 GitHub's outer artifact ZIP once and sideload the chosen inner OTA ZIP. A public
 recipient certificate selects the existing encrypted private handoff instead.
 Both are build-only device-acceptance transport; release assets and Custota
-channels remain quarantined. The normal provider
-selects the latest nightly, so any later run must record its actual authenticated
-source identity rather than claim this fixture's evidence automatically.
+channels remain quarantined. The normal provider selects the latest nightly. The `care-map-pdx235` development
+profile now selects the exact October 9 filename and authenticated SHA-256 from
+the official API, failing closed if the fixture is absent or its digest changes.
+This keeps the boot-failure repair separate from the newer LineageOS 24 / Android
+17 source. Each output still requires fresh cryptographic and device acceptance.
 
 For each final signed output, including secondary Magisk:
 

@@ -23,8 +23,15 @@ function fetch_grapheneos_ota_metadata() {
 }
 
 function fetch_lineageos_ota_metadata() {
-  local release_metadata parsed filename ota_url latest_version
+  local release_metadata parsed filename ota_url latest_version source_filename=""
   local endpoint="${ROM_PROFILE[OTA_BASE_URL]}/devices/${DEVICE_NAME}/builds"
+
+  # Reproduce the physical candidate failure without upgrading Android as well.
+  # This reviewed development profile remains restricted to unpublished pdx235.
+  if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 &&
+    "${DEVICE_NAME}" == pdx235 ]]; then
+    source_filename='lineage-23.2-20261009-nightly-pdx235-signed.zip'
+  fi
 
   release_metadata="$(curl -sLf "${endpoint}")" || {
     echo "Error: failed to fetch LineageOS release metadata." >&2
@@ -40,13 +47,17 @@ try:
     builds = json.load(sys.stdin)
     channel = sys.argv[1]
     device = sys.argv[2]
+    source_filename = sys.argv[3]
     build = max(
-        (item for item in builds if item["type"] == channel),
+        (item for item in builds if item["type"] == channel and
+         (not source_filename or any(file["filename"] == source_filename
+                                     for file in item["files"]))),
         key=lambda item: item.get("datetime", item.get("date", "")),
     )
     item = next(
         item for item in build["files"]
         if item["filename"].endswith(".zip") and item["type"] == channel
+        and (not source_filename or item["filename"] == source_filename)
     )
     filename = item["filename"]
     url = item["url"]
@@ -56,6 +67,8 @@ except (KeyError, IndexError, StopIteration, TypeError, ValueError, json.JSONDec
 if not isinstance(filename, str) or not re.fullmatch(r"[A-Za-z0-9._+-]+[.]zip", filename):
     raise SystemExit(1)
 if not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256):
+    raise SystemExit(1)
+if source_filename and sha256 != "b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8":
     raise SystemExit(1)
 if not re.fullmatch(r"[a-z0-9_]+", device) or f"-{device}-" not in filename:
     raise SystemExit(1)
@@ -70,7 +83,7 @@ if (
 print(filename)
 print(url)
 print(sha256)
-' "${GRAPHENEOS[UPDATE_CHANNEL]}" "${DEVICE_NAME}")" || {
+' "${GRAPHENEOS[UPDATE_CHANNEL]}" "${DEVICE_NAME}" "${source_filename}")" || {
     echo "Error: LineageOS returned invalid release metadata." >&2
     return 1
   }
