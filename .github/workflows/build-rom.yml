@@ -228,7 +228,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12.11"
+          python-version: "3.15.0"
 
       - name: Setup signing environment
         if: (inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository'
