@@ -36,7 +36,7 @@ jobs:
           uv sync --frozen --python 3.15
           uv run python --version
           uv run python -m unittest discover -s tests
-          uv run python module-tool.py catalog --format json >/dev/null
+          uv run python module-tool.py catalog list --format json >/dev/null
           uv run python patch.py --help >/dev/null
       - name: Prepare small multipart artifact fixture
         run: |
