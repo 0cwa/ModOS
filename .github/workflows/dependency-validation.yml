@@ -15,6 +15,7 @@ jobs:
           python-version: '3.15.0'
       - name: Exercise ModOS Python and workflow boundaries
         run: |
+          mv .github/workflows/dependency-validation.yml "${RUNNER_TEMP}/dependency-validation.yml"
           python --version
           python3 tests/boot_animation_test.py
           python3 tests/disable_system_updater_test.py
