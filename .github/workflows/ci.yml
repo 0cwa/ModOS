@@ -55,6 +55,9 @@ jobs:
         shell: bash
         run: bash tests/avbroot_setup_compat_test.sh --strict
 
+      - name: Check microG release against immutable helper lock
+        run: python3 src/ci/check_microg_helper_lock.py
+
       - name: Run deterministic tests
         shell: bash
         run: |

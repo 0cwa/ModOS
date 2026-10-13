@@ -190,8 +190,9 @@ identity. Check actual AVB/verity state and recovery behavior on-device.
 After the completed configured-signer artifact evidence and applicable enrolled-key
 and device acceptance are reviewed, promote the helper dependency before the
 ModOS microG consumer. Remove the temporary quarantine explicitly in a
-reviewed release change; keep microG scheduled builds off until its device
-acceptance is complete. Resolve #114 using that evidence, not test counts.
+reviewed release change. At the owner's October 13 request, scheduled pdx235
+builds now select microG by default; this does not lift publication quarantine
+or establish the remaining device acceptance. Resolve #114 using that evidence, not test counts.
 
 ## Validation ownership
 

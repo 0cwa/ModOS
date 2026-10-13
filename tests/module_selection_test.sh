@@ -384,7 +384,7 @@ enable_microg_fixture() {
   ROOT_MODE=""
   RESOLVED_ROOT_MODE=""
   mkdir -p "${WORKDIR}/tools/my-avbroot-setup/locks"
-  touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-v0.3.15.250932.json"
+  touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json"
 }
 
 test_microg_locked_preparation_and_arguments() {
@@ -393,7 +393,7 @@ test_microg_locked_preparation_and_arguments() {
 
   run_patch
 
-  assert_pair "--module-lock" "${WORKDIR}/tools/my-avbroot-setup/locks/microg-v0.3.15.250932.json" "microG"
+  assert_pair "--module-lock" "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json" "microG"
   assert_pair     "--module-profile"     "${WORKDIR}/locked-profiles/microg.toml"     "microG"
   assert_pair "--module-cache" "${WORKDIR}/locked-artifacts" "microG"
   assert_pair     "--patch-report"     "${WORKDIR}/patched.zip.microg-patch-report.json"     "microG"

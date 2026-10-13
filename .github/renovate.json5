@@ -11,6 +11,14 @@
   labels: ["dependencies"],
   packageRules: [
     {
+      description: "Propose microG releases; require verified helper lock update before merge",
+      matchPackageNames: ["microg/GmsCore"],
+      automerge: false,
+      prBodyNotes: [
+        "Update the helper's canonical microG lock and adapter package/version constants using tools/update_microg_lock.py. Verify both APK signatures against the existing microG signer, then update ModOS's immutable helper revision and compatibility manifests. CI rejects a release selector without its matching helper lock.",
+      ],
+    },
+    {
       description: "Require explicit upstream-lead and lock review for fork dependencies",
       matchManagers: ["custom.regex"],
       matchFileNames: ["/^src\\/declarations\\.sh$/"],
@@ -25,6 +33,14 @@
   // Their versions, archive hashes, member hashes, modes, and signer binding must
   // be updated atomically in locks/executable-tools-v1.json.
   customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^src/declarations\\.sh$/"],
+      matchStrings: ['VERSION\\[MICROG\\]="(?<currentValue>v[0-9.]+)"'],
+      depNameTemplate: "microg/GmsCore",
+      datasourceTemplate: "github-releases",
+      versioningTemplate: "loose",
+    },
     {
       customType: "regex",
       managerFilePatterns: ["/src/declarations.sh/"],

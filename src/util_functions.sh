@@ -488,7 +488,7 @@ function prepare_microg() {
   local args_name="${1}"
   local helper_root="${2}"
   local -n args_ref="${args_name}"
-  local lock_path="${helper_root}/locks/microg-v0.3.15.250932.json"
+  local lock_path="${helper_root}/locks/microg-${VERSION[MICROG]}.json"
   local cache_path="${WORKDIR}/locked-artifacts"
   local profile_path="${WORKDIR}/locked-profiles/microg.toml"
   local report_path="${OUTPUTS[PATCHED_OTA]}.microg-patch-report.json"

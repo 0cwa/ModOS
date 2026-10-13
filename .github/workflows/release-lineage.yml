@@ -118,6 +118,7 @@ jobs:
       msd: ${{ steps.definition.outputs.msd }}
       oemunlockonboot: ${{ steps.definition.outputs.oemunlockonboot }}
       disable_system_updater: ${{ steps.definition.outputs.disable_system_updater }}
+      microg: ${{ steps.definition.outputs.microg }}
       fdroid_privileged_extension: ${{ steps.definition.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
@@ -153,6 +154,7 @@ jobs:
       msd: ${{ needs.schedule_config.outputs.msd == 'true' }}
       oemunlockonboot: ${{ needs.schedule_config.outputs.oemunlockonboot == 'true' }}
       disable-system-updater: ${{ needs.schedule_config.outputs.disable_system_updater == 'true' }}
+      microg: ${{ needs.schedule_config.outputs.microg == 'true' }}
       fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
       allow-unauthorized-adb: false

@@ -280,9 +280,9 @@ required while the option is disabled.
 ### microG on LineageOS
 
 Set `'ADDITIONALS[MICROG]' = true` for an opt-in LineageOS build. The pinned
-helper supplies the reviewed microG `v0.3.15.250932` lock and adapter: Services
-(`com.google.android.gms`, versionCode `250932030`) plus Companion
-(`com.android.vending`, versionCode `84022630`).
+helper supplies the reviewed microG `v0.3.17.252432` lock and adapter: Services
+(`com.google.android.gms`, versionCode `252432034`) plus Companion
+(`com.android.vending`, versionCode `84022634`).
 
 Before OTA unpacking, the helper's generic locked-artifact path verifies exact
 size, SHA-256, package/version identity, and the official microG APK signer.
@@ -294,10 +294,17 @@ This relies on current LineageOS API 36 restricted microG signature spoofing.
 GrapheneOS is intentionally rejected. GsfProxy, F-Droid, Aurora Store, and
 opinionated microG preference defaults are not bundled.
 
-microG remains default-off, including scheduled pdx235 builds, until physical
-pdx235 first-boot, self-check/account, FCM, location, and Custota OTA-persistence
-validation is complete. The same prepared microG product image works for both
-rootless and Magisk outputs when explicitly selected.
+microG remains default-off for manual builds; scheduled pdx235 builds select it
+explicitly at the owner's request. Publication remains quarantined pending physical
+the remaining self-check/account, FCM, location, and Custota OTA-persistence
+validation. The same prepared microG product image works for both
+rootless and Magisk outputs when selected.
+
+Renovate proposes microG release updates without automerge. Update and verify
+the helper lock and adapter identities together, then advance the immutable
+helper pin and compatibility manifests. CI rejects a release selector without
+its matching helper lock. See the helper
+[lock update procedure](https://github.com/0cwa/my-avbroot-setup/blob/master/docs/microg.md).
 ### Disable the stock ROM updater
 
 Set `'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true` under `[build]` to remove the stock OTA updater from the patched ROM. For the supported profiles, PixeneOS removes GrapheneOS's `app.seamlessupdate.client` updater from the system partition or LineageOS's `org.lineageos.updater` from `system_ext`, along with updater-specific permission/default-permission configuration files when present.
