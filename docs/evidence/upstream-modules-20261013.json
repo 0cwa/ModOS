@@ -1,4 +1,28 @@
 {
+  "adapter_checks": {
+    "app_contexts": "each selector appears once, only in platform; vendor/ODM originals unchanged",
+    "cil_fallback": "both module rules present in vendor and ODM fixtures",
+    "limitations": [
+      "No binary Android policy patched in this fixture; policy-tool source/context rules unchanged between releases.",
+      "No full OTA build or phone runtime acceptance claimed."
+    ],
+    "modules": [
+      {
+        "actual_apk_xml_bytes_and_modes": "passed",
+        "archive": "Custota-6.6-release.zip",
+        "module": "custota",
+        "native_patcher_help": "passed",
+        "signed_helper_constructor": "passed"
+      },
+      {
+        "actual_apk_xml_bytes_and_modes": "passed",
+        "archive": "MSD-2.5-release.zip",
+        "module": "msd",
+        "native_patcher_help": "passed",
+        "signed_helper_constructor": "passed"
+      }
+    ]
+  },
   "artifacts": [
     {
       "app_contexts": "user=_app isPrivApp=true name=com.chiller3.custota domain=custota_app type=app_data_file levelFrom=all",
@@ -377,6 +401,13 @@
       "verifier": "Good \"file\" signature for chenxiaolong with ED25519 key SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA"
     }
   ],
+  "custota_tool_checks": {
+    "bootstrap_security_regressions": "21 archive tests and13 bootstrap tests passed under system Python",
+    "bootstrap_signature_archive_member_verification": "passed",
+    "gen_csig_argument_contract": "unchanged helper arguments accepted by help; no signing-key use",
+    "gen_update_info_create_update": "version2, expected full OTA/csig URLs; malformed missing-version input rejected",
+    "sealed_native_execution": "custota-tool v6.6"
+  },
   "limitations": [
     "No physical installation of these versions performed.",
     "Publication quarantine remains active."
