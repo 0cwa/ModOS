@@ -9,3 +9,9 @@ b5055dbe09a6de320266854db37efcb2c3413fd3:tests/release_existing_build_test.sh:ge
 b5055dbe09a6de320266854db37efcb2c3413fd3:tests/release_existing_build_test.sh:generic-api-key:55
 aa190eabea2bacb740b517132844b6f5bd4a72ed:tests/publication_helper_test.sh:generic-api-key:12
 aa190eabea2bacb740b517132844b6f5bd4a72ed:tests/publication_helper_test.sh:generic-api-key:13
+
+# Exact historical verifier output for the unchanged public SSH signer fingerprint.
+# The public fingerprint is also bound in trust/chenxiaolong.allowed_signers.
+73b04d0c290e4e6b9fa2ad25bbafa342d1e55512:docs/evidence/upstream-modules-20261013.json:generic-api-key:180
+73b04d0c290e4e6b9fa2ad25bbafa342d1e55512:docs/evidence/upstream-modules-20261013.json:generic-api-key:359
+73b04d0c290e4e6b9fa2ad25bbafa342d1e55512:docs/evidence/upstream-modules-20261013.json:generic-api-key:377

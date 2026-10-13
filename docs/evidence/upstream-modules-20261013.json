@@ -249,8 +249,8 @@
       "sha256": "95bef249eada9fc68321b7113d8913b5a68ee06a970a75ca5c42f3cd305f9c62",
       "signature_sha256": "bc5348b87d722beaf62278456c134ce9f621f9a7425084fcf66f5ba3e223450b",
       "signature_verified": true,
-      "size": 3535281,
-      "verifier": "Good \"file\" signature for chenxiaolong with ED25519 key SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA"
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 3535281
     },
     {
       "app_contexts": "user=_app isPrivApp=true name=com.chiller3.msd domain=msd_app type=app_data_file levelFrom=all",
@@ -428,8 +428,8 @@
       "sha256": "d2c03c9b964ee282b2e857f7c3c1ce1ec4f3d881083858ab4e386af3a0ee1e16",
       "signature_sha256": "79f43017b1dc3143ef46700da754ca7ef3b78e58c43d2a9c1648e94fd743ba68",
       "signature_verified": true,
-      "size": 4146040,
-      "verifier": "Good \"file\" signature for chenxiaolong with ED25519 key SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA"
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 4146040
     },
     {
       "app_contexts": null,
@@ -446,8 +446,8 @@
       "sha256": "c556e5e72b7671914d7c772728abb0d2f602ff53d8873a1e6efdf202df654d73",
       "signature_sha256": "b572263f37a922daa933ed521f7b4e78bfcc1b96c93f28a6050636d7a0f66e53",
       "signature_verified": true,
-      "size": 2389309,
-      "verifier": "Good \"file\" signature for chenxiaolong with ED25519 key SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA"
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 2389309
     }
   ],
   "custota_tool_checks": {
