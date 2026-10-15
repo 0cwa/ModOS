@@ -55,7 +55,7 @@ function fetch_lineageos_ota_metadata() {
       echo 'Error: pdx235 pilot source selected outside approved publication scope.' >&2
       return 1
     }
-    source_filename="${_PDX235_PILOT_SOURCE_TARGET}"
+    source_filename='lineage-24.0-20261012-nightly-pdx235-signed.zip'
   fi
 
   release_metadata="$(curl -sLf "${endpoint}")" || {
