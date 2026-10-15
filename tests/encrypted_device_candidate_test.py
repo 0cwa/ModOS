@@ -163,13 +163,17 @@ class EncryptedCandidateTest(unittest.TestCase):
                 export.validate_recipient(base64.b64encode(unsafe).decode())
 
     def test_export_requires_explicit_repository_candidate(self):
-        good = ['care-map-pdx235', 'repository', 'build-only', False]
-        export.require_candidate(*good)
-        for index, forbidden in enumerate(['none', 'disposable', 'default', True]):
-            bad = good.copy()
-            bad[index] = forbidden
+        for profile in ('care-map-pdx235', 'care-map-pdx235-lineage24'):
+            good = [profile, 'repository', 'build-only', False]
+            export.require_candidate(*good)
+            for index, forbidden in enumerate(['none', 'disposable', 'default', True]):
+                bad = good.copy()
+                bad[index] = forbidden
+                with self.assertRaises(ValueError):
+                    export.require_candidate(*bad)
+        for rejected in ('care-map-pdx235-lineage25', 'care-map-pdx235-lineage24-v2', ''):
             with self.assertRaises(ValueError):
-                export.require_candidate(*bad)
+                export.require_candidate(rejected, 'repository', 'build-only', False)
 
 
 if __name__ == '__main__':
