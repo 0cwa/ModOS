@@ -97,6 +97,11 @@ on:
         required: false
         type: boolean
         default: false
+      pdx235-pilot-release:
+        description: Allow only the exact reviewed October 12 Android 17 pilot, never arbitrary pdx235 publication
+        required: false
+        type: boolean
+        default: false
     secrets:
       AVB_KEY:
         required: false
@@ -122,6 +127,7 @@ env:
   # Build-only runs must not receive the separate release-API credential.
   GH_TOKEN: ${{ inputs.publish && inputs.release-type != 'build-only' && secrets.GH_TOKEN || '' }}
   PIXENEOS_DEVELOPMENT_PROFILE: ${{ inputs.development-profile }}
+  PIXENEOS_PDX235_PILOT_RELEASE: ${{ inputs.pdx235-pilot-release }}
   RELEASE_TYPE: ${{ inputs.release-type }}
   ROOT_MODE: ${{ inputs.root-mode }}
   ADDITIONALS_AFSR: ${{ inputs.afsr }}
@@ -158,7 +164,19 @@ jobs:
           DEVELOPMENT_PROFILE: ${{ inputs.development-profile }}
           DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
           PUBLISH_REQUEST: ${{ inputs.publish }}
+          PILOT_RELEASE: ${{ inputs.pdx235-pilot-release }}
+          ROM_FAMILY_REQUEST: ${{ inputs.rom-family }}
+          DEVICE_ID_REQUEST: ${{ inputs.device-id }}
         run: |
+          if [[ "${PILOT_RELEASE}" == true ]]; then
+            [[ "${ROM_FAMILY_REQUEST}" == lineageos && "${DEVICE_ID_REQUEST}" == pdx235 &&
+              "${DEVELOPMENT_PROFILE}" == none && "${RELEASE_TYPE}" == default &&
+              "${SIGNING_MODE}" == disposable && "${PUBLISH_REQUEST}" == true &&
+              "${EXPORT_DEVICE_CANDIDATE}" == false ]] || {
+              echo '::error::Pilot publishing is limited to the approved production-signed pdx235 test release'
+              exit 1
+            }
+          fi
           if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
             [[ ("${DEVELOPMENT_PROFILE}" == care-map-pdx235 ||
                  "${DEVELOPMENT_PROFILE}" == care-map-pdx235-lineage24) &&
