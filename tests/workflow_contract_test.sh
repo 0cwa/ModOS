@@ -376,11 +376,14 @@ base = {**os.environ, 'EXPORT_DEVICE_CANDIDATE': 'true',
         'ROOT_MODE_INPUT': 'rootless', 'ADDITIONALS_ROOT': 'false', 'MAGISK_PREINIT_REQUEST': ''}
 with tempfile.TemporaryDirectory() as scratch:
     base['GITHUB_ENV'] = str(Path(scratch) / 'env')
-    assert subprocess.run(['bash', '-euc', script], env=base, capture_output=True).returncode == 0
-    assert subprocess.run(['bash', '-euc', script], env={**base, 'DEVICE_CANDIDATE_RECIPIENT_BASE64': ''},
-                          capture_output=True).returncode == 0
-    for name, forbidden in [('DEVELOPMENT_PROFILE', 'none'), ('SIGNING_MODE', 'disposable'),
-                            ('RELEASE_TYPE', 'default'), ('PUBLISH_REQUEST', 'true')]:
+    for profile in ('care-map-pdx235', 'care-map-pdx235-lineage24'):
+        approved = {**base, 'DEVELOPMENT_PROFILE': profile}
+        assert subprocess.run(['bash', '-euc', script], env=approved, capture_output=True).returncode == 0
+        assert subprocess.run(['bash', '-euc', script], env={**approved, 'DEVICE_CANDIDATE_RECIPIENT_BASE64': ''},
+                              capture_output=True).returncode == 0
+    for name, forbidden in [('DEVELOPMENT_PROFILE', 'none'), ('DEVELOPMENT_PROFILE', 'care-map-pdx235-lineage25'),
+                            ('SIGNING_MODE', 'disposable'), ('RELEASE_TYPE', 'default'),
+                            ('PUBLISH_REQUEST', 'true')]:
         assert subprocess.run(['bash', '-euc', script], env={**base, name: forbidden},
                               capture_output=True).returncode != 0, name
 # The one artifact destination is the export script's fresh allowlisted stage,
