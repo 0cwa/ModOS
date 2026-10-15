@@ -58,8 +58,16 @@ has already booted. Magisk device testing is deferred and should not block
 rootless delivery; generating both variants still requires the helper to
 verify both signed outputs before success.
 
-A production rollout requires a separate reviewed change to make the guarded
-runtime-map path available for current nightlies, retain the authenticated avbroot 3.35 executable lock
-and signed-header enforcement, and narrowly adjust
-publication policy. Do not simply clear the quarantine or fill the October 9
-exception SHA-256 with an unrelated LineageOS 24 digest.
+The normal `development-profile=none` build path now selects the guarded
+source-built expected-map verifier for an API-digest-identified pdx235
+LineageOS **24.0 nightly**. That automatic selection is scoped to exactly the
+reviewed version series; it does not silently accept future 24.1 or 25.x
+images. The PR-only CI build exercises this normal route with disposable keys.
+The explicit `care-map-pdx235-lineage24` profile is still required to export
+a repository-signed private device-acceptance candidate.
+
+An Android 17 physical rootless upgrade and a separately reviewed
+**publication-quarantine** change are still prerequisites for publication.
+The ordinary path being able to build safely does not itself authorize release
+publishing. Do not fill the October 9 exception digest with an unrelated
+LineageOS 24 digest.
