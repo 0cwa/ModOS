@@ -38,7 +38,7 @@ enforce_pdx235_care_map_quarantine() {
     # exact filename AND digest are verified before key use or signing.
     if [[ "${output_scope}" == published &&
       "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true &&
-      ( -z "${VERSION[GRAPHENEOS]:-}" || "${VERSION[GRAPHENEOS]:-}" == 20261012 ) ]]; then
+      ( -z "${GRAPHENEOS_VERSION:-}" || "${GRAPHENEOS_VERSION}" == 20261012 ) ]]; then
       return 0
     fi
     echo "Error: ModOS#114 blocks LineageOS/pdx235 publication outside the exact approved October 12 pilot." >&2
