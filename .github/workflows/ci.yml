@@ -93,51 +93,15 @@ jobs:
       - name: Check upstream download endpoints
         shell: bash
         run: bash src/ci/smoke_test.sh
-      - name: Inspect available signed pdx235 LineageOS 24.0 source
+      - name: Probe exact archived pdx235 pilot OTA
         if: github.head_ref == 'fix/pdx235-pilot-current-lineage24-source-20261015'
         shell: bash
         run: |
           set -euo pipefail
-          curl -fLsS --retry 3 --connect-timeout 20 \
-            'https://download.lineageos.org/api/v2/devices/pdx235/builds' |
-            python3 -c '
-          import json, re, sys
-          builds = json.load(sys.stdin)
-          matches = []
-          for build in builds:
-              if build.get("type") != "nightly":
-                  continue
-              for item in build.get("files", []):
-                  fn = item.get("filename", "")
-                  if re.fullmatch(r"lineage-24[.]0-[0-9]{8}-nightly-pdx235-signed[.]zip", fn):
-                      matches.append((build.get("datetime", 0), fn, item.get("sha256"), item.get("url")))
-          for _, fn, sha, url in sorted(matches, reverse=True)[:5]:
-              print("APPROVED_SERIES_API_ENTRY", fn, sha, url)
-          if not matches:
-              print("NO_LINEAGE_24_0_PDX235_NIGHTLY_CURRENTLY_IN_OFFICIAL_API")
-          '
-
-  # Narrow, nonpublishing Android 17 qualification on this review branch only.
-  # No repository signing secrets, release credentials or write permissions.
-  lineage24_qualification:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/lineage24-care-map-qualification-20261015'
-    permissions:
-      contents: read
-    uses: ./.github/workflows/build-rom.yml
-    with:
-      rom-family: lineageos
-      device-id: pdx235
-      root: false
-      root-mode: both
-      magisk-preinit-device: sda47
-      update-channel: nightly
-      compatible-sepolicy-patching: true
-      allow-unauthorized-adb: false
-      microg: true
-      disable-system-updater: true
-      boot-animation: true
-      # Exercise the ordinary provider/build path, not the opt-in fixture profile.
-      development-profile: none
-      signing-mode: disposable
-      release-type: build-only
-      publish: false
+          curl -fILsS --retry 2 --connect-timeout 20 --max-time 75 \
+            'https://ftp.fau.de/lineageos/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip' |
+            grep -E '^HTTP/|^[Cc]ontent-[Ll]ength:' || true
+          # Fail closed if the archive cannot be opened via HTTPS; the hash and
+          # OTA signature are checked after the full release download.
+          curl -fILsS --retry 2 --connect-timeout 20 --max-time 75 \
+            'https://ftp.fau.de/lineageos/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip' >/dev/null
