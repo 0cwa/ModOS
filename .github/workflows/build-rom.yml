@@ -84,7 +84,7 @@ on:
         type: string
         default: ""
       development-profile:
-        description: Explicit source-build development profile (none or care-map-pdx235)
+        description: Explicit source-build profile (none, care-map-pdx235, or care-map-pdx235-lineage24)
         required: false
         type: string
         default: none
