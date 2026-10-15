@@ -96,6 +96,41 @@ expect_quarantine_failure 'direct paired-output publisher' env \
   OUTPUT_SCOPE=published RELEASE_TYPE=default \
   bash src/ci/publish_ota_pair.sh
 
+# Explicit one-time Android 17 pilot: the preliminary gate is allowed
+# only under the trusted workflow's flag; actual API-provided source identity
+# must subsequently match the exact reviewed artifact before signing.
+PIXENEOS_PDX235_PILOT_RELEASE=true
+ROM_FAMILY=lineageos DEVICE_NAME=pdx235 OUTPUT_SCOPE=published
+GRAPHENEOS[UPDATE_CHANNEL]=nightly
+GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
+ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
+VERSION[GRAPHENEOS]=20261012
+expect_allow 'exact pilot source identity' enforce_pdx235_pilot_source
+expect_allow 'pilot published scope only' enforce_output_policy published
+expect_allow 'pilot paired publication scope' enforce_pdx235_care_map_quarantine lineageos pdx235 published
+expect_reject 'pilot cannot become private/shared' enforce_pdx235_care_map_quarantine lineageos pdx235 shared
+for case_name in wrong-digest wrong-date wrong-build wrong-channel wrong-family wrong-device; do
+  (
+    case "${case_name}" in
+      wrong-digest) ROM_OTA_SHA256="$(printf '0%.0s' {1..64})" ;;
+      wrong-date) VERSION[GRAPHENEOS]=20261013 ;;
+      wrong-build) GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261015-nightly-pdx235-signed ;;
+      wrong-channel) GRAPHENEOS[UPDATE_CHANNEL]=weekly ;;
+      wrong-family) ROM_FAMILY=grapheneos ;;
+      wrong-device) DEVICE_NAME=other ;;
+    esac
+    if enforce_pdx235_pilot_source >/dev/null 2>&1; then
+      fail "pilot accepted ${case_name}"
+    fi
+  )
+  ((cases+=1))
+done
+unset PIXENEOS_PDX235_PILOT_RELEASE
+expect_quarantine_failure 'no pilot flag still quarantined' enforce_pdx235_care_map_quarantine lineageos pdx235 published
+VERSION[GRAPHENEOS]=''
+ROM_OTA_SHA256=''
+OUTPUT_SCOPE=local-unpublished
+
 # Reusing a locally present pdx235 ZIP must never bypass postflight checks.
 # These are only synthetic local files; no OTA is created or verified here.
 rootless="${tmp}/pdx235-rootless.zip"
