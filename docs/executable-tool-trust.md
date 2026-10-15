@@ -315,8 +315,34 @@ verification of the previously accepted October 9 OTA. Wrong keys, unsigned
 images with an explicit expected key, tampering, and a wrong expected-map
 fingerprint were rejected. See [qualification evidence](evidence/avbroot-20261013.json).
 
-The official prebuilt executable lock remains at 3.34.1: the signed upstream
-3.35.0 binary accepted an unsigned AVB header despite an explicit expected key.
-The guarded source engine closes that gap. These are regression checks on a
-frozen accepted fixture; new firmware still needs fresh verification and device
-acceptance. The pdx235 publication quarantine remains active.
+On October 13, the official prebuilt lock was deliberately retained at
+3.34.1 after demonstrating that upstream 3.35.0 accepts an unsigned AVB header
+even with an explicitly expected key. Subsequent source comparison established
+this behavior is **identical in 3.34.1 and 3.35.0**, not a 3.35 regression.
+The guarded source engine adds a fail-closed signed-header check; that guard
+must remain active on any path requiring actual authenticated AVB headers.
+
+## Official avbroot 3.35.0 executable qualification — October 15, 2026
+
+The official 3.35.0 `x86_64-unknown-linux-gnu` release archive and detached
+signature were downloaded in nonpublishing ModOS CI
+[run 38743045133](https://github.com/0cwa/ModOS/actions/runs/38743045133).
+The exact archive SHA-256 and 4,250,535-byte size match the published release
+metadata. Both the archive and signature SHA-256 were verified before
+`ssh-keygen -Y verify` accepted the signature with the **existing** allowed
+signer `chenxiaolong`, namespace `file`, Ed25519 fingerprint
+`SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Official 3.35.0 ZIP | `bbc7f8b4df8d9e6d2162bf354ac9f06643b2f64247a6f345d71e963f645f58c5` |
+| Detached .sig | `7ab8b19e7c47bbaf7f846df5c601b3a0888d605f5a3176144b7bedf64600176b` |
+| Extracted `LICENSE` (35,149 bytes, 0644) | `3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986` |
+| Extracted `README.md` (33,214 bytes, 0644) | `398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6` |
+| Extracted `avbroot` (10,916,976 bytes, 0755) | `2539724e0add2b8f6d855b8311897d01a4c28e851d387551f130325f006fa614` |
+
+The checked-in executable lock, offline validator and independent lock regression
+fixture advance together; no executable signer, signing key, or release permission
+changes. The official binary **does not replace** the source-built guarded
+expected-care-map verifier in the pdx235 development path. Physical Android 17
+acceptance and pdx235 publication review remain separate.
