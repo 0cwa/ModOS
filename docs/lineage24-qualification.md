@@ -59,7 +59,7 @@ rootless delivery; generating both variants still requires the helper to
 verify both signed outputs before success.
 
 A production rollout requires a separate reviewed change to make the guarded
-runtime-map path available for current nightlies, qualify the chosen avbroot
-executable under the existing cryptographic trust rules, and narrowly adjust
+runtime-map path available for current nightlies, retain the authenticated avbroot 3.35 executable lock
+and signed-header enforcement, and narrowly adjust
 publication policy. Do not simply clear the quarantine or fill the October 9
 exception SHA-256 with an unrelated LineageOS 24 digest.
