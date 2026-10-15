@@ -439,6 +439,50 @@ PYTEST
   [[ "${VERSION[AVBROOT_SETUP]}" == aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ]] || fail 'Reviewed development helper not selected'
 )
 
+# Guarded semantics are automatically selected only for the reviewed 24.0
+# source series with a provider SHA-256; no user-supplied version can widen it.
+test_guarded_lineage24_routing() (
+  source src/util_functions.sh
+  PIXENEOS_DEVELOPMENT_PROFILE=none
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  GRAPHENEOS[UPDATE_CHANNEL]=nightly
+  GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
+  ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
+  pdx235_guarded_runtime_care_map_required ||
+    fail '24.0 nightly with provider digest must require guarded verification'
+  for target in \
+    lineage-23.2-20261009-nightly-pdx235-signed \
+    lineage-24.1-20261012-nightly-pdx235-signed \
+    lineage-24.0-20261012-nightly-other-signed \
+    lineage-24.0-20261012-nightly-pdx235-signed.zip; do
+    GRAPHENEOS[OTA_TARGET]="$target"
+    if pdx235_guarded_runtime_care_map_required; then
+      fail "Unreviewed runtime-map source passed: $target"
+    fi
+  done
+  GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
+  ROM_OTA_SHA256=''
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Missing publisher API SHA-256 selected guarded verifier'
+  fi
+  ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
+  GRAPHENEOS[UPDATE_CHANNEL]=weekly
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Wrong channel selected guarded verifier'
+  fi
+  GRAPHENEOS[UPDATE_CHANNEL]=nightly
+  DEVICE_NAME=other
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Wrong device selected guarded verifier'
+  fi
+  DEVICE_NAME=pdx235
+  ROM_FAMILY=grapheneos
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Wrong ROM selected guarded verifier'
+  fi
+)
+
 test_release_triggers() {
   local lineage="${WORKFLOW_DIR}/release-lineage.yml"
 
@@ -622,6 +666,7 @@ test_build_only_permissions
 test_device_candidate_signing_routes
 test_encrypted_device_candidate_request_gate
 test_development_profile_activation
+test_guarded_lineage24_routing
 test_release_triggers
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding
