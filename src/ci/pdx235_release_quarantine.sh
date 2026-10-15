@@ -10,15 +10,12 @@
 # Source this file from the ROM profile gate and *both* publication helpers.
 # The only approved public exception is this one exact, signed Android 17 pilot.
 # Future nightlies and all other shared/published scopes remain blocked.
-readonly _PDX235_PILOT_SOURCE_TARGET='lineage-24.0-20261012-nightly-pdx235-signed'
-readonly _PDX235_PILOT_SOURCE_SHA256='29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820'
-
 pdx235_pilot_source_matches() {
   [[ "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true &&
     "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
     "${GRAPHENEOS[UPDATE_CHANNEL]:-}" == nightly &&
-    "${GRAPHENEOS[OTA_TARGET]:-}" == "${_PDX235_PILOT_SOURCE_TARGET}" &&
-    "${ROM_OTA_SHA256:-}" == "${_PDX235_PILOT_SOURCE_SHA256}" &&
+    "${GRAPHENEOS[OTA_TARGET]:-}" == 'lineage-24.0-20261012-nightly-pdx235-signed' &&
+    "${ROM_OTA_SHA256:-}" == '29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820' &&
     "${VERSION[GRAPHENEOS]:-}" == 20261012 ]]
 }
 
