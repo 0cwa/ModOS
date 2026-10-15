@@ -15,8 +15,8 @@ import tempfile
 
 
 def require_candidate(profile, signing_mode, release_type, publish):
-    if (profile != 'care-map-pdx235' or signing_mode != 'repository' or
-            release_type != 'build-only' or publish):
+    if (profile not in ('care-map-pdx235', 'care-map-pdx235-lineage24') or
+            signing_mode != 'repository' or release_type != 'build-only' or publish):
         raise ValueError('Export requires an explicit nonpublishing repository-signed care-map device candidate')
 
 
