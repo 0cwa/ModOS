@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
 # Explicit source-build experiments use the common OTA pipeline and keep the
 # production helper/executable pins unchanged.
+# The frozen October 9 fixture and the LineageOS 24 series both use the same
+# reviewed source-built care-map verifier. Neither profile authorizes release.
+is_care_map_development_profile() {
+  case "${PIXENEOS_DEVELOPMENT_PROFILE:-}" in
+    care-map-pdx235|care-map-pdx235-lineage24) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 validate_development_profile() {
   local scope="${1:-${OUTPUT_SCOPE:-}}"
   case "${PIXENEOS_DEVELOPMENT_PROFILE:-}" in
     ''|none) return 0 ;;
-    care-map-pdx235)
+    care-map-pdx235|care-map-pdx235-lineage24)
       if [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
         "${scope}" == local-unpublished ]]; then
         return 0
       fi
-      echo 'Error: care-map-pdx235 development requires LineageOS/pdx235 local-unpublished scope.' >&2
+      echo 'Error: care-map development requires LineageOS/pdx235 local-unpublished scope.' >&2
       ;;
     *) echo 'Error: unknown development profile.' >&2 ;;
   esac
