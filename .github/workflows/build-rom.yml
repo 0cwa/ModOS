@@ -84,7 +84,7 @@ on:
         type: string
         default: ""
       development-profile:
-        description: Explicit source-build development profile (none or care-map-pdx235)
+        description: Explicit source-build profile (none, care-map-pdx235, or care-map-pdx235-lineage24)
         required: false
         type: string
         default: none
@@ -160,7 +160,8 @@ jobs:
           PUBLISH_REQUEST: ${{ inputs.publish }}
         run: |
           if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
-            [[ "${DEVELOPMENT_PROFILE}" == care-map-pdx235 &&
+            [[ ("${DEVELOPMENT_PROFILE}" == care-map-pdx235 ||
+                 "${DEVELOPMENT_PROFILE}" == care-map-pdx235-lineage24) &&
               "${SIGNING_MODE}" == repository && "${RELEASE_TYPE}" == build-only &&
               "${PUBLISH_REQUEST}" == false ]] || {
               echo '::error::Candidate export requires an explicit nonpublishing repository-signed development candidate'

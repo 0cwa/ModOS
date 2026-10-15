@@ -124,6 +124,10 @@ physical acceptance and reviewed production promotion remain incomplete.
 
 The October 13 upstream dependency qualification merged Custota 6.6/MSD 2.5 and
 qualified the guarded avbroot 3.35 source engine. The helper consumer is pinned
-to the reviewed source-build revision; official prebuilt avbroot stays at 3.34.1.
+to the reviewed source-build revision. On October 15, an independent CI
+detached-signature check and measured member hashes qualified the official
+prebuilt avbroot 3.35.0 for the executable trust lock. Its unsigned-header
+behavior was already present in 3.34.1; the guarded source verifier remains
+necessary for signed-header enforcement.
 See [qualification evidence](evidence/avbroot-20261013.json). Fresh firmware/device
 acceptance and the publication quarantine remain separate requirements.

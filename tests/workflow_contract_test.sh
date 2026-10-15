@@ -376,11 +376,14 @@ base = {**os.environ, 'EXPORT_DEVICE_CANDIDATE': 'true',
         'ROOT_MODE_INPUT': 'rootless', 'ADDITIONALS_ROOT': 'false', 'MAGISK_PREINIT_REQUEST': ''}
 with tempfile.TemporaryDirectory() as scratch:
     base['GITHUB_ENV'] = str(Path(scratch) / 'env')
-    assert subprocess.run(['bash', '-euc', script], env=base, capture_output=True).returncode == 0
-    assert subprocess.run(['bash', '-euc', script], env={**base, 'DEVICE_CANDIDATE_RECIPIENT_BASE64': ''},
-                          capture_output=True).returncode == 0
-    for name, forbidden in [('DEVELOPMENT_PROFILE', 'none'), ('SIGNING_MODE', 'disposable'),
-                            ('RELEASE_TYPE', 'default'), ('PUBLISH_REQUEST', 'true')]:
+    for profile in ('care-map-pdx235', 'care-map-pdx235-lineage24'):
+        approved = {**base, 'DEVELOPMENT_PROFILE': profile}
+        assert subprocess.run(['bash', '-euc', script], env=approved, capture_output=True).returncode == 0
+        assert subprocess.run(['bash', '-euc', script], env={**approved, 'DEVICE_CANDIDATE_RECIPIENT_BASE64': ''},
+                              capture_output=True).returncode == 0
+    for name, forbidden in [('DEVELOPMENT_PROFILE', 'none'), ('DEVELOPMENT_PROFILE', 'care-map-pdx235-lineage25'),
+                            ('SIGNING_MODE', 'disposable'), ('RELEASE_TYPE', 'default'),
+                            ('PUBLISH_REQUEST', 'true')]:
         assert subprocess.run(['bash', '-euc', script], env={**base, name: forbidden},
                               capture_output=True).returncode != 0, name
 # The one artifact destination is the export script's fresh allowlisted stage,
@@ -404,17 +407,19 @@ test_development_profile_activation() (
   [[ "${VERSION[AVBROOT_SETUP]}" == "${original_pin}" ]] || fail 'Default profile changed helper pin'
   PIXENEOS_DEVELOPMENT_PROFILE=unreviewed
   if validate_development_profile local-unpublished 2>/dev/null; then fail 'Unknown development profile accepted'; fi
-  PIXENEOS_DEVELOPMENT_PROFILE=care-map-pdx235
   ROM_FAMILY=lineageos DEVICE_NAME=pdx235 OUTPUT_SCOPE=local-unpublished
-  validate_development_profile
-  for OUTPUT_SCOPE in private shared published; do
-    if validate_development_profile 2>/dev/null; then fail 'Development shared scope accepted'; fi
+  for PIXENEOS_DEVELOPMENT_PROFILE in care-map-pdx235 care-map-pdx235-lineage24; do
+    is_care_map_development_profile || fail 'Expected care-map profile not recognized'
+    validate_development_profile
+    for OUTPUT_SCOPE in private shared published; do
+      if validate_development_profile 2>/dev/null; then fail 'Development shared scope accepted'; fi
+    done
+    OUTPUT_SCOPE=local-unpublished DEVICE_NAME=other
+    if validate_development_profile 2>/dev/null; then fail 'Development wrong device accepted'; fi
+    DEVICE_NAME=pdx235 ROM_FAMILY=grapheneos
+    if validate_development_profile 2>/dev/null; then fail 'Development wrong family accepted'; fi
+    ROM_FAMILY=lineageos
   done
-  OUTPUT_SCOPE=local-unpublished DEVICE_NAME=other
-  if validate_development_profile 2>/dev/null; then fail 'Development wrong device accepted'; fi
-  DEVICE_NAME=pdx235 ROM_FAMILY=grapheneos
-  if validate_development_profile 2>/dev/null; then fail 'Development wrong family accepted'; fi
-  ROM_FAMILY=lineageos
   fixture="$(mktemp -d)"
   trap 'rm -rf "${fixture}"' EXIT
   git init -q "${fixture}"
@@ -434,6 +439,50 @@ PYTEST
   [[ "${VERSION[AVBROOT_SETUP]}" == aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ]] || fail 'Reviewed development helper not selected'
 )
 
+# Guarded semantics are automatically selected only for the reviewed 24.0
+# source series with a provider SHA-256; no user-supplied version can widen it.
+test_guarded_lineage24_routing() (
+  source src/util_functions.sh
+  PIXENEOS_DEVELOPMENT_PROFILE=none
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  GRAPHENEOS[UPDATE_CHANNEL]=nightly
+  GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
+  ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
+  pdx235_guarded_runtime_care_map_required ||
+    fail '24.0 nightly with provider digest must require guarded verification'
+  for target in \
+    lineage-23.2-20261009-nightly-pdx235-signed \
+    lineage-24.1-20261012-nightly-pdx235-signed \
+    lineage-24.0-20261012-nightly-other-signed \
+    lineage-24.0-20261012-nightly-pdx235-signed.zip; do
+    GRAPHENEOS[OTA_TARGET]="$target"
+    if pdx235_guarded_runtime_care_map_required; then
+      fail "Unreviewed runtime-map source passed: $target"
+    fi
+  done
+  GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
+  ROM_OTA_SHA256=''
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Missing publisher API SHA-256 selected guarded verifier'
+  fi
+  ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
+  GRAPHENEOS[UPDATE_CHANNEL]=weekly
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Wrong channel selected guarded verifier'
+  fi
+  GRAPHENEOS[UPDATE_CHANNEL]=nightly
+  DEVICE_NAME=other
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Wrong device selected guarded verifier'
+  fi
+  DEVICE_NAME=pdx235
+  ROM_FAMILY=grapheneos
+  if pdx235_guarded_runtime_care_map_required; then
+    fail 'Wrong ROM selected guarded verifier'
+  fi
+)
+
 test_release_triggers() {
   local lineage="${WORKFLOW_DIR}/release-lineage.yml"
 
@@ -446,6 +495,7 @@ test_release_triggers() {
   assert_contains "${lineage}" 'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
   assert_contains "${RELEASE}" '^[[:space:]]+- build-only[[:space:]]*$'     "GrapheneOS manual release must expose build-only mode"
   assert_contains "${lineage}" '^[[:space:]]+- build-only[[:space:]]*$'     "LineageOS manual release must expose build-only mode"
+  assert_contains "${lineage}" '^[[:space:]]+- care-map-pdx235-lineage24[[:space:]]*$' "LineageOS 24 profile must be selectable"
 
   assert_dispatch_default "${RELEASE}" device-id shiba
   assert_dispatch_default "${RELEASE}" root true
@@ -616,6 +666,7 @@ test_build_only_permissions
 test_device_candidate_signing_routes
 test_encrypted_device_candidate_request_gate
 test_development_profile_activation
+test_guarded_lineage24_routing
 test_release_triggers
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding

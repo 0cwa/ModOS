@@ -188,10 +188,10 @@ expected = {
         ),
     },
     "avbroot": {
-        "version": "3.34.1",
-        "artifact": "avbroot-3.34.1-x86_64-unknown-linux-gnu.zip",
-        "archive_size": 4254252,
-        "archive_sha256": "b1740ebf92d503cf2e81ca443afa4b615fb97ec365e170b71791ed72d9e559f8",
+        "version": "3.35.0",
+        "artifact": "avbroot-3.35.0-x86_64-unknown-linux-gnu.zip",
+        "archive_size": 4250535,
+        "archive_sha256": "bbc7f8b4df8d9e6d2162bf354ac9f06643b2f64247a6f345d71e963f645f58c5",
         "layout": {
             "LICENSE": "0644",
             "README.md": "0644",
@@ -203,17 +203,17 @@ expected = {
                 "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
             },
             "README.md": {
-                "size": 33128,
-                "sha256": "36f29f6c9142be36a1895ff1f1b8675b9f29f1d2949d9680da8100ed47555d29",
+                "size": 33214,
+                "sha256": "398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6",
             },
             "avbroot": {
-                "size": 10931888,
-                "sha256": "de0ed1b439175c8c358e2b2de289adc1a8947c655e3cce1598de374ab71d316b",
+                "size": 10916976,
+                "sha256": "2539724e0add2b8f6d855b8311897d01a4c28e851d387551f130325f006fa614",
             },
         },
         "url": (
             "https://github.com/chenxiaolong/avbroot/releases/download/"
-            "v3.34.1/avbroot-3.34.1-x86_64-unknown-linux-gnu.zip"
+            "v3.35.0/avbroot-3.35.0-x86_64-unknown-linux-gnu.zip"
         ),
     },
     "custota-tool": {

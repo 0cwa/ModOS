@@ -23,15 +23,30 @@ function fetch_grapheneos_ota_metadata() {
 }
 
 function fetch_lineageos_ota_metadata() {
-  local release_metadata parsed filename ota_url latest_version source_filename=""
+  local release_metadata parsed filename ota_url latest_version source_filename="" source_series=""
   local endpoint="${ROM_PROFILE[OTA_BASE_URL]}/devices/${DEVICE_NAME}/builds"
 
   # Reproduce the physical candidate failure without upgrading Android as well.
   # This reviewed development profile remains restricted to unpublished pdx235.
-  if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 &&
-    "${DEVICE_NAME}" == pdx235 ]]; then
-    source_filename='lineage-23.2-20261009-nightly-pdx235-signed.zip'
-  fi
+  case "${PIXENEOS_DEVELOPMENT_PROFILE:-}" in
+    care-map-pdx235)
+      [[ "${DEVICE_NAME}" == pdx235 ]] || {
+        echo 'Error: the frozen care-map source is restricted to pdx235.' >&2
+        return 1
+      }
+      source_filename='lineage-23.2-20261009-nightly-pdx235-signed.zip'
+      ;;
+    care-map-pdx235-lineage24)
+      [[ "${DEVICE_NAME}" == pdx235 &&
+        "${GRAPHENEOS[UPDATE_CHANNEL]}" == nightly ]] || {
+        echo 'Error: LineageOS 24 care-map source requires pdx235/nightly.' >&2
+        return 1
+      }
+      # Select the newest 24.0 nightly, never the older 23.2 fixture or a
+      # future 24.1/25 series without its own compatibility qualification.
+      source_series='24.0'
+      ;;
+  esac
 
   release_metadata="$(curl -sLf "${endpoint}")" || {
     echo "Error: failed to fetch LineageOS release metadata." >&2
@@ -48,16 +63,25 @@ try:
     channel = sys.argv[1]
     device = sys.argv[2]
     source_filename = sys.argv[3]
+    source_series = sys.argv[4]
+    def in_approved_series(file):
+        return not source_series or re.fullmatch(
+            rf"lineage-{re.escape(source_series)}-[0-9]{{8}}-nightly-{re.escape(device)}-signed[.]zip",
+            file["filename"],
+        ) is not None
     build = max(
         (item for item in builds if item["type"] == channel and
          (not source_filename or any(file["filename"] == source_filename
-                                     for file in item["files"]))),
+                                     for file in item["files"])) and
+         (not source_series or any(in_approved_series(file)
+                                   for file in item["files"]))),
         key=lambda item: item.get("datetime", item.get("date", "")),
     )
     item = next(
         item for item in build["files"]
         if item["filename"].endswith(".zip") and item["type"] == channel
         and (not source_filename or item["filename"] == source_filename)
+        and in_approved_series(item)
     )
     filename = item["filename"]
     url = item["url"]
@@ -83,7 +107,7 @@ if (
 print(filename)
 print(url)
 print(sha256)
-' "${GRAPHENEOS[UPDATE_CHANNEL]}" "${DEVICE_NAME}" "${source_filename}")" || {
+' "${GRAPHENEOS[UPDATE_CHANNEL]}" "${DEVICE_NAME}" "${source_filename}" "${source_series}")" || {
     echo "Error: LineageOS returned invalid release metadata." >&2
     return 1
   }

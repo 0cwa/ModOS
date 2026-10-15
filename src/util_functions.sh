@@ -704,8 +704,16 @@ function patch_ota() {
     echo -e "Patching OTA..."
     local args=()
     local tool_runner_prefix
-    if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
-      activate_development_profile || return 1
+    # Use the guarded source-built verifier for current LineageOS 24.0
+    # nightlies, not only the frozen 23.2 development fixture. Publication
+    # quarantine remains an independent earlier policy check.
+    local runtime_care_map_active=false
+    if is_care_map_development_profile ||
+      pdx235_guarded_runtime_care_map_required; then
+      runtime_care_map_active=true
+      if is_care_map_development_profile; then
+        activate_development_profile || return 1
+      fi
       args+=("--runtime-care-map")
     else
       tool_runner_prefix="$(executable_tool_runner_prefix_json)" || return 1
@@ -828,7 +836,7 @@ function patch_ota() {
     # Keep large helper images on the build filesystem rather than a small
     # host /tmp tmpfs. Only the child inherits this private scratch location.
     local -a helper_command=(python "${my_avbroot_setup}/patch.py")
-    if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+    if [[ "${runtime_care_map_active}" == true ]]; then
       local repository_root build_parent
       repository_root="$(git rev-parse --show-toplevel)" || return 1
       build_parent="$(mktemp -d "${WORKDIR}/care-map-source-build.XXXXXX")" || return 1
@@ -1164,7 +1172,7 @@ function my_avbroot_setup() {
   local helper_source="${PIXENEOS_AVBROOT_SETUP_SOURCE:-${DOMAIN}/0cwa/my-avbroot-setup}"
   local location_path
   local -a compatibility_args=()
-  if [[ "${PIXENEOS_DEVELOPMENT_PROFILE:-}" == care-map-pdx235 ]]; then
+  if is_care_map_development_profile; then
     activate_development_profile || return 1
     helper_source="${PIXENEOS_AVBROOT_SETUP_SOURCE}"
     compatibility_args+=("--manifest" "${PIXENEOS_DEVELOPMENT_COMPAT_MANIFEST}")

@@ -272,6 +272,58 @@ test_changed_development_source_digest_fails_closed() (
   fi
 )
 
+test_lineage24_development_selects_latest_24_0_not_unreviewed_series() (
+  reset_acquisition_fixture
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  PIXENEOS_DEVELOPMENT_PROFILE=care-map-pdx235-lineage24
+  git() { mock_magisk_tags "$@"; }
+  curl() {
+    printf '%s\n' '[
+      {"type":"nightly","datetime":1792137600,"files":[{
+        "filename":"lineage-24.1-20261016-nightly-pdx235-signed.zip",
+        "type":"nightly","sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "url":"https://mirrorbits.lineageos.org/full/pdx235/20261016/lineage-24.1-20261016-nightly-pdx235-signed.zip"}]},
+      {"type":"nightly","datetime":1792051200,"files":[{
+        "filename":"lineage-24.0-20261015-nightly-pdx235-signed.zip",
+        "type":"nightly","sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "url":"https://mirrorbits.lineageos.org/full/pdx235/20261015/lineage-24.0-20261015-nightly-pdx235-signed.zip"}]},
+      {"type":"nightly","datetime":1791814447,"files":[{
+        "filename":"lineage-24.0-20261012-nightly-pdx235-signed.zip",
+        "type":"nightly","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "url":"https://mirrorbits.lineageos.org/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip"}]},
+      {"type":"nightly","datetime":1791520682,"files":[{
+        "filename":"lineage-23.2-20261009-nightly-pdx235-signed.zip",
+        "type":"nightly","sha256":"b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8",
+        "url":"https://mirrorbits.lineageos.org/full/pdx235/20261009/lineage-23.2-20261009-nightly-pdx235-signed.zip"}]}]'
+  }
+  get_latest_version >/dev/null
+  assert_equals 20261015 "${VERSION[GRAPHENEOS]}" 'LineageOS 24.0 source date'
+  assert_equals lineage-24.0-20261015-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" 'LineageOS 24.0 target'
+  assert_equals cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc "${ROM_OTA_SHA256}" 'LineageOS 24.0 source digest'
+)
+
+test_lineage24_development_refuses_wrong_series_and_channel() (
+  reset_acquisition_fixture
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  PIXENEOS_DEVELOPMENT_PROFILE=care-map-pdx235-lineage24
+  git() { mock_magisk_tags "$@"; }
+  curl() {
+    printf '%s\n' '[{"type":"nightly","files":[{
+      "filename":"lineage-24.1-20261016-nightly-pdx235-signed.zip",
+      "type":"nightly","sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "url":"https://mirrorbits.lineageos.org/full/pdx235/20261016/lineage-24.1-20261016-nightly-pdx235-signed.zip"}]}]'
+  }
+  if get_latest_version >/dev/null 2>&1; then
+    fail 'LineageOS 24.1 was accepted by 24.0 development profile'
+  fi
+  GRAPHENEOS_UPDATE_CHANNEL=weekly
+  if get_latest_version >/dev/null 2>&1; then
+    fail 'LineageOS 24.0 development profile accepted non-nightly channel'
+  fi
+)
+
 test_pinned_magisk_version_skips_tag_discovery
 test_grapheneos_text_metadata
 test_lineageos_v2_metadata
@@ -281,6 +333,8 @@ test_unsafe_grapheneos_device_fails_closed
 test_unsafe_lineageos_metadata_fails_closed
 
 test_development_source_does_not_follow_major_upgrade
+test_lineage24_development_selects_latest_24_0_not_unreviewed_series
+test_lineage24_development_refuses_wrong_series_and_channel
 test_missing_development_source_fails_closed
 test_changed_development_source_digest_fails_closed
 
