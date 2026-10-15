@@ -66,9 +66,9 @@ TOOL_POLICY = {
         "layout": {"afsr": "0755"},
     },
     "avbroot": {
-        "version": "3.34.1",
+        "version": "3.35.0",
         "repository": "avbroot",
-        "artifact_name": "avbroot-3.34.1-x86_64-unknown-linux-gnu.zip",
+        "artifact_name": "avbroot-3.35.0-x86_64-unknown-linux-gnu.zip",
         "layout": {"LICENSE": "0644", "README.md": "0644", "avbroot": "0755"},
     },
     "custota-tool": {
