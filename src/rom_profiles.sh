@@ -81,6 +81,18 @@ function resolve_rom_profile() {
   fi
 }
 
+# Runtime care-map enforcement for the qualified pdx235 Android 17 series.
+# Selected target and SHA originate from the HTTPS official builds API;
+# verify_rom_ota_digest authenticates downloaded bytes before patching.
+# Do not extend this to a future major/minor source without explicit review.
+function pdx235_guarded_runtime_care_map_required() {
+  [[ "${ROM_FAMILY:-}" == lineageos &&
+    "${DEVICE_NAME:-}" == pdx235 &&
+    "${GRAPHENEOS[UPDATE_CHANNEL]:-}" == nightly &&
+    "${GRAPHENEOS[OTA_TARGET]:-}" =~ ^lineage-24[.]0-[0-9]{8}-nightly-pdx235-signed$ &&
+    "${ROM_OTA_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]
+}
+
 function enforce_output_policy() {
   local output_scope="${1}"
 
