@@ -113,7 +113,8 @@ jobs:
       microg: true
       disable-system-updater: true
       boot-animation: true
-      development-profile: care-map-pdx235-lineage24
+      # Exercise the ordinary provider/build path, not the opt-in fixture profile.
+      development-profile: none
       signing-mode: disposable
       release-type: build-only
       publish: false
