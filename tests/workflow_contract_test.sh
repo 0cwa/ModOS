@@ -450,6 +450,1093 @@ test_release_triggers() {
   assert_contains "${lineage}" 'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
   assert_contains "${RELEASE}" '^[[:space:]]+- build-only[[:space:]]*$'     "GrapheneOS manual release must expose build-only mode"
   assert_contains "${lineage}" '^[[:space:]]+- build-only[[:space:]]*
+  assert_dispatch_default "${RELEASE}" device-id shiba
+  assert_dispatch_default "${RELEASE}" root true
+  assert_dispatch_default "${RELEASE}" alterinstaller true
+  assert_dispatch_default "${RELEASE}" bcr true
+  assert_dispatch_default "${RELEASE}" custota true
+  assert_dispatch_default "${RELEASE}" msd true
+  assert_dispatch_default "${RELEASE}" oemunlockonboot true
+  assert_dispatch_default "${RELEASE}" disable-system-updater false
+  assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
+  assert_dispatch_default "${RELEASE}" boot-animation true
+  assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
+  assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
+  assert_dispatch_default "${lineage}" device-id pdx235
+  assert_dispatch_default "${lineage}" root true
+  assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
+  assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" disable-system-updater false
+  assert_dispatch_default "${lineage}" boot-animation true
+  assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
+}
+
+test_config_loading_isolated_to_scheduled_releases() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${RELEASE}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/grapheneos-shiba\.toml'     "GrapheneOS schedule must use the shiba definition"
+  assert_contains "${lineage}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
+  assert_not_contains "${lineage}" 'env\.toml'     "LineageOS schedule must not inherit repository-wide local env.toml"
+}
+
+test_release_configuration_forwarding() {
+  local loader="src/ci/load_schedule_definition.sh"
+
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Load scheduled build definition'     "scheduled GrapheneOS release must load a checked-in definition"
+  assert_contains "${RELEASE}"     'if:[[:space:]]*github\.event_name == .schedule.'     "scheduled configuration must be schedule-only"
+  assert_contains "${RELEASE}"     'run:[[:space:]]*bash src/ci/load_schedule_definition\.sh'     "GrapheneOS schedule must use the shared definition loader"
+  assert_contains "${loader}"     'check_toml_env "\$\{SCHEDULE_DEFINITION\}"'     "schedule loader must use the typed TOML parser"
+  assert_contains "${loader}"     'toml_config_has "\$\{key\}"'     "schedule loader must require every declared schedule key"
+  assert_contains "${loader}"     'disable_system_updater="\$\(toml_resolve_value disable_system_updater'     "schedule loader must resolve updater removal"
+  assert_contains "${loader}"     'boot_animation="\$\(toml_resolve_value boot_animation'     "schedule loader must resolve the boot-animation selection"
+  assert_contains "${loader}"     'compatible_sepolicy_patching="\$\(toml_resolve_value compatible_sepolicy_patching'     "schedule loader must resolve compatible-SEPolicy selection"
+  assert_contains "${loader}"     'force_update="\$\(toml_resolve_value force_update'     "schedule loader must resolve FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Resolve expected selection identity'     "release preflight must resolve the canonical selection identity"
+  assert_contains "${RELEASE}"     'module_selection_fingerprint'     "release preflight must use the shared selection fingerprint"
+  assert_contains "${RELEASE}"     'expected_variant:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "release preflight must expose the resolved identity"
+  assert_contains "${RELEASE}"     'EXPECTED_VARIANT:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "existing-build preflight must receive the resolved identity"
+  assert_contains "${RELEASE}"     'force_update:[[:space:]]*\$\{\{ steps\.scheduled_config\.outputs\.force_update \}\}'     "preflight must expose scheduled FORCE_UPDATE as a job output"
+  assert_contains "${RELEASE}"     'FORCE_UPDATE:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.force_update \|\| false \}\}'     "existing-build preflight must receive scheduled FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'device-id:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.device_id \|\| inputs\.device-id \}\}'     "manual device input must remain authoritative"
+  assert_contains "${RELEASE}"     'disable-system-updater:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.disable_system_updater == .true. \|\| inputs\.disable-system-updater \}\}'     "updater removal must be forwarded from scheduled definition or manual input"
+  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "boot animation must respect scheduled and manual explicit false values"
+  assert_contains "${RELEASE}"     'ADDITIONALS_BOOT_ANIMATION:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "preflight identity must respect scheduled and manual boot animation opt-outs"
+  assert_contains "${RELEASE}"     'compatible-sepolicy-patching:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.compatible_sepolicy_patching == .true.'     "compatible SEPolicy must be forwarded from the scheduled definition"
+  assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
+  assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"
+  assert_contains "${RELEASE}"     'update-channel:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.update_channel'     "scheduled update channel must be forwarded"
+}
+
+test_microg_lineage_forwarding() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
+  assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
+  assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+}
+
+test_module_forwarding_contract() {
+  local contract input config output
+  local loader="src/ci/load_schedule_definition.sh"
+
+  for contract in \
+    'afsr:AFSR:afsr' \
+    'alterinstaller:ALTERINSTALLER:alterinstaller' \
+    'bcr:BCR:bcr' \
+    'custota:CUSTOTA:custota' \
+    'msd:MSD:msd' \
+    'oemunlockonboot:OEMUNLOCKONBOOT:oemunlockonboot' \
+    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater' \
+    'fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION:fdroid_privileged_extension'; do
+    IFS=: read -r input config output <<<"${contract}"
+
+    assert_contains \
+      "${loader}" \
+      "toml_resolve_value ${output}" \
+      "schedule loader must resolve ${config} through the typed contract"
+    assert_contains \
+      "${loader}" \
+      "echo \"${output}=" \
+      "schedule loader must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "steps\\.scheduled_config\\.outputs\\.${output}" \
+      "preflight must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "ADDITIONALS_${config}:[[:space:]].*steps\\.scheduled_config\\.outputs\\.${output}.*inputs\\.${input}" \
+      "expected identity must use scheduled/manual ${input}"
+    assert_contains \
+      "${RELEASE}" \
+      "needs\\.preflight\\.outputs\\.${output}[[:space:]]*==[[:space:]]*['\"]true['\"].*inputs\\.${input}" \
+      "build invocation must use scheduled/manual ${input}"
+    assert_contains \
+      "${REUSABLE}" \
+      "ADDITIONALS_${config}:[[:space:]].*inputs\\.${input}" \
+      "reusable build must map ${config} from input ${input}"
+  done
+}
+
+test_publication_identity_is_step_scoped() {
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_EMAIL:[[:space:]]*\$\{\{ secrets\.EMAIL \}\}' \
+    "publication identity email must be step-scoped"
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_NAME:[[:space:]]*\$\{\{ github\.repository_owner \}\}' \
+    "publication identity name must be step-scoped"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.email "\$\{GIT_COMMIT_EMAIL-\}"' \
+    "publication helper must configure local email from the step environment"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.name "\$\{GIT_COMMIT_NAME-\}"' \
+    "publication helper must configure local name from the step environment"
+  assert_not_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'git config user\.email .*secrets\.EMAIL' \
+    "publication must not interpolate the email secret in shell source"
+}
+
+test_workflow_inventory_is_intentional() (
+  local expected actual
+
+  expected="$(printf '%s\n' \
+    build-rom.yml \
+    ci.yml \
+    multi-release.yml \
+    release-lineage.yml \
+    release.yml \
+    renovate.yml)"
+
+  actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
+
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'unexpected workflow inventory\nexpected:\n%s\nactual:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    exit 1
+  }
+)
+
+test_no_lineage_checkout_anywhere() {
+  local file
+
+  while IFS= read -r -d '' file; do
+    assert_not_contains \
+      "${file}" \
+      '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
+      "workflows must use the main branch implementation"
+  done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -print0)
+}
+
+test_reusable_workflow
+test_build_only_signing
+test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_release_triggers
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+     "LineageOS manual release must expose build-only mode"
+  assert_contains "${lineage}" '^[[:space:]]+- care-map-pdx235-lineage24[[:space:]]*
+
+  assert_dispatch_default "${RELEASE}" device-id shiba
+  assert_dispatch_default "${RELEASE}" root true
+  assert_dispatch_default "${RELEASE}" alterinstaller true
+  assert_dispatch_default "${RELEASE}" bcr true
+  assert_dispatch_default "${RELEASE}" custota true
+  assert_dispatch_default "${RELEASE}" msd true
+  assert_dispatch_default "${RELEASE}" oemunlockonboot true
+  assert_dispatch_default "${RELEASE}" disable-system-updater false
+  assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
+  assert_dispatch_default "${RELEASE}" boot-animation true
+  assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
+  assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
+  assert_dispatch_default "${lineage}" device-id pdx235
+  assert_dispatch_default "${lineage}" root true
+  assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
+  assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" disable-system-updater false
+  assert_dispatch_default "${lineage}" boot-animation true
+  assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
+}
+
+test_config_loading_isolated_to_scheduled_releases() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${RELEASE}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/grapheneos-shiba\.toml'     "GrapheneOS schedule must use the shiba definition"
+  assert_contains "${lineage}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
+  assert_not_contains "${lineage}" 'env\.toml'     "LineageOS schedule must not inherit repository-wide local env.toml"
+}
+
+test_release_configuration_forwarding() {
+  local loader="src/ci/load_schedule_definition.sh"
+
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Load scheduled build definition'     "scheduled GrapheneOS release must load a checked-in definition"
+  assert_contains "${RELEASE}"     'if:[[:space:]]*github\.event_name == .schedule.'     "scheduled configuration must be schedule-only"
+  assert_contains "${RELEASE}"     'run:[[:space:]]*bash src/ci/load_schedule_definition\.sh'     "GrapheneOS schedule must use the shared definition loader"
+  assert_contains "${loader}"     'check_toml_env "\$\{SCHEDULE_DEFINITION\}"'     "schedule loader must use the typed TOML parser"
+  assert_contains "${loader}"     'toml_config_has "\$\{key\}"'     "schedule loader must require every declared schedule key"
+  assert_contains "${loader}"     'disable_system_updater="\$\(toml_resolve_value disable_system_updater'     "schedule loader must resolve updater removal"
+  assert_contains "${loader}"     'boot_animation="\$\(toml_resolve_value boot_animation'     "schedule loader must resolve the boot-animation selection"
+  assert_contains "${loader}"     'compatible_sepolicy_patching="\$\(toml_resolve_value compatible_sepolicy_patching'     "schedule loader must resolve compatible-SEPolicy selection"
+  assert_contains "${loader}"     'force_update="\$\(toml_resolve_value force_update'     "schedule loader must resolve FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Resolve expected selection identity'     "release preflight must resolve the canonical selection identity"
+  assert_contains "${RELEASE}"     'module_selection_fingerprint'     "release preflight must use the shared selection fingerprint"
+  assert_contains "${RELEASE}"     'expected_variant:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "release preflight must expose the resolved identity"
+  assert_contains "${RELEASE}"     'EXPECTED_VARIANT:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "existing-build preflight must receive the resolved identity"
+  assert_contains "${RELEASE}"     'force_update:[[:space:]]*\$\{\{ steps\.scheduled_config\.outputs\.force_update \}\}'     "preflight must expose scheduled FORCE_UPDATE as a job output"
+  assert_contains "${RELEASE}"     'FORCE_UPDATE:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.force_update \|\| false \}\}'     "existing-build preflight must receive scheduled FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'device-id:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.device_id \|\| inputs\.device-id \}\}'     "manual device input must remain authoritative"
+  assert_contains "${RELEASE}"     'disable-system-updater:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.disable_system_updater == .true. \|\| inputs\.disable-system-updater \}\}'     "updater removal must be forwarded from scheduled definition or manual input"
+  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "boot animation must respect scheduled and manual explicit false values"
+  assert_contains "${RELEASE}"     'ADDITIONALS_BOOT_ANIMATION:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "preflight identity must respect scheduled and manual boot animation opt-outs"
+  assert_contains "${RELEASE}"     'compatible-sepolicy-patching:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.compatible_sepolicy_patching == .true.'     "compatible SEPolicy must be forwarded from the scheduled definition"
+  assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
+  assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"
+  assert_contains "${RELEASE}"     'update-channel:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.update_channel'     "scheduled update channel must be forwarded"
+}
+
+test_microg_lineage_forwarding() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
+  assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
+  assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+}
+
+test_module_forwarding_contract() {
+  local contract input config output
+  local loader="src/ci/load_schedule_definition.sh"
+
+  for contract in \
+    'afsr:AFSR:afsr' \
+    'alterinstaller:ALTERINSTALLER:alterinstaller' \
+    'bcr:BCR:bcr' \
+    'custota:CUSTOTA:custota' \
+    'msd:MSD:msd' \
+    'oemunlockonboot:OEMUNLOCKONBOOT:oemunlockonboot' \
+    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater' \
+    'fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION:fdroid_privileged_extension'; do
+    IFS=: read -r input config output <<<"${contract}"
+
+    assert_contains \
+      "${loader}" \
+      "toml_resolve_value ${output}" \
+      "schedule loader must resolve ${config} through the typed contract"
+    assert_contains \
+      "${loader}" \
+      "echo \"${output}=" \
+      "schedule loader must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "steps\\.scheduled_config\\.outputs\\.${output}" \
+      "preflight must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "ADDITIONALS_${config}:[[:space:]].*steps\\.scheduled_config\\.outputs\\.${output}.*inputs\\.${input}" \
+      "expected identity must use scheduled/manual ${input}"
+    assert_contains \
+      "${RELEASE}" \
+      "needs\\.preflight\\.outputs\\.${output}[[:space:]]*==[[:space:]]*['\"]true['\"].*inputs\\.${input}" \
+      "build invocation must use scheduled/manual ${input}"
+    assert_contains \
+      "${REUSABLE}" \
+      "ADDITIONALS_${config}:[[:space:]].*inputs\\.${input}" \
+      "reusable build must map ${config} from input ${input}"
+  done
+}
+
+test_publication_identity_is_step_scoped() {
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_EMAIL:[[:space:]]*\$\{\{ secrets\.EMAIL \}\}' \
+    "publication identity email must be step-scoped"
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_NAME:[[:space:]]*\$\{\{ github\.repository_owner \}\}' \
+    "publication identity name must be step-scoped"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.email "\$\{GIT_COMMIT_EMAIL-\}"' \
+    "publication helper must configure local email from the step environment"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.name "\$\{GIT_COMMIT_NAME-\}"' \
+    "publication helper must configure local name from the step environment"
+  assert_not_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'git config user\.email .*secrets\.EMAIL' \
+    "publication must not interpolate the email secret in shell source"
+}
+
+test_workflow_inventory_is_intentional() (
+  local expected actual
+
+  expected="$(printf '%s\n' \
+    build-rom.yml \
+    ci.yml \
+    multi-release.yml \
+    release-lineage.yml \
+    release.yml \
+    renovate.yml)"
+
+  actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
+
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'unexpected workflow inventory\nexpected:\n%s\nactual:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    exit 1
+  }
+)
+
+test_no_lineage_checkout_anywhere() {
+  local file
+
+  while IFS= read -r -d '' file; do
+    assert_not_contains \
+      "${file}" \
+      '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
+      "workflows must use the main branch implementation"
+  done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -print0)
+}
+
+test_reusable_workflow
+test_build_only_signing
+test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_release_triggers
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+ "LineageOS 24 profile must be selectable only as explicit development input"
+
+  assert_dispatch_default "${RELEASE}" device-id shiba
+  assert_dispatch_default "${RELEASE}" root true
+  assert_dispatch_default "${RELEASE}" alterinstaller true
+  assert_dispatch_default "${RELEASE}" bcr true
+  assert_dispatch_default "${RELEASE}" custota true
+  assert_dispatch_default "${RELEASE}" msd true
+  assert_dispatch_default "${RELEASE}" oemunlockonboot true
+  assert_dispatch_default "${RELEASE}" disable-system-updater false
+  assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
+  assert_dispatch_default "${RELEASE}" boot-animation true
+  assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
+  assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
+  assert_dispatch_default "${lineage}" device-id pdx235
+  assert_dispatch_default "${lineage}" root true
+  assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
+  assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" disable-system-updater false
+  assert_dispatch_default "${lineage}" boot-animation true
+  assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
+}
+
+test_config_loading_isolated_to_scheduled_releases() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${RELEASE}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/grapheneos-shiba\.toml'     "GrapheneOS schedule must use the shiba definition"
+  assert_contains "${lineage}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
+  assert_not_contains "${lineage}" 'env\.toml'     "LineageOS schedule must not inherit repository-wide local env.toml"
+}
+
+test_release_configuration_forwarding() {
+  local loader="src/ci/load_schedule_definition.sh"
+
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Load scheduled build definition'     "scheduled GrapheneOS release must load a checked-in definition"
+  assert_contains "${RELEASE}"     'if:[[:space:]]*github\.event_name == .schedule.'     "scheduled configuration must be schedule-only"
+  assert_contains "${RELEASE}"     'run:[[:space:]]*bash src/ci/load_schedule_definition\.sh'     "GrapheneOS schedule must use the shared definition loader"
+  assert_contains "${loader}"     'check_toml_env "\$\{SCHEDULE_DEFINITION\}"'     "schedule loader must use the typed TOML parser"
+  assert_contains "${loader}"     'toml_config_has "\$\{key\}"'     "schedule loader must require every declared schedule key"
+  assert_contains "${loader}"     'disable_system_updater="\$\(toml_resolve_value disable_system_updater'     "schedule loader must resolve updater removal"
+  assert_contains "${loader}"     'boot_animation="\$\(toml_resolve_value boot_animation'     "schedule loader must resolve the boot-animation selection"
+  assert_contains "${loader}"     'compatible_sepolicy_patching="\$\(toml_resolve_value compatible_sepolicy_patching'     "schedule loader must resolve compatible-SEPolicy selection"
+  assert_contains "${loader}"     'force_update="\$\(toml_resolve_value force_update'     "schedule loader must resolve FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Resolve expected selection identity'     "release preflight must resolve the canonical selection identity"
+  assert_contains "${RELEASE}"     'module_selection_fingerprint'     "release preflight must use the shared selection fingerprint"
+  assert_contains "${RELEASE}"     'expected_variant:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "release preflight must expose the resolved identity"
+  assert_contains "${RELEASE}"     'EXPECTED_VARIANT:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "existing-build preflight must receive the resolved identity"
+  assert_contains "${RELEASE}"     'force_update:[[:space:]]*\$\{\{ steps\.scheduled_config\.outputs\.force_update \}\}'     "preflight must expose scheduled FORCE_UPDATE as a job output"
+  assert_contains "${RELEASE}"     'FORCE_UPDATE:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.force_update \|\| false \}\}'     "existing-build preflight must receive scheduled FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'device-id:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.device_id \|\| inputs\.device-id \}\}'     "manual device input must remain authoritative"
+  assert_contains "${RELEASE}"     'disable-system-updater:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.disable_system_updater == .true. \|\| inputs\.disable-system-updater \}\}'     "updater removal must be forwarded from scheduled definition or manual input"
+  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "boot animation must respect scheduled and manual explicit false values"
+  assert_contains "${RELEASE}"     'ADDITIONALS_BOOT_ANIMATION:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "preflight identity must respect scheduled and manual boot animation opt-outs"
+  assert_contains "${RELEASE}"     'compatible-sepolicy-patching:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.compatible_sepolicy_patching == .true.'     "compatible SEPolicy must be forwarded from the scheduled definition"
+  assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
+  assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"
+  assert_contains "${RELEASE}"     'update-channel:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.update_channel'     "scheduled update channel must be forwarded"
+}
+
+test_microg_lineage_forwarding() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
+  assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
+  assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+}
+
+test_module_forwarding_contract() {
+  local contract input config output
+  local loader="src/ci/load_schedule_definition.sh"
+
+  for contract in \
+    'afsr:AFSR:afsr' \
+    'alterinstaller:ALTERINSTALLER:alterinstaller' \
+    'bcr:BCR:bcr' \
+    'custota:CUSTOTA:custota' \
+    'msd:MSD:msd' \
+    'oemunlockonboot:OEMUNLOCKONBOOT:oemunlockonboot' \
+    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater' \
+    'fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION:fdroid_privileged_extension'; do
+    IFS=: read -r input config output <<<"${contract}"
+
+    assert_contains \
+      "${loader}" \
+      "toml_resolve_value ${output}" \
+      "schedule loader must resolve ${config} through the typed contract"
+    assert_contains \
+      "${loader}" \
+      "echo \"${output}=" \
+      "schedule loader must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "steps\\.scheduled_config\\.outputs\\.${output}" \
+      "preflight must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "ADDITIONALS_${config}:[[:space:]].*steps\\.scheduled_config\\.outputs\\.${output}.*inputs\\.${input}" \
+      "expected identity must use scheduled/manual ${input}"
+    assert_contains \
+      "${RELEASE}" \
+      "needs\\.preflight\\.outputs\\.${output}[[:space:]]*==[[:space:]]*['\"]true['\"].*inputs\\.${input}" \
+      "build invocation must use scheduled/manual ${input}"
+    assert_contains \
+      "${REUSABLE}" \
+      "ADDITIONALS_${config}:[[:space:]].*inputs\\.${input}" \
+      "reusable build must map ${config} from input ${input}"
+  done
+}
+
+test_publication_identity_is_step_scoped() {
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_EMAIL:[[:space:]]*\$\{\{ secrets\.EMAIL \}\}' \
+    "publication identity email must be step-scoped"
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_NAME:[[:space:]]*\$\{\{ github\.repository_owner \}\}' \
+    "publication identity name must be step-scoped"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.email "\$\{GIT_COMMIT_EMAIL-\}"' \
+    "publication helper must configure local email from the step environment"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.name "\$\{GIT_COMMIT_NAME-\}"' \
+    "publication helper must configure local name from the step environment"
+  assert_not_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'git config user\.email .*secrets\.EMAIL' \
+    "publication must not interpolate the email secret in shell source"
+}
+
+test_workflow_inventory_is_intentional() (
+  local expected actual
+
+  expected="$(printf '%s\n' \
+    build-rom.yml \
+    ci.yml \
+    multi-release.yml \
+    release-lineage.yml \
+    release.yml \
+    renovate.yml)"
+
+  actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
+
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'unexpected workflow inventory\nexpected:\n%s\nactual:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    exit 1
+  }
+)
+
+test_no_lineage_checkout_anywhere() {
+  local file
+
+  while IFS= read -r -d '' file; do
+    assert_not_contains \
+      "${file}" \
+      '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
+      "workflows must use the main branch implementation"
+  done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -print0)
+}
+
+test_reusable_workflow
+test_build_only_signing
+test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_release_triggers
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+     "LineageOS manual release must expose build-only mode"
+  assert_contains "${lineage}" '^[[:space:]]+- care-map-pdx235-lineage24[[:space:]]*
+  assert_dispatch_default "${RELEASE}" device-id shiba
+  assert_dispatch_default "${RELEASE}" root true
+  assert_dispatch_default "${RELEASE}" alterinstaller true
+  assert_dispatch_default "${RELEASE}" bcr true
+  assert_dispatch_default "${RELEASE}" custota true
+  assert_dispatch_default "${RELEASE}" msd true
+  assert_dispatch_default "${RELEASE}" oemunlockonboot true
+  assert_dispatch_default "${RELEASE}" disable-system-updater false
+  assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
+  assert_dispatch_default "${RELEASE}" boot-animation true
+  assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
+  assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
+  assert_dispatch_default "${lineage}" device-id pdx235
+  assert_dispatch_default "${lineage}" root true
+  assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
+  assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" disable-system-updater false
+  assert_dispatch_default "${lineage}" boot-animation true
+  assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
+}
+
+test_config_loading_isolated_to_scheduled_releases() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${RELEASE}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/grapheneos-shiba\.toml'     "GrapheneOS schedule must use the shiba definition"
+  assert_contains "${lineage}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
+  assert_not_contains "${lineage}" 'env\.toml'     "LineageOS schedule must not inherit repository-wide local env.toml"
+}
+
+test_release_configuration_forwarding() {
+  local loader="src/ci/load_schedule_definition.sh"
+
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Load scheduled build definition'     "scheduled GrapheneOS release must load a checked-in definition"
+  assert_contains "${RELEASE}"     'if:[[:space:]]*github\.event_name == .schedule.'     "scheduled configuration must be schedule-only"
+  assert_contains "${RELEASE}"     'run:[[:space:]]*bash src/ci/load_schedule_definition\.sh'     "GrapheneOS schedule must use the shared definition loader"
+  assert_contains "${loader}"     'check_toml_env "\$\{SCHEDULE_DEFINITION\}"'     "schedule loader must use the typed TOML parser"
+  assert_contains "${loader}"     'toml_config_has "\$\{key\}"'     "schedule loader must require every declared schedule key"
+  assert_contains "${loader}"     'disable_system_updater="\$\(toml_resolve_value disable_system_updater'     "schedule loader must resolve updater removal"
+  assert_contains "${loader}"     'boot_animation="\$\(toml_resolve_value boot_animation'     "schedule loader must resolve the boot-animation selection"
+  assert_contains "${loader}"     'compatible_sepolicy_patching="\$\(toml_resolve_value compatible_sepolicy_patching'     "schedule loader must resolve compatible-SEPolicy selection"
+  assert_contains "${loader}"     'force_update="\$\(toml_resolve_value force_update'     "schedule loader must resolve FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Resolve expected selection identity'     "release preflight must resolve the canonical selection identity"
+  assert_contains "${RELEASE}"     'module_selection_fingerprint'     "release preflight must use the shared selection fingerprint"
+  assert_contains "${RELEASE}"     'expected_variant:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "release preflight must expose the resolved identity"
+  assert_contains "${RELEASE}"     'EXPECTED_VARIANT:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "existing-build preflight must receive the resolved identity"
+  assert_contains "${RELEASE}"     'force_update:[[:space:]]*\$\{\{ steps\.scheduled_config\.outputs\.force_update \}\}'     "preflight must expose scheduled FORCE_UPDATE as a job output"
+  assert_contains "${RELEASE}"     'FORCE_UPDATE:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.force_update \|\| false \}\}'     "existing-build preflight must receive scheduled FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'device-id:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.device_id \|\| inputs\.device-id \}\}'     "manual device input must remain authoritative"
+  assert_contains "${RELEASE}"     'disable-system-updater:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.disable_system_updater == .true. \|\| inputs\.disable-system-updater \}\}'     "updater removal must be forwarded from scheduled definition or manual input"
+  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "boot animation must respect scheduled and manual explicit false values"
+  assert_contains "${RELEASE}"     'ADDITIONALS_BOOT_ANIMATION:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "preflight identity must respect scheduled and manual boot animation opt-outs"
+  assert_contains "${RELEASE}"     'compatible-sepolicy-patching:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.compatible_sepolicy_patching == .true.'     "compatible SEPolicy must be forwarded from the scheduled definition"
+  assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
+  assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"
+  assert_contains "${RELEASE}"     'update-channel:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.update_channel'     "scheduled update channel must be forwarded"
+}
+
+test_microg_lineage_forwarding() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
+  assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
+  assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+}
+
+test_module_forwarding_contract() {
+  local contract input config output
+  local loader="src/ci/load_schedule_definition.sh"
+
+  for contract in \
+    'afsr:AFSR:afsr' \
+    'alterinstaller:ALTERINSTALLER:alterinstaller' \
+    'bcr:BCR:bcr' \
+    'custota:CUSTOTA:custota' \
+    'msd:MSD:msd' \
+    'oemunlockonboot:OEMUNLOCKONBOOT:oemunlockonboot' \
+    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater' \
+    'fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION:fdroid_privileged_extension'; do
+    IFS=: read -r input config output <<<"${contract}"
+
+    assert_contains \
+      "${loader}" \
+      "toml_resolve_value ${output}" \
+      "schedule loader must resolve ${config} through the typed contract"
+    assert_contains \
+      "${loader}" \
+      "echo \"${output}=" \
+      "schedule loader must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "steps\\.scheduled_config\\.outputs\\.${output}" \
+      "preflight must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "ADDITIONALS_${config}:[[:space:]].*steps\\.scheduled_config\\.outputs\\.${output}.*inputs\\.${input}" \
+      "expected identity must use scheduled/manual ${input}"
+    assert_contains \
+      "${RELEASE}" \
+      "needs\\.preflight\\.outputs\\.${output}[[:space:]]*==[[:space:]]*['\"]true['\"].*inputs\\.${input}" \
+      "build invocation must use scheduled/manual ${input}"
+    assert_contains \
+      "${REUSABLE}" \
+      "ADDITIONALS_${config}:[[:space:]].*inputs\\.${input}" \
+      "reusable build must map ${config} from input ${input}"
+  done
+}
+
+test_publication_identity_is_step_scoped() {
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_EMAIL:[[:space:]]*\$\{\{ secrets\.EMAIL \}\}' \
+    "publication identity email must be step-scoped"
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_NAME:[[:space:]]*\$\{\{ github\.repository_owner \}\}' \
+    "publication identity name must be step-scoped"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.email "\$\{GIT_COMMIT_EMAIL-\}"' \
+    "publication helper must configure local email from the step environment"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.name "\$\{GIT_COMMIT_NAME-\}"' \
+    "publication helper must configure local name from the step environment"
+  assert_not_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'git config user\.email .*secrets\.EMAIL' \
+    "publication must not interpolate the email secret in shell source"
+}
+
+test_workflow_inventory_is_intentional() (
+  local expected actual
+
+  expected="$(printf '%s\n' \
+    build-rom.yml \
+    ci.yml \
+    multi-release.yml \
+    release-lineage.yml \
+    release.yml \
+    renovate.yml)"
+
+  actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
+
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'unexpected workflow inventory\nexpected:\n%s\nactual:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    exit 1
+  }
+)
+
+test_no_lineage_checkout_anywhere() {
+  local file
+
+  while IFS= read -r -d '' file; do
+    assert_not_contains \
+      "${file}" \
+      '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
+      "workflows must use the main branch implementation"
+  done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -print0)
+}
+
+test_reusable_workflow
+test_build_only_signing
+test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_release_triggers
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+     "LineageOS manual release must expose build-only mode"
+  assert_contains "${lineage}" '^[[:space:]]+- care-map-pdx235-lineage24[[:space:]]*
+
+  assert_dispatch_default "${RELEASE}" device-id shiba
+  assert_dispatch_default "${RELEASE}" root true
+  assert_dispatch_default "${RELEASE}" alterinstaller true
+  assert_dispatch_default "${RELEASE}" bcr true
+  assert_dispatch_default "${RELEASE}" custota true
+  assert_dispatch_default "${RELEASE}" msd true
+  assert_dispatch_default "${RELEASE}" oemunlockonboot true
+  assert_dispatch_default "${RELEASE}" disable-system-updater false
+  assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
+  assert_dispatch_default "${RELEASE}" boot-animation true
+  assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
+  assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
+  assert_dispatch_default "${lineage}" device-id pdx235
+  assert_dispatch_default "${lineage}" root true
+  assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
+  assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" disable-system-updater false
+  assert_dispatch_default "${lineage}" boot-animation true
+  assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
+}
+
+test_config_loading_isolated_to_scheduled_releases() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${RELEASE}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/grapheneos-shiba\.toml'     "GrapheneOS schedule must use the shiba definition"
+  assert_contains "${lineage}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
+  assert_not_contains "${lineage}" 'env\.toml'     "LineageOS schedule must not inherit repository-wide local env.toml"
+}
+
+test_release_configuration_forwarding() {
+  local loader="src/ci/load_schedule_definition.sh"
+
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Load scheduled build definition'     "scheduled GrapheneOS release must load a checked-in definition"
+  assert_contains "${RELEASE}"     'if:[[:space:]]*github\.event_name == .schedule.'     "scheduled configuration must be schedule-only"
+  assert_contains "${RELEASE}"     'run:[[:space:]]*bash src/ci/load_schedule_definition\.sh'     "GrapheneOS schedule must use the shared definition loader"
+  assert_contains "${loader}"     'check_toml_env "\$\{SCHEDULE_DEFINITION\}"'     "schedule loader must use the typed TOML parser"
+  assert_contains "${loader}"     'toml_config_has "\$\{key\}"'     "schedule loader must require every declared schedule key"
+  assert_contains "${loader}"     'disable_system_updater="\$\(toml_resolve_value disable_system_updater'     "schedule loader must resolve updater removal"
+  assert_contains "${loader}"     'boot_animation="\$\(toml_resolve_value boot_animation'     "schedule loader must resolve the boot-animation selection"
+  assert_contains "${loader}"     'compatible_sepolicy_patching="\$\(toml_resolve_value compatible_sepolicy_patching'     "schedule loader must resolve compatible-SEPolicy selection"
+  assert_contains "${loader}"     'force_update="\$\(toml_resolve_value force_update'     "schedule loader must resolve FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Resolve expected selection identity'     "release preflight must resolve the canonical selection identity"
+  assert_contains "${RELEASE}"     'module_selection_fingerprint'     "release preflight must use the shared selection fingerprint"
+  assert_contains "${RELEASE}"     'expected_variant:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "release preflight must expose the resolved identity"
+  assert_contains "${RELEASE}"     'EXPECTED_VARIANT:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "existing-build preflight must receive the resolved identity"
+  assert_contains "${RELEASE}"     'force_update:[[:space:]]*\$\{\{ steps\.scheduled_config\.outputs\.force_update \}\}'     "preflight must expose scheduled FORCE_UPDATE as a job output"
+  assert_contains "${RELEASE}"     'FORCE_UPDATE:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.force_update \|\| false \}\}'     "existing-build preflight must receive scheduled FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'device-id:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.device_id \|\| inputs\.device-id \}\}'     "manual device input must remain authoritative"
+  assert_contains "${RELEASE}"     'disable-system-updater:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.disable_system_updater == .true. \|\| inputs\.disable-system-updater \}\}'     "updater removal must be forwarded from scheduled definition or manual input"
+  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "boot animation must respect scheduled and manual explicit false values"
+  assert_contains "${RELEASE}"     'ADDITIONALS_BOOT_ANIMATION:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "preflight identity must respect scheduled and manual boot animation opt-outs"
+  assert_contains "${RELEASE}"     'compatible-sepolicy-patching:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.compatible_sepolicy_patching == .true.'     "compatible SEPolicy must be forwarded from the scheduled definition"
+  assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
+  assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"
+  assert_contains "${RELEASE}"     'update-channel:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.update_channel'     "scheduled update channel must be forwarded"
+}
+
+test_microg_lineage_forwarding() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
+  assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
+  assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+}
+
+test_module_forwarding_contract() {
+  local contract input config output
+  local loader="src/ci/load_schedule_definition.sh"
+
+  for contract in \
+    'afsr:AFSR:afsr' \
+    'alterinstaller:ALTERINSTALLER:alterinstaller' \
+    'bcr:BCR:bcr' \
+    'custota:CUSTOTA:custota' \
+    'msd:MSD:msd' \
+    'oemunlockonboot:OEMUNLOCKONBOOT:oemunlockonboot' \
+    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater' \
+    'fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION:fdroid_privileged_extension'; do
+    IFS=: read -r input config output <<<"${contract}"
+
+    assert_contains \
+      "${loader}" \
+      "toml_resolve_value ${output}" \
+      "schedule loader must resolve ${config} through the typed contract"
+    assert_contains \
+      "${loader}" \
+      "echo \"${output}=" \
+      "schedule loader must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "steps\\.scheduled_config\\.outputs\\.${output}" \
+      "preflight must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "ADDITIONALS_${config}:[[:space:]].*steps\\.scheduled_config\\.outputs\\.${output}.*inputs\\.${input}" \
+      "expected identity must use scheduled/manual ${input}"
+    assert_contains \
+      "${RELEASE}" \
+      "needs\\.preflight\\.outputs\\.${output}[[:space:]]*==[[:space:]]*['\"]true['\"].*inputs\\.${input}" \
+      "build invocation must use scheduled/manual ${input}"
+    assert_contains \
+      "${REUSABLE}" \
+      "ADDITIONALS_${config}:[[:space:]].*inputs\\.${input}" \
+      "reusable build must map ${config} from input ${input}"
+  done
+}
+
+test_publication_identity_is_step_scoped() {
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_EMAIL:[[:space:]]*\$\{\{ secrets\.EMAIL \}\}' \
+    "publication identity email must be step-scoped"
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_NAME:[[:space:]]*\$\{\{ github\.repository_owner \}\}' \
+    "publication identity name must be step-scoped"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.email "\$\{GIT_COMMIT_EMAIL-\}"' \
+    "publication helper must configure local email from the step environment"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.name "\$\{GIT_COMMIT_NAME-\}"' \
+    "publication helper must configure local name from the step environment"
+  assert_not_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'git config user\.email .*secrets\.EMAIL' \
+    "publication must not interpolate the email secret in shell source"
+}
+
+test_workflow_inventory_is_intentional() (
+  local expected actual
+
+  expected="$(printf '%s\n' \
+    build-rom.yml \
+    ci.yml \
+    multi-release.yml \
+    release-lineage.yml \
+    release.yml \
+    renovate.yml)"
+
+  actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
+
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'unexpected workflow inventory\nexpected:\n%s\nactual:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    exit 1
+  }
+)
+
+test_no_lineage_checkout_anywhere() {
+  local file
+
+  while IFS= read -r -d '' file; do
+    assert_not_contains \
+      "${file}" \
+      '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
+      "workflows must use the main branch implementation"
+  done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -print0)
+}
+
+test_reusable_workflow
+test_build_only_signing
+test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_release_triggers
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+ "LineageOS 24 profile must be selectable only as explicit development input"
+
+  assert_dispatch_default "${RELEASE}" device-id shiba
+  assert_dispatch_default "${RELEASE}" root true
+  assert_dispatch_default "${RELEASE}" alterinstaller true
+  assert_dispatch_default "${RELEASE}" bcr true
+  assert_dispatch_default "${RELEASE}" custota true
+  assert_dispatch_default "${RELEASE}" msd true
+  assert_dispatch_default "${RELEASE}" oemunlockonboot true
+  assert_dispatch_default "${RELEASE}" disable-system-updater false
+  assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
+  assert_dispatch_default "${RELEASE}" boot-animation true
+  assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
+  assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
+  assert_dispatch_default "${lineage}" device-id pdx235
+  assert_dispatch_default "${lineage}" root true
+  assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
+  assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" disable-system-updater false
+  assert_dispatch_default "${lineage}" boot-animation true
+  assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
+}
+
+test_config_loading_isolated_to_scheduled_releases() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${RELEASE}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/grapheneos-shiba\.toml'     "GrapheneOS schedule must use the shiba definition"
+  assert_contains "${lineage}"     'SCHEDULE_DEFINITION:[[:space:]]*\.github/schedules/lineageos-pdx235\.toml'     "LineageOS schedule must use the pdx235 definition"
+  assert_not_contains "${lineage}" 'env\.toml'     "LineageOS schedule must not inherit repository-wide local env.toml"
+}
+
+test_release_configuration_forwarding() {
+  local loader="src/ci/load_schedule_definition.sh"
+
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Load scheduled build definition'     "scheduled GrapheneOS release must load a checked-in definition"
+  assert_contains "${RELEASE}"     'if:[[:space:]]*github\.event_name == .schedule.'     "scheduled configuration must be schedule-only"
+  assert_contains "${RELEASE}"     'run:[[:space:]]*bash src/ci/load_schedule_definition\.sh'     "GrapheneOS schedule must use the shared definition loader"
+  assert_contains "${loader}"     'check_toml_env "\$\{SCHEDULE_DEFINITION\}"'     "schedule loader must use the typed TOML parser"
+  assert_contains "${loader}"     'toml_config_has "\$\{key\}"'     "schedule loader must require every declared schedule key"
+  assert_contains "${loader}"     'disable_system_updater="\$\(toml_resolve_value disable_system_updater'     "schedule loader must resolve updater removal"
+  assert_contains "${loader}"     'boot_animation="\$\(toml_resolve_value boot_animation'     "schedule loader must resolve the boot-animation selection"
+  assert_contains "${loader}"     'compatible_sepolicy_patching="\$\(toml_resolve_value compatible_sepolicy_patching'     "schedule loader must resolve compatible-SEPolicy selection"
+  assert_contains "${loader}"     'force_update="\$\(toml_resolve_value force_update'     "schedule loader must resolve FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'name:[[:space:]]*Resolve expected selection identity'     "release preflight must resolve the canonical selection identity"
+  assert_contains "${RELEASE}"     'module_selection_fingerprint'     "release preflight must use the shared selection fingerprint"
+  assert_contains "${RELEASE}"     'expected_variant:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "release preflight must expose the resolved identity"
+  assert_contains "${RELEASE}"     'EXPECTED_VARIANT:[[:space:]]*\$\{\{ steps\.selection_identity\.outputs\.expected_variant \}\}'     "existing-build preflight must receive the resolved identity"
+  assert_contains "${RELEASE}"     'force_update:[[:space:]]*\$\{\{ steps\.scheduled_config\.outputs\.force_update \}\}'     "preflight must expose scheduled FORCE_UPDATE as a job output"
+  assert_contains "${RELEASE}"     'FORCE_UPDATE:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.force_update \|\| false \}\}'     "existing-build preflight must receive scheduled FORCE_UPDATE"
+  assert_contains "${RELEASE}"     'device-id:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.device_id \|\| inputs\.device-id \}\}'     "manual device input must remain authoritative"
+  assert_contains "${RELEASE}"     'disable-system-updater:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.disable_system_updater == .true. \|\| inputs\.disable-system-updater \}\}'     "updater removal must be forwarded from scheduled definition or manual input"
+  assert_contains "${RELEASE}"     'boot-animation:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "boot animation must respect scheduled and manual explicit false values"
+  assert_contains "${RELEASE}"     'ADDITIONALS_BOOT_ANIMATION:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.boot_animation == .true. \|\| github\.event_name != .schedule. && inputs\.boot-animation \}\}'     "preflight identity must respect scheduled and manual boot animation opt-outs"
+  assert_contains "${RELEASE}"     'compatible-sepolicy-patching:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.compatible_sepolicy_patching == .true.'     "compatible SEPolicy must be forwarded from the scheduled definition"
+  assert_contains "${RELEASE}"     'root:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.root == .true. \|\| inputs\.root \}\}'     "root must explicitly coerce the scheduled string output to boolean"
+  assert_contains "${RELEASE}"     'magisk-preinit-device:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.magisk_preinit_device'     "scheduled preinit configuration must be forwarded"
+  assert_contains "${RELEASE}"     'update-channel:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.update_channel'     "scheduled update channel must be forwarded"
+}
+
+test_microg_lineage_forwarding() {
+  local lineage="${WORKFLOW_DIR}/release-lineage.yml"
+
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
+  assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
+  assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+}
+
+test_module_forwarding_contract() {
+  local contract input config output
+  local loader="src/ci/load_schedule_definition.sh"
+
+  for contract in \
+    'afsr:AFSR:afsr' \
+    'alterinstaller:ALTERINSTALLER:alterinstaller' \
+    'bcr:BCR:bcr' \
+    'custota:CUSTOTA:custota' \
+    'msd:MSD:msd' \
+    'oemunlockonboot:OEMUNLOCKONBOOT:oemunlockonboot' \
+    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater' \
+    'fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION:fdroid_privileged_extension'; do
+    IFS=: read -r input config output <<<"${contract}"
+
+    assert_contains \
+      "${loader}" \
+      "toml_resolve_value ${output}" \
+      "schedule loader must resolve ${config} through the typed contract"
+    assert_contains \
+      "${loader}" \
+      "echo \"${output}=" \
+      "schedule loader must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "steps\\.scheduled_config\\.outputs\\.${output}" \
+      "preflight must expose ${output}"
+    assert_contains \
+      "${RELEASE}" \
+      "ADDITIONALS_${config}:[[:space:]].*steps\\.scheduled_config\\.outputs\\.${output}.*inputs\\.${input}" \
+      "expected identity must use scheduled/manual ${input}"
+    assert_contains \
+      "${RELEASE}" \
+      "needs\\.preflight\\.outputs\\.${output}[[:space:]]*==[[:space:]]*['\"]true['\"].*inputs\\.${input}" \
+      "build invocation must use scheduled/manual ${input}"
+    assert_contains \
+      "${REUSABLE}" \
+      "ADDITIONALS_${config}:[[:space:]].*inputs\\.${input}" \
+      "reusable build must map ${config} from input ${input}"
+  done
+}
+
+test_publication_identity_is_step_scoped() {
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_EMAIL:[[:space:]]*\$\{\{ secrets\.EMAIL \}\}' \
+    "publication identity email must be step-scoped"
+  assert_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'GIT_COMMIT_NAME:[[:space:]]*\$\{\{ github\.repository_owner \}\}' \
+    "publication identity name must be step-scoped"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.email "\$\{GIT_COMMIT_EMAIL-\}"' \
+    "publication helper must configure local email from the step environment"
+  assert_contains \
+    "src/ci/publish_ota.sh" \
+    'git config user\.name "\$\{GIT_COMMIT_NAME-\}"' \
+    "publication helper must configure local name from the step environment"
+  assert_not_contains \
+    "${WORKFLOW_DIR}/build-rom.yml" \
+    'git config user\.email .*secrets\.EMAIL' \
+    "publication must not interpolate the email secret in shell source"
+}
+
+test_workflow_inventory_is_intentional() (
+  local expected actual
+
+  expected="$(printf '%s\n' \
+    build-rom.yml \
+    ci.yml \
+    multi-release.yml \
+    release-lineage.yml \
+    release.yml \
+    renovate.yml)"
+
+  actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
+
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'unexpected workflow inventory\nexpected:\n%s\nactual:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    exit 1
+  }
+)
+
+test_no_lineage_checkout_anywhere() {
+  local file
+
+  while IFS= read -r -d '' file; do
+    assert_not_contains \
+      "${file}" \
+      '(^|[[:space:]])ref:[[:space:]]*['\"]?lineage['\"]?([[:space:]#]|$)' \
+      "workflows must use the main branch implementation"
+  done < <(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
+    \( -name '*.yml' -o -name '*.yaml' \) -print0)
+}
+
+test_reusable_workflow
+test_build_only_signing
+test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_release_triggers
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+ "LineageOS 24 profile must be selectable"
 
   assert_dispatch_default "${RELEASE}" device-id shiba
   assert_dispatch_default "${RELEASE}" root true
