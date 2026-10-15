@@ -33,40 +33,6 @@ jobs:
         shell: bash
         run: bash src/ci/configure_android_apk_tools.sh
 
-      - name: Qualify signed avbroot 3.35 archive for executable lock review
-        shell: bash
-        run: |
-          set -euo pipefail
-          scratch="$(mktemp -d)"
-          trap 'rm -rf -- "${scratch}"' EXIT
-          asset='avbroot-3.35.0-x86_64-unknown-linux-gnu.zip'
-          url="https://github.com/chenxiaolong/avbroot/releases/download/v3.35.0/${asset}"
-          curl --proto '=https' --tlsv1.2 --retry 3 -fLsS -o "${scratch}/${asset}" "${url}"
-          curl --proto '=https' --tlsv1.2 --retry 3 -fLsS -o "${scratch}/${asset}.sig" "${url}.sig"
-          echo 'bbc7f8b4df8d9e6d2162bf354ac9f06643b2f64247a6f345d71e963f645f58c5  '"${scratch}/${asset}" | sha256sum -c -
-          echo '7ab8b19e7c47bbaf7f846df5c601b3a0888d605f5a3176144b7bedf64600176b  '"${scratch}/${asset}.sig" | sha256sum -c -
-          ssh-keygen -Y verify -f trust/chenxiaolong.allowed_signers -I chenxiaolong -n file -s "${scratch}/${asset}.sig" < "${scratch}/${asset}"
-          python3 - "${scratch}/${asset}" <<'PY'
-          import hashlib, json, pathlib, stat, sys, zipfile
-          archive = pathlib.Path(sys.argv[1])
-          with zipfile.ZipFile(archive) as z:
-              infos = z.infolist()
-              if [i.filename for i in infos] != ['LICENSE', 'README.md', 'avbroot']:
-                  raise SystemExit('Unreviewed avbroot archive member list')
-              layout = []
-              for info in infos:
-                  if info.is_dir() or info.flag_bits & 1:
-                      raise SystemExit('Unexpected directory/encrypted member')
-                  mode = stat.S_IMODE(info.external_attr >> 16)
-                  if not stat.S_ISREG(info.external_attr >> 16):
-                      raise SystemExit('Unexpected archive member type')
-                  if mode != (0o755 if info.filename == 'avbroot' else 0o644):
-                      raise SystemExit('Unexpected archive member mode')
-                  data = z.read(info)
-                  layout.append(dict(path=info.filename,type='file',mode=f'{mode:04o}',size=len(data),sha256=hashlib.sha256(data).hexdigest()))
-              print('AVBROOT_335_VERIFIED_LAYOUT='+json.dumps(layout,sort_keys=True))
-          PY
-
       - name: Check shell syntax
         shell: bash
         run: |
