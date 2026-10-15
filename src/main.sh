@@ -24,6 +24,13 @@ function main() {
 
   # Fetch the latest ROM version and Magisk
   get_latest_version
+  # The normal provider must never silently advance this test release to an
+  # unreviewed nightly. Enforce both the official API digest and exact target
+  # before downloading dependencies or accessing repository signing keys.
+  if [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
+    "${OUTPUT_SCOPE}" == published ]]; then
+    enforce_pdx235_pilot_source
+  fi
   # Check for requirements and download them accordingly
   check_and_download_dependencies
   # Patch the OTA, sign it

@@ -48,6 +48,16 @@ function fetch_lineageos_ota_metadata() {
       ;;
   esac
 
+  if [[ "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true ]]; then
+    [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME}" == pdx235 &&
+      "${GRAPHENEOS[UPDATE_CHANNEL]}" == nightly &&
+      "${OUTPUT_SCOPE:-}" == published && -z "${source_filename}" ]] || {
+      echo 'Error: pdx235 pilot source selected outside approved publication scope.' >&2
+      return 1
+    }
+    source_filename='lineage-24.0-20261012-nightly-pdx235-signed.zip'
+  fi
+
   release_metadata="$(curl -sLf "${endpoint}")" || {
     echo "Error: failed to fetch LineageOS release metadata." >&2
     return 1
