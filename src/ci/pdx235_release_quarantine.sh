@@ -36,12 +36,16 @@ enforce_pdx235_care_map_quarantine() {
   local rom_family="$1" device="$2" output_scope="$3"
   if [[ "${rom_family}" == 'lineageos' && "${device}" == 'pdx235' &&
     "${output_scope}" != 'local-unpublished' ]]; then
-    # Early policy runs before source selection. Only the explicitly selected
-    # test-release workflow may proceed to fetching source metadata; that
-    # exact filename AND digest are verified before key use or signing.
+    # The release runner invokes this before provider selection, so it only
+    # accepts the explicit workflow intent here. After source selection the
+    # main pipeline verifies device/channel/version/date, API SHA-256 and
+    # full original-signer provenance before signing either output.
     if [[ "${output_scope}" == published &&
-      "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true &&
-      ( -z "${GRAPHENEOS_VERSION:-}" || "${GRAPHENEOS_VERSION}" == 20261012 ) ]]; then
+      "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true ]]; then
+      if [[ -n "${GRAPHENEOS_VERSION:-}" ]]; then
+        [[ "${GRAPHENEOS_VERSION}" =~ ^20[0-9]{6}$ &&
+          "${GRAPHENEOS_VERSION}" > 20261011 ]] || return 1
+      fi
       return 0
     fi
     echo "Error: ModOS#114 blocks LineageOS/pdx235 publication outside the reviewed 24.0 series." >&2
