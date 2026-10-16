@@ -3,8 +3,8 @@ name: Patch and Release LineageOS OTA
 on:
   schedule:
     - cron: "0 */6 * * *"
-  # One reviewed test release; regular publishing stays quarantined. A
-  # purpose-named main merge commit triggers the pilot exactly once.
+  # Publish LineageOS 24.0 nightlies on the existing six-hour schedule.
+  # A purpose-named main merge also provides an explicit first-run trigger.
   push:
     branches:
       - main
@@ -106,7 +106,7 @@ permissions:
 
 jobs:
   schedule_config:
-    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot') }}"
+    if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot')) }}"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -143,7 +143,7 @@ jobs:
   scheduled_build:
     permissions:
       contents: write
-    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot') && inputs.source-artifact-id == '' }}"
+    if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot')) && inputs.source-artifact-id == '' }}"
     needs: schedule_config
     uses: ./.github/workflows/build-rom.yml
     with:
