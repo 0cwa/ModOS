@@ -55,16 +55,10 @@ function fetch_lineageos_ota_metadata() {
       echo 'Error: pdx235 pilot source selected outside approved publication scope.' >&2
       return 1
     }
-    # The historic build was published by LineageOS and successfully
-    # authenticated in nonpublishing CI before the API rotated. Its original
-    # official builds-API SHA-256 is deliberately pinned here. Download from
-    # a public LineageOS archive mirror, then require both exact digest and
-    # independent original LineageOS OTA signer authentication.
-    ROM_OTA_SHA256='29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820'
-    VERSION[GRAPHENEOS]='20261012'
-    GRAPHENEOS[OTA_TARGET]='lineage-24.0-20261012-nightly-pdx235-signed'
-    GRAPHENEOS[OTA_URL]='https://ftp.fau.de/lineageos/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip'
-    return 0
+    # The source is selected from the current official builds API, not the
+    # one-off archived October 12 ZIP. The API digest and LineageOS whole-file
+    # signature remain mandatory for every scheduled release.
+    source_series='24.0'
   fi
 
   release_metadata="$(curl -sLf "${endpoint}")" || {

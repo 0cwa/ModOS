@@ -324,23 +324,35 @@ test_lineage24_development_refuses_wrong_series_and_channel() (
   fi
 )
 
-test_pilot_source_is_frozen_even_if_newer_nightly_exists() (
+test_pilot_source_uses_current_official_24_0_nightly() (
   reset_acquisition_fixture
   ROM_FAMILY=lineageos
   DEVICE_NAME=pdx235
   OUTPUT_SCOPE=published
   PIXENEOS_PDX235_PILOT_RELEASE=true
   git() { mock_magisk_tags "$@"; }
-  curl() { fail 'reviewed October 12 pilot must not depend on the mutable builds API'; }
+  curl() {
+    printf '%s\n' '[
+      {"type":"nightly","datetime":1792425600,"files":[{
+        "filename":"lineage-24.0-20261019-nightly-pdx235-signed.zip",
+        "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type":"nightly","url":"https://mirrorbits.lineageos.org/full/pdx235/20261019/lineage-24.0-20261019-nightly-pdx235-signed.zip"}]},
+      {"type":"nightly","datetime":1791814447,"files":[{
+        "filename":"lineage-24.0-20261012-nightly-pdx235-signed.zip",
+        "sha256":"29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820",
+        "type":"nightly","url":"https://mirrorbits.lineageos.org/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip"}]},
+      {"type":"nightly","datetime":1792512000,"files":[{
+        "filename":"lineage-24.1-20261020-nightly-pdx235-signed.zip",
+        "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "type":"nightly","url":"https://mirrorbits.lineageos.org/full/pdx235/20261020/lineage-24.1-20261020-nightly-pdx235-signed.zip"}]}]'
+  }
   get_latest_version >/dev/null
-  assert_equals 20261012 "${VERSION[GRAPHENEOS]}" 'immutable pilot version'
-  assert_equals lineage-24.0-20261012-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" 'immutable pilot build'
-  assert_equals 29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820 "${ROM_OTA_SHA256}" 'reviewed original official SHA-256'
-  assert_equals \
-    https://ftp.fau.de/lineageos/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip \
-    "${GRAPHENEOS[OTA_URL]}" 'approved archived release URL'
-  enforce_pdx235_pilot_source || fail 'reviewed pilot unexpectedly rejected'
+  assert_equals 20261019 "${VERSION[GRAPHENEOS]}" 'newest approved 24.0 nightly'
+  assert_equals lineage-24.0-20261019-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" '24.0 source target'
+  assert_equals aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "${ROM_OTA_SHA256}" 'official source digest'
+  enforce_pdx235_pilot_source || fail 'newest 24.0 nightly unexpectedly rejected'
 )
+
 
 test_pilot_source_wrong_scope_fails_before_download() (
   reset_acquisition_fixture
@@ -367,7 +379,7 @@ test_unsafe_lineageos_metadata_fails_closed
 test_development_source_does_not_follow_major_upgrade
 test_lineage24_development_selects_latest_24_0_not_unreviewed_series
 test_lineage24_development_refuses_wrong_series_and_channel
-test_pilot_source_is_frozen_even_if_newer_nightly_exists
+test_pilot_source_uses_current_official_24_0_nightly
 test_pilot_source_wrong_scope_fails_before_download
 test_missing_development_source_fails_closed
 test_changed_development_source_digest_fails_closed

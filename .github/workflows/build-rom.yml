@@ -168,7 +168,7 @@ jobs:
           ROM_FAMILY_REQUEST: ${{ inputs.rom-family }}
           DEVICE_ID_REQUEST: ${{ inputs.device-id }}
         run: |
-          if [[ "${PILOT_RELEASE}" == true ]]; then
+          if [[ "${PILOT_RELEASE:-false}" == true ]]; then
             [[ "${ROM_FAMILY_REQUEST}" == lineageos && "${DEVICE_ID_REQUEST}" == pdx235 &&
               "${DEVELOPMENT_PROFILE}" == none && "${RELEASE_TYPE}" == default &&
               "${SIGNING_MODE}" == disposable && "${PUBLISH_REQUEST}" == true &&
