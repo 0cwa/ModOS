@@ -332,7 +332,7 @@ test_pilot_source_uses_current_official_24_0_nightly() (
   PIXENEOS_PDX235_PILOT_RELEASE=true
   git() { mock_magisk_tags "$@"; }
   curl() {
-    printf '%s\\n' '[
+    printf '%s\n' '[
       {"type":"nightly","datetime":1792425600,"files":[{
         "filename":"lineage-24.0-20261019-nightly-pdx235-signed.zip",
         "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
