@@ -96,9 +96,9 @@ expect_quarantine_failure 'direct paired-output publisher' env \
   OUTPUT_SCOPE=published RELEASE_TYPE=default \
   bash src/ci/publish_ota_pair.sh
 
-# Explicit one-time Android 17 pilot: the preliminary gate is allowed
-# only under the trusted workflow's flag; actual API-provided source identity
-# must subsequently match the exact reviewed artifact before signing.
+# Scheduled Android 17 series: the preliminary gate is allowed only under
+# the trusted workflow flag; actual official API data and final signatures
+# must be verified before any signing or publishing.
 PIXENEOS_PDX235_PILOT_RELEASE=true
 ROM_FAMILY=lineageos DEVICE_NAME=pdx235 OUTPUT_SCOPE=published
 GRAPHENEOS[UPDATE_CHANNEL]=nightly
@@ -112,7 +112,7 @@ expect_reject 'pilot cannot become private/shared' enforce_pdx235_care_map_quara
 for case_name in wrong-digest wrong-date wrong-build wrong-channel wrong-family wrong-device; do
   (
     case "${case_name}" in
-      wrong-digest) ROM_OTA_SHA256="$(printf '0%.0s' {1..64})" ;;
+      wrong-digest) ROM_OTA_SHA256='not-a-sha256' ;;
       wrong-date) VERSION[GRAPHENEOS]=20261013 ;;
       wrong-build) GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261015-nightly-pdx235-signed ;;
       wrong-channel) GRAPHENEOS[UPDATE_CHANNEL]=weekly ;;
@@ -125,6 +125,18 @@ for case_name in wrong-digest wrong-date wrong-build wrong-channel wrong-family 
   )
   ((cases+=1))
 done
+GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261019-nightly-pdx235-signed
+VERSION[GRAPHENEOS]=20261019
+ROM_OTA_SHA256="$(printf 'a%.0s' {1..64})"
+expect_allow 'later 24.0 nightly with official API digest' enforce_pdx235_pilot_source
+GRAPHENEOS[OTA_TARGET]=lineage-24.1-20261019-nightly-pdx235-signed
+expect_reject '24.1 outside qualified Android series' enforce_pdx235_pilot_source
+GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261011-nightly-pdx235-signed
+VERSION[GRAPHENEOS]=20261011
+expect_reject 'prequalification source cannot publish' enforce_pdx235_pilot_source
+GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
+VERSION[GRAPHENEOS]=20261012
+ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
 unset PIXENEOS_PDX235_PILOT_RELEASE
 expect_quarantine_failure 'no pilot flag still quarantined' enforce_pdx235_care_map_quarantine lineageos pdx235 published
 VERSION[GRAPHENEOS]=''
