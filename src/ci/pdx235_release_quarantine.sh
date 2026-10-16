@@ -16,10 +16,10 @@ pdx235_pilot_source_matches() {
   [[ "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true &&
     "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
     "${GRAPHENEOS[UPDATE_CHANNEL]:-}" == nightly &&
-    "${GRAPHENEOS[OTA_TARGET]:-}" =~ ^lineage-24[.]0-([0-9]{8})-nightly-pdx235-signed$ &&
-    "${BASH_REMATCH[1]}" > 20261011 &&
-    "${ROM_OTA_SHA256:-}" =~ ^[0-9a-f]{64}$ &&
-    "${VERSION[GRAPHENEOS]:-}" == "${BASH_REMATCH[1]}" ]]
+    "${VERSION[GRAPHENEOS]:-}" =~ ^20[0-9]{6}$ &&
+    "${VERSION[GRAPHENEOS]}" > 20261011 &&
+    "${GRAPHENEOS[OTA_TARGET]:-}" == "lineage-24.0-${VERSION[GRAPHENEOS]}-nightly-pdx235-signed" &&
+    "${ROM_OTA_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]
 }
 
 enforce_pdx235_pilot_source() {
