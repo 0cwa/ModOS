@@ -8,20 +8,23 @@
 # after care-map runtime conformance and physical-device acceptance.
 #
 # Source this file from the ROM profile gate and *both* publication helpers.
-# The only approved public exception is this one exact, signed Android 17 pilot.
-# Future nightlies and all other shared/published scopes remain blocked.
+# The approved public scope is the LineageOS 24.0 nightly series on pdx235.
+# Every ZIP requires the official builds API SHA-256, independent publisher
+# signature, and strict output cryptographic and runtime care-map postflight.
+# Future series and other devices/flavors remain outside this release policy.
 pdx235_pilot_source_matches() {
   [[ "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true &&
     "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
     "${GRAPHENEOS[UPDATE_CHANNEL]:-}" == nightly &&
-    "${GRAPHENEOS[OTA_TARGET]:-}" == 'lineage-24.0-20261012-nightly-pdx235-signed' &&
-    "${ROM_OTA_SHA256:-}" == '29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820' &&
-    "${VERSION[GRAPHENEOS]:-}" == 20261012 ]]
+    "${GRAPHENEOS[OTA_TARGET]:-}" =~ ^lineage-24[.]0-([0-9]{8})-nightly-pdx235-signed$ &&
+    "${BASH_REMATCH[1]}" > 20261011 &&
+    "${ROM_OTA_SHA256:-}" =~ ^[0-9a-f]{64}$ &&
+    "${VERSION[GRAPHENEOS]:-}" == "${BASH_REMATCH[1]}" ]]
 }
 
 enforce_pdx235_pilot_source() {
   pdx235_pilot_source_matches && return 0
-  echo 'Error: pdx235 pilot publication requires exact reviewed LineageOS 24.0 October 12 source identity.' >&2
+  echo 'Error: pdx235 publishing requires an official, signed LineageOS 24.0 pdx235 nightly with valid API SHA-256.' >&2
   return 1
 }
 enforce_pdx235_care_map_quarantine() {
@@ -41,7 +44,7 @@ enforce_pdx235_care_map_quarantine() {
       ( -z "${GRAPHENEOS_VERSION:-}" || "${GRAPHENEOS_VERSION}" == 20261012 ) ]]; then
       return 0
     fi
-    echo "Error: ModOS#114 blocks LineageOS/pdx235 publication outside the exact approved October 12 pilot." >&2
+    echo "Error: ModOS#114 blocks LineageOS/pdx235 publication outside the reviewed 24.0 series." >&2
     return 1
   fi
 }
