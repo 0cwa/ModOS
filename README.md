@@ -316,7 +316,8 @@ The updater APK itself is required to match the reviewed ROM-specific path; if i
 By default, generated Custota metadata points patched OTA downloads at GitHub Releases for the current repository. These environment variables can override that behavior:
 
 - `PIXENEOS_RELEASE_OWNER`: GitHub release asset owner. Defaults to the owner from `GITHUB_REPOSITORY`, then `0cwa`.
-- `PIXENEOS_RELEASE_REPOSITORY`: GitHub release asset repository. Defaults to the repository from `GITHUB_REPOSITORY`, then `PixeneOS`.
+- `PROJECT_NAME`: Project/release display name (default `ModOS`). Set it under `[github]` in `env.toml` for local runs, or as the GitHub Actions repository variable `PROJECT_NAME`. Use letters, digits, dots, underscores or hyphens, starting with a letter or digit. It changes display names, not production signing keys or certificate identity.
+- `PIXENEOS_RELEASE_REPOSITORY`: GitHub release asset repository. Defaults to the repository from `GITHUB_REPOSITORY`, then `PROJECT_NAME`. Explicit repository overrides remain independent of the display name.
 - `PIXENEOS_RELEASE_BASE_URL`: Full release asset URL prefix, excluding the OTA filename. When set, generated metadata appends the patched OTA filename to this prefix instead of using the default GitHub Releases URL. If you use alternate hosting, publish both the patched OTA and its `.csig` signature at the same prefix.
 - `PIXENEOS_AVBROOT_SETUP_SOURCE`: Custom clone URL for the `my-avbroot-setup` helper repository. Defaults to `https://github.com/0cwa/my-avbroot-setup`.
 

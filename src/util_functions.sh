@@ -1160,7 +1160,7 @@ function resolve_release_repository() {
   fi
 
   PIXENEOS_RELEASE_OWNER="${PIXENEOS_RELEASE_OWNER:-0cwa}"
-  PIXENEOS_RELEASE_REPOSITORY="${PIXENEOS_RELEASE_REPOSITORY:-PixeneOS}"
+  PIXENEOS_RELEASE_REPOSITORY="${PIXENEOS_RELEASE_REPOSITORY:-${PROJECT_NAME}}"
 }
 
 # Function to setup the environment for the my-avbroot-setup script

@@ -16,6 +16,7 @@ fail() {
 
 reset_release_config() {
   unset GITHUB_REPOSITORY
+  PROJECT_NAME=ModOS
   PIXENEOS_RELEASE_OWNER=""
   PIXENEOS_RELEASE_REPOSITORY=""
   PIXENEOS_RELEASE_BASE_URL=""
@@ -46,6 +47,7 @@ test_toml_env_allowlisted_assignments() {
     cd "${tmpdir}"
     printf '%s\n' \
       '[device]' \
+      'PROJECT_NAME = "FixtureOS"' \
       'DEVICE_NAME = "fixture-device"' \
       'INTERACTIVE_MODE = "false"' \
       'ROM_FAMILY = "grapheneos"' \
@@ -88,6 +90,7 @@ test_toml_env_allowlisted_assignments() {
 
     check_toml_env >/dev/null
 
+    [[ "${PROJECT_NAME}" == FixtureOS ]]
     [[ "${DEVICE_NAME}" == "fixture-device" ]]
     [[ "${INTERACTIVE_MODE}" == "false" ]]
     [[ "${ROM_FAMILY}" == "grapheneos" ]]
@@ -175,7 +178,7 @@ capture_setup_url() {
 test_default_release_url() {
   reset_release_config
   capture_setup_url \
-    "https://github.com/0cwa/PixeneOS/releases/download/2026050400/shiba-2026050400-rootless-abc1234.zip"
+    "https://github.com/0cwa/ModOS/releases/download/2026050400/shiba-2026050400-rootless-abc1234.zip"
 }
 
 test_github_repository_release_url() {
@@ -210,7 +213,7 @@ test_my_avbroot_setup_source_override() {
   reset_release_config
   PIXENEOS_AVBROOT_SETUP_SOURCE="https://example.com/my-avbroot-setup.git"
   capture_setup_url \
-    "https://github.com/0cwa/PixeneOS/releases/download/2026050400/shiba-2026050400-rootless-abc1234.zip"
+    "https://github.com/0cwa/ModOS/releases/download/2026050400/shiba-2026050400-rootless-abc1234.zip"
 }
 
 test_fetcher_source_override() {
@@ -254,6 +257,20 @@ test_my_avbroot_setup_source_fallback() {
   fi
 }
 
+test_project_name_release_fallback() {
+  reset_release_config
+  PROJECT_NAME=FixtureOS
+  capture_setup_url \
+    "https://github.com/0cwa/FixtureOS/releases/download/2026050400/shiba-2026050400-rootless-abc1234.zip"
+  reset_release_config
+  PROJECT_NAME=FixtureOS
+  GITHUB_REPOSITORY=fixture/ActualRepository
+  capture_setup_url \
+    "https://github.com/fixture/ActualRepository/releases/download/2026050400/shiba-2026050400-rootless-abc1234.zip"
+  reset_release_config
+}
+
+test_project_name_release_fallback
 test_default_release_url
 test_github_repository_release_url
 test_release_base_url_override
