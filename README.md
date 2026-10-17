@@ -244,7 +244,7 @@ Updates can be done by patching (or re-patching) the OTA using `adb sideload`:
 PixeneOS leverages Custota:
 
 1. For builds with `ADDITIONALS[DISABLE_SYSTEM_UPDATER] = true`, PixeneOS removes the stock ROM updater from the patched system image, so there is no separate manual disable step. The checked-in scheduled `shiba` and `pdx235` definitions enable this option. If you leave the option disabled, disable the stock updater manually before relying on Custota.
-2. Open Custota and set the OTA server URL to the repository's GitHub Pages publication URL, using the form `https://<owner>.github.io/<repository>/<rootless/magisk>`.
+2. Open Custota and set the OTA server URL to the repository's GitHub Pages publication URL, using the form `https://<owner>.github.io/<repository>/<rootless/magisk>/`. For pdx235 rootless builds from this repository, use `https://0cwa.github.io/ModOS/rootless/`. The phone reports `XQ-DC72` as its OTA device, so Custota fetches `rootless/XQ-DC72.json`. The publisher keeps that file byte-identical to the verified `rootless/pdx235.json` pointer (likewise for the Magisk flavor). Do **not** configure Custota to a historical PixeneOS release feed.
 
 For more info, refer to the current repository's [server](../../tree/gh-pages) branch.
 
