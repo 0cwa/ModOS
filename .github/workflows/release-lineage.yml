@@ -128,9 +128,13 @@ jobs:
       fdroid_privileged_extension: ${{ steps.definition.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
+      should_build: ${{ steps.existing.outputs.should_build }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Load scheduled build definition
         id: definition
@@ -140,10 +144,18 @@ jobs:
           EXPECTED_ROM_FAMILY: lineageos
         run: bash src/ci/load_schedule_definition.sh
 
+      - name: Check for an already-published matching OTA pair
+        id: existing
+        shell: bash
+        env:
+          OUTPUT_SCOPE: published
+          PIXENEOS_PDX235_PILOT_RELEASE: true
+        run: bash src/ci/check_scheduled_pdx235_pair.sh
+
   scheduled_build:
     permissions:
       contents: write
-    if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot')) && inputs.source-artifact-id == '' }}"
+    if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot')) && inputs.source-artifact-id == '' && needs.schedule_config.outputs.should_build == 'true' }}"
     needs: schedule_config
     uses: ./.github/workflows/build-rom.yml
     with:
