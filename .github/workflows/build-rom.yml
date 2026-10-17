@@ -331,6 +331,9 @@ jobs:
             echo "ROOT_MODE_RESOLVED=${RESOLVED_ROOT_MODE}"
             echo "ROM_PROFILE_PROVIDER=${ROM_PROFILE[PROVIDER]}"
             echo "WORKDIR=${WORKDIR}"
+            echo "SOURCE_OTA_SHA256=${ROM_OTA_SHA256:-}"
+            echo "SOURCE_OTA_TARGET=${GRAPHENEOS[OTA_TARGET]}"
+            echo "BUILD_COMMIT=$(git rev-parse --verify HEAD)"
           } >> "${GITHUB_ENV}"
           case "${RESOLVED_ROOT_MODE}" in
             magisk) echo 'ROM_FLAVOR=magisk' >> "${GITHUB_ENV}" ;;
@@ -353,12 +356,16 @@ jobs:
               "${DEVICE_NAME}" \
               "${GRAPHENEOS_VERSION}" \
               "${fingerprint}" \
-              "${OUTPUT_SCOPE}" <<'PY'
+              "${OUTPUT_SCOPE}" \
+              "${SOURCE_OTA_SHA256:-}" \
+              "${SOURCE_OTA_TARGET:-}" \
+              "${BUILD_COMMIT:-}" <<'PY'
           import json
           import pathlib
           import sys
 
-          path, artifact_name, rom_family, device, version, fingerprint, output_scope = sys.argv[1:]
+          (path, artifact_name, rom_family, device, version, fingerprint,
+           output_scope, source_sha256, source_target, build_commit) = sys.argv[1:]
           data = {
               "artifact_name": artifact_name,
               "device": device,
@@ -367,6 +374,9 @@ jobs:
               "output_scope": output_scope,
               "rom_family": rom_family,
               "schema_version": 2,
+              "source_ota_sha256": source_sha256,
+              "source_ota_target": source_target,
+              "modos_commit": build_commit,
           }
           pathlib.Path(path).write_text(
               json.dumps(data, indent=2, sort_keys=True) + "\n",
