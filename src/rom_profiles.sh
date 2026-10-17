@@ -9,6 +9,7 @@ declare -gA ROM_PROFILE
 _rom_profiles_source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_rom_profiles_source_dir}/ci/selection_variant.sh"
 source "${_rom_profiles_source_dir}/ci/pdx235_release_quarantine.sh"
+source "${_rom_profiles_source_dir}/ci/pdx235_rootless_hold.sh"
 source "${_rom_profiles_source_dir}/development_profile.sh"
 unset _rom_profiles_source_dir
 
@@ -110,6 +111,15 @@ function enforce_output_policy() {
   # independent of release-type, FORCE_UPDATE, module selections and root mode.
   enforce_pdx235_care_map_quarantine \
     "${ROM_FAMILY:-}" "${DEVICE_NAME:-}" "${output_scope}" || return 1
+
+  local hold_mode="${RESOLVED_ROOT_MODE:-${ROOT_MODE:-}}"
+  if [[ -z "${hold_mode}" ]]; then
+    if [[ "${ADDITIONALS[ROOT]}" == true ]]; then hold_mode=magisk; else hold_mode=rootless; fi
+  fi
+  require_pdx235_repaired_helper "${ROM_FAMILY:-}" "${DEVICE_NAME:-}" \
+    "${hold_mode}" "${VERSION[AVBROOT_SETUP]:-}" || return 1
+  enforce_pdx235_rootless_hold "${ROM_FAMILY:-}" "${DEVICE_NAME:-}" \
+    "${hold_mode}" "${output_scope}" || return 1
 
   if [[ "${ADDITIONALS[DEBUG]}" == 'true' &&
     "${output_scope}" != 'local-unpublished' ]]; then
