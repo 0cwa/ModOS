@@ -180,6 +180,10 @@ cp -- "${OTA_METADATA_PATH}" "${target_file}"
 cp -- "${OTA_METADATA_PATH}" "${variant_file}"
 git add -- "${target_file}" "${variant_file}"
 
+# Keep Custota's pre-device XQ-DC72 entry aligned with the verified pdx235
+# metadata also when only one OTA flavor is published.
+publish_custota_device_alias "${ROM_FAMILY}" "${DEVICE_NAME}" "${ROM_FLAVOR}" "${target_file}"
+
 if [[ "${RELEASE_TYPE}" == 'force-publish' ]]; then
   marker_file="force-publish/${DEVICE_NAME}.marker"
   mkdir -p -- "$(dirname -- "${marker_file}")"
