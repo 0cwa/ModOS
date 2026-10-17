@@ -103,4 +103,25 @@ if (check missing_metadata true) >/dev/null 2>&1; then
   exit 1
 fi
 
+# The scheduled workflow must keep this decision independent of
+# repository secrets and skip the reusable job only for a verified false.
+python3 - <<'PY'
+from pathlib import Path
+flow = Path('.github/workflows/release-lineage.yml').read_text()
+assert 'should_build: ${{ steps.existing.outputs.should_build }}' in flow
+assert 'bash src/ci/check_scheduled_pdx235_pair.sh' in flow
+assert "needs.schedule_config.outputs.should_build == 'true'" in flow
+preflight = Path('src/ci/check_scheduled_pdx235_pair.sh').read_text()
+assert 'source src/util_functions.sh' in preflight
+assert 'enforce_pdx235_pilot_source' in preflight
+assert 'bash src/ci/check_existing_pair.sh' in preflight
+assert 'GITHUB_REPOSITORY' in preflight
+assert 'SOURCE_OTA_SHA256' in preflight
+assert 'BUILD_COMMIT' in preflight
+assert 'ROOT_MODE:-' in preflight
+build = Path('.github/workflows/build-rom.yml').read_text()
+for token in ('source_ota_sha256', 'source_ota_target', 'modos_commit'):
+    assert f'"{token}"' in build
+PY
+
 echo 'pdx235 source/revision-bound preflight tests passed'
