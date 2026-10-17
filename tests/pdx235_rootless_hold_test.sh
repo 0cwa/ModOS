@@ -11,6 +11,7 @@ for mode in rootless both; do
   done
   enforce_pdx235_rootless_hold lineageos pdx235 "${mode}" local-unpublished
   require_pdx235_repaired_helper lineageos pdx235 "${mode}" "${repair}"
+  reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" c9d091225bdbed9f62d6401a040e3cdbae834078
   reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" ed6c24fdcc34d048f1fd51580c0c08569c3c0cc5
   reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" ''
 done
