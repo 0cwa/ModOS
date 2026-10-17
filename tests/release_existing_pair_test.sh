@@ -18,6 +18,9 @@ cat >"${FAKE_CHECKER}" <<'EOF'
 set -euo pipefail
 
 echo "${ROOT}" >>"${CALL_LOG}"
+# The real checker prints status diagnostics; they must never contaminate the
+# single boolean returned to the paired caller through its result stream.
+printf 'Tag exists. Checking variant ROOT=%s.\n' "${ROOT}"
 case "${ROOT}" in
   false) result="${ROOTLESS_RESULT}" ;;
   true) result="${MAGISK_RESULT}" ;;
