@@ -9,7 +9,10 @@
 set -o nounset -o pipefail -o errexit
 
 # Belt-and-suspenders check: both output flavors must remain unpublished.
-source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/pdx235_release_quarantine.sh"
+_publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
+source "${_publish_ci_dir}/publish_custota_device_alias.sh"
+unset _publish_ci_dir
 
 die() {
   echo "::error::$*" >&2
@@ -165,6 +168,12 @@ cp -- "${ROOTLESS_OTA_METADATA_PATH}" "${rootless_variant}"
 cp -- "${MAGISK_OTA_METADATA_PATH}" "${magisk_target}"
 cp -- "${MAGISK_OTA_METADATA_PATH}" "${magisk_variant}"
 git add -- "${rootless_target}" "${rootless_variant}" "${magisk_target}" "${magisk_variant}"
+
+# The Sony device reports XQ-DC72 as its OTA pre-device. Custota therefore
+# requests XQ-DC72.json, not pdx235.json, for either build flavor.
+# Write aliases from the exact canonical, release-asset-verified metadata.
+publish_custota_device_alias "${ROM_FAMILY}" "${DEVICE_NAME}" rootless "${rootless_target}"
+publish_custota_device_alias "${ROM_FAMILY}" "${DEVICE_NAME}" magisk "${magisk_target}"
 
 if [[ "${RELEASE_TYPE}" == force-publish ]]; then
   marker_file="force-publish/${DEVICE_NAME}.marker"

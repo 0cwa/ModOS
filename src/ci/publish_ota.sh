@@ -26,7 +26,10 @@
 set -o nounset -o pipefail -o errexit
 
 # Recheck the same immutable release quarantine when invoked directly.
-source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/pdx235_release_quarantine.sh"
+_publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
+source "${_publish_ci_dir}/publish_custota_device_alias.sh"
+unset _publish_ci_dir
 
 die() {
   echo "::error::$*" >&2
@@ -176,6 +179,10 @@ mkdir -p -- "${ROM_FLAVOR}" "$(dirname -- "${variant_file}")"
 cp -- "${OTA_METADATA_PATH}" "${target_file}"
 cp -- "${OTA_METADATA_PATH}" "${variant_file}"
 git add -- "${target_file}" "${variant_file}"
+
+# Keep Custota's pre-device XQ-DC72 entry aligned with the verified pdx235
+# metadata also when only one OTA flavor is published.
+publish_custota_device_alias "${ROM_FAMILY}" "${DEVICE_NAME}" "${ROM_FLAVOR}" "${target_file}"
 
 if [[ "${RELEASE_TYPE}" == 'force-publish' ]]; then
   marker_file="force-publish/${DEVICE_NAME}.marker"
