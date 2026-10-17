@@ -1,7 +1,7 @@
 {
   "compatibility_version": 1,
   "repository": "https://github.com/0cwa/my-avbroot-setup",
-  "revision": "c9d091225bdbed9f62d6401a040e3cdbae834078",
+  "revision": "abdede21c1b048e11700ec2789d0fb96ace0b0e4",
   "targets": {
     "patch.py": {
       "sha256": "1e70fcf356c6d2904a5cba8fe7405ddfaf7c6f1b5c7344f2f0718e7d084ef34c",
