@@ -93,6 +93,58 @@ jobs:
           bash tests/secrets_scan_test.sh
           bash tests/verifier_test.sh
 
+      - name: Exercise scheduled no-op preflight without signing (review branch)
+        if: github.head_ref == 'fix/lineage24-existing-release-preflight-20261017'
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch="$(mktemp -d)"
+          trap 'rm -rf -- "${scratch}"' EXIT
+          export GITHUB_OUTPUT="${scratch}/definition.out"
+          export GITHUB_ENV="${scratch}/definition.env"
+          : >"${GITHUB_OUTPUT}"
+          : >"${GITHUB_ENV}"
+          SCHEDULE_DEFINITION=.github/schedules/lineageos-pdx235.toml \
+            EXPECTED_ROM_FAMILY=lineageos \
+            bash src/ci/load_schedule_definition.sh
+          set -a
+          source "${GITHUB_ENV}"
+          set +a
+          export GITHUB_OUTPUT="${scratch}/preflight.out"
+          : >"${GITHUB_OUTPUT}"
+          export OUTPUT_SCOPE=published
+          export PIXENEOS_PDX235_PILOT_RELEASE=true
+          bash src/ci/check_scheduled_pdx235_pair.sh
+          grep -Eq '^should_build=(true|false)        shell: bash
+        run: bash src/ci/smoke_test.sh
+
+  # Narrow, nonpublishing Android 17 qualification on this review branch only.
+  # No repository signing secrets, release credentials or write permissions.
+  lineage24_qualification:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/lineage24-care-map-qualification-20261015'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with:
+      rom-family: lineageos
+      device-id: pdx235
+      root: false
+      root-mode: both
+      magisk-preinit-device: sda47
+      update-channel: nightly
+      compatible-sepolicy-patching: true
+      allow-unauthorized-adb: false
+      microg: true
+      disable-system-updater: true
+      boot-animation: true
+      # Exercise the ordinary provider/build path, not the opt-in fixture profile.
+      development-profile: none
+      signing-mode: disposable
+      release-type: build-only
+      publish: false
+ "${GITHUB_OUTPUT}"
+          echo "Preflight decision: $(cat "${GITHUB_OUTPUT}")"
+
       - name: Check upstream download endpoints
         shell: bash
         run: bash src/ci/smoke_test.sh
