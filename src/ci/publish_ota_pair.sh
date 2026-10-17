@@ -9,7 +9,10 @@
 set -o nounset -o pipefail -o errexit
 
 # Belt-and-suspenders check: both output flavors must remain unpublished.
-source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/pdx235_release_quarantine.sh"
+_publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
+source "${_publish_ci_dir}/publish_custota_device_alias.sh"
+unset _publish_ci_dir
 
 die() {
   echo "::error::$*" >&2
