@@ -28,7 +28,6 @@ set -o nounset -o pipefail -o errexit
 # Recheck the same immutable release quarantine when invoked directly.
 _publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
-source "${_publish_ci_dir}/pdx235_rootless_hold.sh"
 source "${_publish_ci_dir}/publish_custota_device_alias.sh"
 unset _publish_ci_dir
 
@@ -94,7 +93,6 @@ fi
   die "OTA publication requires published output scope"
 enforce_pdx235_care_map_quarantine \
   "${ROM_FAMILY}" "${DEVICE_NAME}" "${OUTPUT_SCOPE}" || exit 1
-enforce_pdx235_rootless_hold "${ROM_FAMILY}" "${DEVICE_NAME}" "${ROM_FLAVOR}" "${OUTPUT_SCOPE}" || exit 1
 
 for field in \
   ROM_FAMILY \

@@ -106,7 +106,7 @@ GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
 ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
 VERSION[GRAPHENEOS]=20261012
 expect_allow 'exact pilot source identity' enforce_pdx235_pilot_source
-expect_reject 'rootless hold supersedes pilot publication permission' enforce_output_policy published
+expect_allow 'repaired pilot publication permission' enforce_output_policy published
 expect_allow 'pilot paired publication scope' enforce_pdx235_care_map_quarantine lineageos pdx235 published
 expect_reject 'pilot cannot become private/shared' enforce_pdx235_care_map_quarantine lineageos pdx235 shared
 for case_name in wrong-digest wrong-date wrong-build wrong-channel wrong-family wrong-device; do

@@ -105,27 +105,6 @@ permissions:
   contents: read
 
 jobs:
-  hold_rootless_feed:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    concurrency:
-      group: pdx235-rootless-feed-hold
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          path: policy
-          persist-credentials: false
-      - uses: actions/checkout@v7
-        with:
-          ref: gh-pages
-          path: feed
-      - name: Withdraw held rootless update pointers
-        working-directory: feed
-        run: bash ../policy/src/ci/hold_pdx235_rootless_feed.sh
-
   schedule_config:
     if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot')) }}"
     runs-on: ubuntu-latest

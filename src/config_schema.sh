@@ -104,6 +104,8 @@ _config_schema_define fdroid_privileged_extension \
   'ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]' build boolean \
   ADDITIONALS array FDROID_PRIVILEGED_EXTENSION \
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION false true caller-or-existing-or-default
+_config_schema_define project_name PROJECT_NAME github string \
+  PROJECT_NAME scalar '' PROJECT_NAME ModOS false caller-or-default
 _config_schema_define release_owner PIXENEOS_RELEASE_OWNER github string \
   PIXENEOS_RELEASE_OWNER scalar '' PIXENEOS_RELEASE_OWNER '' false caller-or-default
 _config_schema_define release_repository PIXENEOS_RELEASE_REPOSITORY github string \

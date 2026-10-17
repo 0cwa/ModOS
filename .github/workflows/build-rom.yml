@@ -119,6 +119,7 @@ on:
         required: false
 
 env:
+  PROJECT_NAME: ${{ vars.PROJECT_NAME }}
   DEVICE_NAME: ${{ inputs.device-id }}
   INTERACTIVE_MODE: false
   ROM_FAMILY: ${{ inputs.rom-family }}
@@ -233,6 +234,11 @@ jobs:
           source src/declarations.sh
           source src/rom_profiles.sh
           resolve_rom_profile
+          [[ "${PROJECT_NAME}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
+            echo '::error::PROJECT_NAME must be a repository-safe project name'
+            exit 1
+          }
+          echo "PROJECT_NAME=${PROJECT_NAME}" >> "${GITHUB_ENV}"
           enforce_output_policy "${OUTPUT_SCOPE}"
           activate_development_profile
           if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
@@ -483,7 +489,7 @@ jobs:
             ${{ env.OUTPUTS_PATCHED_OTA }}
             ${{ env.OUTPUTS_PATCHED_OTA }}.csig
             ${{ env.SELECTION_METADATA }}
-          name: ${{ env.GRAPHENEOS_VERSION }}
+          name: ${{ env.PROJECT_NAME }} ${{ env.GRAPHENEOS_VERSION }}
           tag_name: ${{ env.GRAPHENEOS_VERSION }}
 
       - name: Publish paired GitHub release assets
@@ -498,7 +504,7 @@ jobs:
             ${{ env.OUTPUTS_PATCHED_OTA_MAGISK }}
             ${{ env.OUTPUTS_PATCHED_OTA_MAGISK }}.csig
             ${{ env.SELECTION_METADATA_MAGISK }}
-          name: ${{ env.GRAPHENEOS_VERSION }}
+          name: ${{ env.PROJECT_NAME }} ${{ env.GRAPHENEOS_VERSION }}
           tag_name: ${{ env.GRAPHENEOS_VERSION }}
 
       - name: Remove superseded release assets
