@@ -38,7 +38,7 @@ run_variant() {
   EXPECTED_VARIANT="${expected_variant}" \
   GITHUB_OUTPUT="${output_file}" \
   GITHUB_ENV="${env_file}" \
-    bash "${CHECK_EXISTING_BUILD_SCRIPT:-src/ci/check_existing_build.sh}"
+    bash "${CHECK_EXISTING_BUILD_SCRIPT:-src/ci/check_existing_build.sh}" >&2
 
   result="$(read_should_build "${output_file}")"
   if [[ -n "${GITHUB_ENV:-}" ]] && grep -Fxq 'FORCE_REBUILD=true' "${env_file}"; then

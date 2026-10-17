@@ -97,6 +97,21 @@ if [[ ! "${expected_variant}" =~ ^[0-9a-f]{64}$ ]]; then
   continue_with_build "Expected selection identity is unresolved."
 fi
 
+# For pdx235's OTA preflight a module fingerprint alone is insufficient:
+# the source ZIP could have changed under the same date, or the ModOS build
+# logic could have changed while the module selection stayed constant.
+# Historical selection files without these fields always trigger rebuilding.
+source_sha="${SOURCE_OTA_SHA256:-}"
+source_target="${SOURCE_OTA_TARGET:-}"
+build_commit="${BUILD_COMMIT:-}"
+if [[ "${rom_family}" == lineageos && "${DEVICE_NAME}" == pdx235 ]]; then
+  if [[ ! "${source_sha}" =~ ^[0-9a-f]{64}$ ||
+        ! "${source_target}" =~ ^lineage-24[.]0-[0-9]{8}-nightly-pdx235-signed$ ||
+        ! "${build_commit}" =~ ^[0-9a-f]{40}$ ]]; then
+    continue_with_build "Source or exact ModOS build identity is not provable."
+  fi
+fi
+
 if [[ "${root}" == 'true' ]]; then
   magisk_version="${MAGISK_VERSION:-}"
   [[ "${magisk_version}" =~ ^[A-Za-z0-9._-]+$ ]] ||
@@ -207,12 +222,20 @@ for metadata_asset in "${candidate_metadata[@]}"; do
     --arg scope "${output_scope}" \
     --arg expected "${expected_variant}" \
     --arg prefix "${artifact_prefix}" \
-    --arg suffix_pattern "${artifact_suffix_pattern}" '
+    --arg suffix_pattern "${artifact_suffix_pattern}" \
+    --arg source_sha "${source_sha}" \
+    --arg source_target "${source_target}" \
+    --arg build_commit "${build_commit}" '
       if .device == $device and
         .rom_family == $family and
         .grapheneos_version == $version and
         .output_scope == $scope and
         .module_selection_fingerprint == $expected and
+        (if $family == "lineageos" and $device == "pdx235"
+         then .source_ota_sha256 == $source_sha and
+              .source_ota_target == $source_target and
+              .modos_commit == $build_commit
+         else true end) and
         .artifact_name == ($metadata_asset | sub("\\.selection\\.json$"; "")) and
         (.artifact_name | startswith($prefix)) and
         ((.artifact_name | ltrimstr($prefix)) | test($suffix_pattern))
