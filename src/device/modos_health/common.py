@@ -30,11 +30,11 @@ class Context:
         self.runner = runner
         self._cache = {}
 
-    def probe(self, command):
+    def probe(self, command, *, refresh=False):
         # Never pass a caller-selected command or execute shell scripts.
         if not _ALLOWED.fullmatch(command):
             raise ValueError("read-only command is not allowlisted")
-        if command not in self._cache:
+        if refresh or command not in self._cache:
             try:
                 result = self.runner(self.adb + ["shell", command],
                                      capture_output=True, text=True, timeout=20,
