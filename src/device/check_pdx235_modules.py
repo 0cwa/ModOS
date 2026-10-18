@@ -46,6 +46,15 @@ def load_config(path):
         raise ValueError("expected [build] and [device] TOML tables")
     if device.get("DEVICE_NAME") != "pdx235" or device.get("ROM_FAMILY") != "lineageos":
         raise ValueError("audit is restricted to LineageOS pdx235")
+    # Do not silently omit a newly enabled module introduced to the build
+    # schedule without adding its own check file to the registry.
+    known = {key for _, key, _ in MODULES}
+    ignored = {"ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]"}
+    unknown = sorted(k for k in build if
+                     k.startswith("ADDITIONALS[") and k.endswith("]") and
+                     k not in known and k not in ignored)
+    if unknown:
+        raise ValueError("unregistered build module(s): " + ", ".join(unknown))
     selections = {}
     for name, key, _ in MODULES:
         value = build.get(key)
