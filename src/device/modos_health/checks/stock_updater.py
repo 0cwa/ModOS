@@ -8,4 +8,4 @@ def check(ctx):
         return [item(ID, "removed", "WARNING", "Stock-updater package query unavailable")]
     return [item(ID, "removed", "FAIL" if "package:/" in result.output else "PASS",
                  "Stock updater still installed" if "package:/" in result.output else
-                 "Stock LineageOS updater not installed")]
+                 "Known LineageOS updater package not installed (other updater implementations not assessed)")]
