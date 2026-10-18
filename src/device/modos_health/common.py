@@ -25,9 +25,9 @@ def item(module, name, status, explanation):
     return {"module": module, "check": name, "status": status, "detail": explanation}
 
 class Context:
-    def __init__(self, adb, *, runner=subprocess.run):
+    def __init__(self, adb, *, runner=None):
         self.adb = list(adb)
-        self.runner = runner
+        self.runner = runner if runner is not None else subprocess.run
         self._cache = {}
 
     def probe(self, command, *, refresh=False):
