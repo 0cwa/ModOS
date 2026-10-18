@@ -60,3 +60,61 @@ Physical acceptance and enrolled-key matching remain pending. Confirm that the
 public AVB key and OTA certificate match the installation's required identity, then follow the reviewed
 installation/OTA procedure and collect these observations. The workflow path
 makes stable candidates possible; it does not prove which firmware booted.
+
+
+## Modular read-only installed-module health audit
+
+The script `src/device/check_pdx235_modules.py` combines **one file per
+module** from `src/device/modos_health/checks/`, plus common Android
+boot/security observations. Modules are selected from the checked-in
+`.github/schedules/lineageos-pdx235.toml`: a disabled module gets
+`NOT_TESTED`, not a fabricated failure. The check runner does not invoke
+module installers or third-party scripts.
+
+Use an already authorized ADB connection with the device running. From the
+repository root, choose a fresh destination directory whose parent exists:
+
+```sh
+mkdir -p work/device-evidence
+python3 src/device/check_pdx235_modules.py \
+  --output work/device-evidence/modules-rootless
+```
+
+If ADB has multiple connected devices, add `--serial SERIAL`. On a Magisk
+installation, choose `--root-mode magisk` (no `su` is invoked). To audit an
+alternative reviewed build selection, pass `--config path/to/schedule.toml`.
+The default is the current checked-in pdx235 scheduled profile.
+
+The runner creates `report.json` and `summary.txt` with private file
+permissions, prints the summary, and exits nonzero when an automatic check
+reports a definite `FAIL`. `WARNING` means a probe cannot establish the
+condition, while `NOT_TESTED` identifies deliberate manual checks or
+disabled components. The full output contains only selected static condition
+summaries, not account contents, full logcat, signing material, private keys,
+full package dumps, or raw privilege XML.
+
+Module ownership:
+
+| Check file | Automated checks | Deliberately manual or build-time |
+| --- | --- | --- |
+| `android.py` | Completed boot, enforcing SELinux, device, locked/yellow boot, boot slot | Snapshot/verity runtime evidence |
+| `microg.py` | Services/Companion present, product DUMP explicit deny | Self-check, spoofing restriction, push/account/location |
+| `custota.py` | Custota package present | Actual XQ-DC72 feed/OTA update/reboot |
+| `bcr.py` | BCR package present | Recording and permission behavior |
+| `msd.py` | MSD binary present | Daemon and SELinux behavior |
+| `alterinstaller.py` | Init-time APK payload present | Boot-time package adjustments |
+| `oemunlockonboot.py` | Init-time APK payload present | Init behavior; does not touch bootloader |
+| `afsr.py` | None (build-time repacker) | Signatures/filesystem checked in build CI |
+| `boot_animation.py` | Product animation file present | On-screen animation |
+| `stock_updater.py` | Stock updater absent when disabled | Custota update itself |
+| `fdroid_privileged_extension.py` | Package present only if enabled | Privileged install behavior |
+| `magisk.py` | None; included only in the `magisk` runtime mode | Root setup and authorization |
+
+The October 17 microG `DUMP` privileged-permission regression is explicitly
+checked using the installed product XML. Absence of the deny, a conflicting
+grant, or malformed XML is reported as `FAIL`; inability to read the file
+is `WARNING`. Package installation, XML correctness and a successful slot
+are **not** proof of module functionality, dm-verity/care-map semantics,
+Android version acceptance or OTA persistence. Continue using the separate
+collector for privileged runtime evidence when needed, and review any collected
+device logs before sharing.
