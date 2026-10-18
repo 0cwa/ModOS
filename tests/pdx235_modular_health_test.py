@@ -195,6 +195,14 @@ class HealthAuditTests(unittest.TestCase):
                 self.assertEqual(stat.S_IMODE((dest / "report.json").stat().st_mode), 0o600)
                 self.assertEqual(stat.S_IMODE((dest / "summary.txt").stat().st_mode), 0o600)
 
+    def test_new_module_requires_its_own_registered_check_file(self):
+        original = (ROOT / ".github/schedules/lineageos-pdx235.toml").read_text()
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "future.toml"
+            path.write_text(original + "\n'ADDITIONALS[FUTURE_MODULE]' = true\n")
+            with self.assertRaisesRegex(ValueError, "unregistered build module"):
+                audit.load_config(path)
+
     def test_invalid_config_rejected_instead_of_guessing(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "bad.toml"
