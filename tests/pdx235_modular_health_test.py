@@ -62,6 +62,8 @@ class FakeADB:
             code, out = 0, "1\n"
         elif cmd == "pm list packages -d":
             code, out = 0, ""
+        elif cmd == "pm path org.lineageos.updater":
+            code, out = 0, ""
         elif cmd.startswith("pm path "):
             code, out = 0, "package:/system/priv-app/Fixture.apk\n"
         elif cmd.startswith("test -f /"):
@@ -182,6 +184,8 @@ class HealthAuditTests(unittest.TestCase):
             report = json.loads((dest / "report.json").read_text())
             self.assertEqual(report["device_acceptance"], "not_established")
             self.assertEqual(report["schema_version"], 1)
+            self.assertGreater(report["counts"]["PASS"], 5)
+            self.assertEqual(report["counts"]["FAIL"], 0)
             self.assertNotIn("serial", report)
             self.assertNotIn("android.permission.DUMP", (dest / "report.json").read_text())
             self.assertIn("Device acceptance: NOT ESTABLISHED",
