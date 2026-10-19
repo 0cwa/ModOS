@@ -31,7 +31,7 @@ jobs:
       - name: Self-hosted Renovate
         # Upstream currently names v46.2.6, but this fork keeps its reviewed
         # immutable pin until the corresponding action artifact is verified.
-        uses: renovatebot/github-action@f0f41e5f2e706165f6814b1d0f0d0e319de7d1d9 # v46.3.8
+        uses: renovatebot/github-action@a63d9a7bc606f7336fd20b47f2f32259a35e6213 # v46.3.9
         with:
           configurationFile: .github/renovate.json5
           # https://docs.renovatebot.com/modules/platform/github/#running-using-a-fine-grained-token
