@@ -155,7 +155,7 @@ jobs:
   scheduled_build:
     permissions:
       contents: write
-    if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot')) && inputs.source-artifact-id == '' && needs.schedule_config.outputs.should_build == 'true' }}"
+    if: "${{ (github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot'))) && inputs.source-artifact-id == '' && needs.schedule_config.outputs.should_build == 'true' }}"
     needs: schedule_config
     uses: ./.github/workflows/build-rom.yml
     with:

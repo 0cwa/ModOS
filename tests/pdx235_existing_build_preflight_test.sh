@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Hermetic negative/positive proof of source+code-bound existing OTA skips.
+# Hermetic proof of source+code-bound paired OTA skips and downstream routing.
 set -euo pipefail
 
 project_root="$(pwd -P)"
@@ -14,9 +14,11 @@ git -C "${scratch}/repo" tag 20261016
 commit="$(git -C "${scratch}/repo" rev-parse HEAD)"
 source_sha="$(printf 'b%.0s' {1..64})"
 fingerprint="$(printf 'a%.0s' {1..64})"
+magisk_fingerprint="$(printf 'e%.0s' {1..64})"
 target='lineage-24.0-20261016-nightly-pdx235-signed'
 artifact="pdx235-20261016-rootless-${fingerprint}-${commit:0:7}.zip"
 metadata="${scratch}/metadata/${artifact}.selection.json"
+magisk_artifact="pdx235-20261016-magisk-v30.7-${magisk_fingerprint}-${commit:0:7}.zip"
 python3 - "${metadata}" "${artifact}" "${source_sha}" "${target}" "${commit}" "${fingerprint}" <<'PY'
 import json, pathlib, sys
 path, artifact, source_sha, target, commit, fingerprint = sys.argv[1:]
@@ -28,11 +30,19 @@ pathlib.Path(path).write_text(json.dumps({
     "modos_commit": commit, "schema_version": 2
 }))
 PY
-python3 - "${scratch}/response.json" "${artifact}" <<'PY'
+python3 - "${metadata}" "${magisk_artifact}" "${magisk_fingerprint}" <<'PY'
 import json, pathlib, sys
-path, artifact = sys.argv[1:]
+source, artifact, fingerprint = sys.argv[1:]
+data = json.loads(pathlib.Path(source).read_text())
+data.update(artifact_name=artifact, module_selection_fingerprint=fingerprint)
+pathlib.Path(source).with_name(artifact + ".selection.json").write_text(json.dumps(data))
+PY
+python3 - "${scratch}/response.json" "${artifact}" "${magisk_artifact}" <<'PY'
+import json, pathlib, sys
+path, *artifacts = sys.argv[1:]
 base = "https://github.com/0cwa/ModOS/releases/download/20261016/"
 data = {"assets": [{"name": name, "browser_download_url": base + name}
+                   for artifact in artifacts
                    for name in (artifact, artifact + ".csig",
                                 artifact + ".selection.json")]}
 pathlib.Path(path).write_text(json.dumps(data))
@@ -61,26 +71,56 @@ chmod +x "${scratch}/bin/curl"
 check() {
   local label="$1" expected="$2"
   shift 2
-  local out="${scratch}/${label}.out"
+  local out="${scratch}/${label}.out" env_file="${scratch}/${label}.env"
   : >"${out}"
+  : >"${env_file}"
   (
     cd "${scratch}/repo"
     env PATH="${scratch}/bin:${PATH}" \
       FIXTURE_METADATA_DIR="${scratch}/metadata" FIXTURE_RESPONSE="${scratch}/response.json" \
       DEVICE_NAME=pdx235 GRAPHENEOS_VERSION=20261016 REPOSITORY=0cwa/ModOS \
       ROM_FAMILY=lineageos OUTPUT_SCOPE=published ROOT=false DEBUG=false \
-      EXPECTED_VARIANT="${fingerprint}" SOURCE_OTA_SHA256="${source_sha}" \
+      EXPECTED_VARIANT_ROOTLESS="${fingerprint}" EXPECTED_VARIANT_MAGISK="${magisk_fingerprint}" \
+      MAGISK_VERSION=v30.7 SOURCE_OTA_SHA256="${source_sha}" \
       SOURCE_OTA_TARGET="${target}" BUILD_COMMIT="${commit}" FORCE_UPDATE=false \
-      GITHUB_OUTPUT="${out}" "$@" "${project_root}/src/ci/check_existing_build.sh" >/dev/null
-  )
+      CHECK_EXISTING_BUILD_SCRIPT="${project_root}/src/ci/check_existing_build.sh" \
+      GITHUB_OUTPUT="${out}" GITHUB_ENV="${env_file}" \
+      "$@" bash "${project_root}/src/ci/check_existing_pair.sh" >/dev/null 2>"${scratch}/${label}.log"
+  ) || { cat "${scratch}/${label}.log" >&2; return 1; }
   grep -Fxq "should_build=${expected}" "${out}" ||
-    { echo "${label}: expected should_build=${expected}" >&2; exit 1; }
+    { cat "${scratch}/${label}.log" >&2; echo "${label}: expected should_build=${expected}" >&2; exit 1; }
+  python3 tests/lineage_workflow_routing_test.py "${out}" "${expected}"
 }
 
 check complete_skip false
 check changed_source_digest true SOURCE_OTA_SHA256="$(printf 'c%.0s' {1..64})"
 check changed_source_target true SOURCE_OTA_TARGET=lineage-24.0-20261017-nightly-pdx235-signed
 check changed_build_commit true BUILD_COMMIT="$(printf 'd%.0s' {1..40})"
+check explicit_rebuild true FORCE_UPDATE=true
+grep -Fxq 'FORCE_REBUILD=true' "${scratch}/explicit_rebuild.env"
+
+# Either variant missing any triplet member must rebuild the whole pair.
+cp "${scratch}/response.json" "${scratch}/complete.json"
+for variant_artifact in "${artifact}" "${magisk_artifact}"; do
+  for suffix in '' .csig .selection.json; do
+    jq --arg name "${variant_artifact}${suffix}" \
+      '.assets |= map(select(.name != $name))' "${scratch}/complete.json" >"${scratch}/response.json"
+    check "missing-${variant_artifact}${suffix}" true
+  done
+done
+cp "${scratch}/complete.json" "${scratch}/response.json"
+
+# Same filenames are insufficient when either variant's metadata disagrees.
+for variant_artifact in "${artifact}" "${magisk_artifact}"; do
+  variant_metadata="${scratch}/metadata/${variant_artifact}.selection.json"
+  cp "${variant_metadata}" "${variant_metadata}.full"
+  for field in module_selection_fingerprint source_ota_sha256 source_ota_target modos_commit; do
+    jq --arg field "${field}" '.[$field] = "mismatched"' \
+      "${variant_metadata}.full" >"${variant_metadata}"
+    check "mismatched-${field}-${variant_artifact}" true
+  done
+  mv "${variant_metadata}.full" "${variant_metadata}"
+done
 
 # Legacy metadata does not carry new source/revision binding; never skip it.
 cp "${metadata}" "${metadata}.full"
