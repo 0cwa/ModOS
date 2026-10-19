@@ -120,8 +120,9 @@ case "${RELEASE_TYPE}" in
 esac
 [[ "${OUTPUT_SCOPE}" == published ]] ||
   die "Dual OTA publication requires published output scope"
-enforce_pdx235_care_map_quarantine \
-  "${ROM_FAMILY}" "${DEVICE_NAME}" "${OUTPUT_SCOPE}" || exit 1
+enforce_pdx235_publication_scope \
+  "${ROM_FAMILY}" "${DEVICE_NAME}" "${OUTPUT_SCOPE}" \
+  "${GRAPHENEOS_UPDATE_CHANNEL-}" "${GRAPHENEOS_VERSION}" || exit 1
 
 validate_variant rootless \
   "${ROOTLESS_OTA_ARTIFACT_PATH}" \

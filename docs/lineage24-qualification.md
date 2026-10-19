@@ -1,8 +1,9 @@
 # LineageOS 24.0 / pdx235 build qualification
 
-This is an **unpublished** Android 17 qualification path. It does not authorize
-release publication or change the existing six-hour release schedule, signing
-keys, executable lock, or the pdx235 quarantine (#114).
+This document records the Android 17 qualification path. Publication is enabled
+for verified official LineageOS 24.0 pdx235 nightlies; other versions, devices,
+and private/shared output scopes remain unsupported. The existing six-hour
+release schedule, signing keys, and executable lock are unchanged.
 
 ## Why a separate profile exists
 
@@ -25,7 +26,8 @@ content and output care ranges are checked by the normal pipeline.
 Both care-map profiles select the reviewed immutable helper revision and
 the same authenticated avbroot source-build manifest. This is not a fallback to
 the vendor tool's historical AVB-derived care-map semantics. All checks remain
-fail-closed. Only `OUTPUT_SCOPE=local-unpublished` is allowed.
+fail-closed. The explicit development profiles remain restricted to
+`OUTPUT_SCOPE=local-unpublished`.
 
 ## First Android 17 candidate
 
@@ -42,9 +44,11 @@ Use the existing **Patch and Release LineageOS OTA** workflow with:
 - Enable microG and the required existing module selections deliberately. The
   scheduled preset is **not automatically applied** to manual workflow inputs.
 
-Do not use `release-type=default` or `force-publish`: the pdx235 quarantine
-must remain effective for both. Build-only candidate artifacts do not appear in
-public GitHub Releases or Custota's OTA channel.
+Use `release-type=default` or `force-publish` only with the supported
+LineageOS 24.0 pdx235 nightly source and after source-identity and post-sign
+verification gates pass. The explicit development profile remains build-only.
+Build-only candidate artifacts do not appear in public GitHub Releases or
+Custota's OTA channel.
 
 Before any physical Android 17 installation, retain the precise source filename,
 API SHA-256, source/engine/helper receipts, both final OTA digests, AVB signature
@@ -66,8 +70,9 @@ images. The PR-only CI build exercises this normal route with disposable keys.
 The explicit `care-map-pdx235-lineage24` profile is still required to export
 a repository-signed private device-acceptance candidate.
 
-An Android 17 physical rootless upgrade and a separately reviewed
-**publication-quarantine** change are still prerequisites for publication.
-The ordinary path being able to build safely does not itself authorize release
-publishing. Do not fill the October 9 exception digest with an unrelated
-LineageOS 24 digest.
+Publication is enabled for the supported LineageOS 24.0 pdx235 nightly series.
+The ordinary build still has to pass the official API digest and publisher-key
+checks plus strict signed-output and runtime care-map postflight. Physical
+Android 17 upgrade and rootless/Magisk behavior remain separate acceptance
+work; successful publication checks do not prove device behavior. Do not fill
+the October 9 exception digest with an unrelated LineageOS 24 digest.

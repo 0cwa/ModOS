@@ -107,9 +107,9 @@ function enforce_output_policy() {
 
   validate_development_profile "${output_scope}" || return 1
 
-  # Block pdx235 releases *before* source download or signing. This remains
+  # Restrict pdx235 publication *before* source download or signing. This stays
   # independent of release-type, FORCE_UPDATE, module selections and root mode.
-  enforce_pdx235_care_map_quarantine \
+  enforce_pdx235_publication_scope \
     "${ROM_FAMILY:-}" "${DEVICE_NAME:-}" "${output_scope}" || return 1
 
   local helper_mode="${RESOLVED_ROOT_MODE:-${ROOT_MODE:-}}"

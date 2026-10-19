@@ -106,7 +106,7 @@ permissions:
 
 jobs:
   schedule_config:
-    if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot')) }}"
+    if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0')) }}"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -149,13 +149,12 @@ jobs:
         shell: bash
         env:
           OUTPUT_SCOPE: published
-          PIXENEOS_PDX235_PILOT_RELEASE: true
         run: bash src/ci/check_scheduled_pdx235_pair.sh
 
   scheduled_build:
     permissions:
       contents: write
-    if: "${{ (github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0 pilot'))) && inputs.source-artifact-id == '' && needs.schedule_config.outputs.should_build == 'true' }}"
+    if: "${{ (github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0'))) && inputs.source-artifact-id == '' && needs.schedule_config.outputs.should_build == 'true' }}"
     needs: schedule_config
     uses: ./.github/workflows/build-rom.yml
     with:
@@ -179,7 +178,6 @@ jobs:
       boot-animation: ${{ needs.schedule_config.outputs.boot_animation == 'true' }}
       release-type: default
       publish: true
-      pdx235-pilot-release: true
     secrets: inherit
 
   manual_build:
@@ -222,7 +220,7 @@ jobs:
     with: *lineage-build-inputs
     # Preserve the installed signing identity without forwarding release/API
     # credentials. This prepares signing only; acquisition/postflight and the
-    # publication quarantine remain unchanged.
+    # supported publication policy remain unchanged.
     secrets:
       AVB_KEY: ${{ secrets.AVB_KEY }}
       CERT_OTA: ${{ secrets.CERT_OTA }}

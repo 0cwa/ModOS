@@ -34,27 +34,24 @@ expect_reject() {
   fi
 }
 
-expect_quarantine_failure() {
-  local label="$1"
-  shift
-  expect_reject "${label}" "$@"
-  grep -Fq 'ModOS#114' "${tmp}/out" ||
-    fail "${label}: rejection was not from the care-map release quarantine"
-}
-
-# The shared gate rejects any nonlocal scope; it has no environment or
-# workflow-input override and is not tied to only the October 9 ZIP.
-for scope in published private shared; do
-  expect_quarantine_failure "pdx235 ${scope}" \
-    enforce_pdx235_care_map_quarantine lineageos pdx235 "${scope}"
+# Private/shared output scopes remain unsupported for pdx235. Published scope
+# is restricted to the supported LineageOS nightly; source identity is checked
+# after selection, before signing.
+expect_reject 'pdx235 publication requires channel identity' \
+  enforce_pdx235_publication_scope lineageos pdx235 published
+for scope in private shared; do
+  expect_reject "pdx235 ${scope}" \
+    enforce_pdx235_publication_scope lineageos pdx235 "${scope}"
 done
 expect_allow 'pdx235 build-only workspace' \
-  enforce_pdx235_care_map_quarantine lineageos pdx235 local-unpublished
+  enforce_pdx235_publication_scope lineageos pdx235 local-unpublished
+expect_allow 'publisher accepts supported source scope' \
+  enforce_pdx235_publication_scope lineageos pdx235 published nightly 20261019
 expect_allow 'GrapheneOS unaffected' \
-  enforce_pdx235_care_map_quarantine grapheneos shiba published
+  enforce_pdx235_publication_scope grapheneos shiba published
 expect_allow 'other LineageOS device unaffected' \
-  enforce_pdx235_care_map_quarantine lineageos other_device published
-expect_reject 'missing context is not allowed' enforce_pdx235_care_map_quarantine lineageos
+  enforce_pdx235_publication_scope lineageos other_device published
+expect_reject 'missing context is not allowed' enforce_pdx235_publication_scope lineageos
 
 ROM_FAMILY=lineageos
 DEVICE_NAME=pdx235
@@ -80,47 +77,45 @@ for scenario in normal forced-pair; do
   PIXENEOS_PDX235_CARE_MAP_SHA256=b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8
   export ROOT_MODE RELEASE_TYPE FORCE_UPDATE PUBLISH PIXENEOS_PDX235_CARE_MAP_SHA256
   expect_allow "${scenario} local-unpublished" enforce_output_policy local-unpublished
-  expect_quarantine_failure "${scenario} early" enforce_output_policy published
-  expect_quarantine_failure "${scenario} late" enforce_publication_evidence published
+  expect_allow "${scenario} early publication scope" enforce_output_policy published
+  expect_allow "${scenario} publication evidence" enforce_publication_evidence published
 done
 
-# Both release helpers must independently refuse direct publication attempts,
-# even without artifacts. They must reject for #114 *before* contacting GH.
-expect_quarantine_failure 'direct single-flavor publisher' env \
+# Both release helpers still fail closed on malformed direct invocation before
+# contacting GH; valid workflow calls receive published scope only after the
+# main pipeline has checked source identity and rebuilt/postverified outputs.
+expect_reject 'direct single-flavor publisher' env \
   ROM_FAMILY=lineageos DEVICE_NAME=pdx235 OUTPUT_SCOPE=published \
   RELEASE_TYPE=force-publish bash src/ci/publish_ota.sh
 
-expect_quarantine_failure 'direct paired-output publisher' env \
+expect_reject 'direct paired-output publisher' env \
   ROM_FAMILY=lineageos ROM_PROFILE_PROVIDER=lineageos \
-  DEVICE_NAME=pdx235 GRAPHENEOS_VERSION=20261009 \
+  DEVICE_NAME=pdx235 GRAPHENEOS_VERSION=20261019 \
   OUTPUT_SCOPE=published RELEASE_TYPE=default \
   bash src/ci/publish_ota_pair.sh
 
-# Scheduled Android 17 series: the preliminary gate is allowed only under
-# the trusted workflow flag; actual official API data and final signatures
-# must be verified before any signing or publishing.
-PIXENEOS_PDX235_PILOT_RELEASE=true
+# Published source identity must match the official API target and digest.
 ROM_FAMILY=lineageos DEVICE_NAME=pdx235 OUTPUT_SCOPE=published
 GRAPHENEOS[UPDATE_CHANNEL]=nightly
 GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
 ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
 VERSION[GRAPHENEOS]=20261012
-expect_allow 'exact pilot source identity' enforce_pdx235_pilot_source
-expect_allow 'repaired pilot publication permission' enforce_output_policy published
-expect_allow 'pilot paired publication scope' enforce_pdx235_care_map_quarantine lineageos pdx235 published
-expect_reject 'pilot cannot become private/shared' enforce_pdx235_care_map_quarantine lineageos pdx235 shared
-for case_name in wrong-digest wrong-date wrong-build wrong-channel wrong-family wrong-device; do
+expect_allow 'supported source identity without workflow override' enforce_pdx235_supported_source
+expect_allow 'unquarantined published scope' enforce_pdx235_publication_scope lineageos pdx235 published
+expect_allow 'supported rootless publication policy' enforce_output_policy published
+expect_allow 'supported paired publication policy' enforce_publication_evidence published
+for case_name in wrong-digest wrong-version wrong-build wrong-channel wrong-family wrong-device; do
   (
     case "${case_name}" in
       wrong-digest) ROM_OTA_SHA256='not-a-sha256' ;;
-      wrong-date) VERSION[GRAPHENEOS]=20261013 ;;
+      wrong-version) VERSION[GRAPHENEOS]=20261013 ;;
       wrong-build) GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261015-nightly-pdx235-signed ;;
       wrong-channel) GRAPHENEOS[UPDATE_CHANNEL]=weekly ;;
       wrong-family) ROM_FAMILY=grapheneos ;;
       wrong-device) DEVICE_NAME=other ;;
     esac
-    if enforce_pdx235_pilot_source >/dev/null 2>&1; then
-      fail "pilot accepted ${case_name}"
+    if enforce_pdx235_supported_source >/dev/null 2>&1; then
+      fail "supported source check accepted ${case_name}"
     fi
   )
   ((cases+=1))
@@ -128,17 +123,12 @@ done
 GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261019-nightly-pdx235-signed
 VERSION[GRAPHENEOS]=20261019
 ROM_OTA_SHA256="$(printf 'a%.0s' {1..64})"
-expect_allow 'later 24.0 nightly with official API digest' enforce_pdx235_pilot_source
+expect_allow 'later 24.0 nightly with official API digest' enforce_pdx235_supported_source
 GRAPHENEOS[OTA_TARGET]=lineage-24.1-20261019-nightly-pdx235-signed
-expect_reject '24.1 outside qualified Android series' enforce_pdx235_pilot_source
+expect_reject '24.1 outside supported Android series' enforce_pdx235_supported_source
 GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261011-nightly-pdx235-signed
 VERSION[GRAPHENEOS]=20261011
-expect_reject 'prequalification source cannot publish' enforce_pdx235_pilot_source
-GRAPHENEOS[OTA_TARGET]=lineage-24.0-20261012-nightly-pdx235-signed
-VERSION[GRAPHENEOS]=20261012
-ROM_OTA_SHA256=29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820
-unset PIXENEOS_PDX235_PILOT_RELEASE
-expect_quarantine_failure 'no pilot flag still quarantined' enforce_pdx235_care_map_quarantine lineageos pdx235 published
+expect_allow '24.0 source has no temporary date cutoff' enforce_pdx235_supported_source
 VERSION[GRAPHENEOS]=''
 ROM_OTA_SHA256=''
 OUTPUT_SCOPE=local-unpublished
@@ -188,4 +178,4 @@ expect_allow 'single build-only publication helper is a no-op' env \
   OUTPUT_SCOPE=local-unpublished RELEASE_TYPE=build-only \
   bash src/ci/publish_ota.sh
 
-echo "PASS: ${cases} pdx235 publication-quarantine regression cases (no OTA build or publication)"
+echo "PASS: ${cases} pdx235 publication-policy regression cases (no OTA build or publication)"

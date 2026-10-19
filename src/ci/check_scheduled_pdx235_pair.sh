@@ -5,7 +5,7 @@
 set -euo pipefail
 
 [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
-   "${OUTPUT_SCOPE:-}" == published && "${PIXENEOS_PDX235_PILOT_RELEASE:-}" == true &&
+   "${OUTPUT_SCOPE:-}" == published &&
    "${ROOT_MODE:-}" == both && -n "${GITHUB_OUTPUT:-}" &&
    "${GITHUB_REPOSITORY:-}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || {
   echo 'Error: scheduled existing-release preflight received unexpected scope.' >&2
@@ -22,7 +22,7 @@ generate_ota_info
 
 # The source is selected by the official LineageOS builds API. The source
 # byte digest MUST also match metadata recorded with both existing outputs.
-enforce_pdx235_pilot_source
+enforce_pdx235_supported_source
 [[ "${ROM_OTA_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || {
   echo 'Error: source release lacks the official SHA-256.' >&2
   exit 1

@@ -706,7 +706,7 @@ function patch_ota() {
     local tool_runner_prefix
     # Use the guarded source-built verifier for current LineageOS 24.0
     # nightlies, not only the frozen 23.2 development fixture. Publication
-    # quarantine remains an independent earlier policy check.
+    # publication scope remains an independent earlier policy check.
     local runtime_care_map_active=false
     if is_care_map_development_profile ||
       pdx235_guarded_runtime_care_map_required; then

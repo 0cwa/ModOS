@@ -324,12 +324,11 @@ test_lineage24_development_refuses_wrong_series_and_channel() (
   fi
 )
 
-test_pilot_source_uses_current_official_24_0_nightly() (
+test_published_source_uses_current_official_24_0_nightly() (
   reset_acquisition_fixture
   ROM_FAMILY=lineageos
   DEVICE_NAME=pdx235
   OUTPUT_SCOPE=published
-  PIXENEOS_PDX235_PILOT_RELEASE=true
   git() { mock_magisk_tags "$@"; }
   curl() {
     printf '%s\n' '[
@@ -350,20 +349,18 @@ test_pilot_source_uses_current_official_24_0_nightly() (
   assert_equals 20261019 "${VERSION[GRAPHENEOS]}" 'newest approved 24.0 nightly'
   assert_equals lineage-24.0-20261019-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" '24.0 source target'
   assert_equals aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "${ROM_OTA_SHA256}" 'official source digest'
-  enforce_pdx235_pilot_source || fail 'newest 24.0 nightly unexpectedly rejected'
+  enforce_pdx235_supported_source || fail 'newest 24.0 nightly unexpectedly rejected'
 )
 
 
-test_pilot_source_wrong_scope_fails_before_download() (
+test_published_scope_rejects_non_nightly() (
   reset_acquisition_fixture
   ROM_FAMILY=lineageos
   DEVICE_NAME=pdx235
-  OUTPUT_SCOPE=local-unpublished
-  PIXENEOS_PDX235_PILOT_RELEASE=true
-  git() { mock_magisk_tags "$@"; }
-  curl() { fail 'wrong-scope pilot must not perform a request'; }
-  if get_latest_version >/dev/null 2>&1; then
-    fail 'pilot unexpectedly accepted an unapproved output scope'
+  GRAPHENEOS_UPDATE_CHANNEL=weekly
+  resolve_rom_profile
+  if enforce_pdx235_publication_scope lineageos pdx235 published; then
+    fail 'published scope unexpectedly accepted a non-nightly channel'
   fi
 )
 
@@ -379,8 +376,8 @@ test_unsafe_lineageos_metadata_fails_closed
 test_development_source_does_not_follow_major_upgrade
 test_lineage24_development_selects_latest_24_0_not_unreviewed_series
 test_lineage24_development_refuses_wrong_series_and_channel
-test_pilot_source_uses_current_official_24_0_nightly
-test_pilot_source_wrong_scope_fails_before_download
+test_published_source_uses_current_official_24_0_nightly
+test_published_scope_rejects_non_nightly
 test_missing_development_source_fails_closed
 test_changed_development_source_digest_fails_closed
 

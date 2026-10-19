@@ -17,10 +17,10 @@ require_pdx235_repaired_helper lineageos pdx235 magisk old-revision
 require_pdx235_repaired_helper grapheneos shiba both old-revision
 require_pdx235_repaired_helper lineageos other rootless old-revision
 ROM_FAMILY=lineageos DEVICE_NAME=pdx235 ROOT_MODE=both RESOLVED_ROOT_MODE=''
-PIXENEOS_PDX235_PILOT_RELEASE=true
 ADDITIONALS[DEBUG]=false ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]=false
 VERSION[GRAPHENEOS]=20261016
 VERSION[AVBROOT_SETUP]="${repair}"
+GRAPHENEOS[UPDATE_CHANNEL]=nightly
 enforce_output_policy published
 enforce_publication_evidence published
 VERSION[AVBROOT_SETUP]=c9d091225bdbed9f62d6401a040e3cdbae834078

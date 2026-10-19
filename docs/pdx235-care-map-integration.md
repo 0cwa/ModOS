@@ -13,7 +13,8 @@ The phone recovered by booting its previous slot. The development helper now
 keeps module app contexts in the platform file only; binary/CIL patches remain.
 See [the failure and repair record](pdx235-bootloop-20261013.md). Earlier artifact
 checks below do not establish that the original candidate can boot. Fresh device
-acceptance is required for the corrected candidate; publication stays quarantined.
+acceptance is still required before installation. The later publication-policy
+change permits only verified official LineageOS 24.0 pdx235 nightly outputs.
 
 ## Current state
 
@@ -56,11 +57,15 @@ carried with the helper. The local proof binary SHA-256 was
 This measured digest records that experiment; it is not a production executable
 trust pin.
 
-The production source-exception digest remains empty and strict source
-verification remains active. The LineageOS/pdx235 output policy permits only
-`local-unpublished`; direct single and paired publication helpers enforce
-the same quarantine. Pre-existing output ZIPs or associated evidence are
-rejected rather than accepted through the historical existence shortcut.
+The production source-exception digest remains empty; supported 24.0 releases
+use the ordinary strict verification path. Explicit development profiles
+permit only `local-unpublished` candidate builds. Production publication is
+limited to official LineageOS 24.0 pdx235 nightlies with the API SHA-256 and
+pinned publisher identity verified before signing, plus strict signed-output
+and runtime care-map postflight. Direct single and paired publishers enforce
+the supported publication scope and validate their release assets. Pre-existing
+output ZIPs or associated evidence are rejected rather than accepted through
+the historical existence shortcut.
 
 Source publisher checks bind the extracted PEM certificate both to the
 independently trusted SPKI and to the unique certificate member in the
@@ -119,9 +124,9 @@ unchanged authenticated group budget. Initial Code 28 failures came from an
 without a new partition-growth policy.
 
 Build-only jobs now request `contents: read` and ordinary runs use disposable
-keys without inheriting production signing secrets. The separately selected
-repository-signer candidate forwards only signing material; publishers remain
-skipped and quarantine remains active. A source-build development profile and
+keys without inheriting production signing secrets. At this stage of the work,
+the separately selected repository-signer candidate forwarded only signing
+material; publishers remained skipped. A source-build development profile and
 an optional authenticated encrypted private handoff are prepared. Ordinary
 production executable pins remain unchanged. The complete enabled-module profile
 has passed actual disposable-key output postflight. The actual read-only repository-key workflow at `0db76b4` succeeded in
@@ -140,8 +145,10 @@ Explicit `export-device-candidate=true` permits normal signed OTA ZIPs in the
 `device-candidate` GitHub artifact when the optional recipient is empty. Extract
 GitHub's outer artifact ZIP once and sideload the chosen inner OTA ZIP. A public
 recipient certificate selects the existing encrypted private handoff instead.
-Both are build-only device-acceptance transport; release assets and Custota
-channels remain quarantined. The normal provider selects the latest nightly. The `care-map-pdx235` development
+Both are build-only device-acceptance transport and do not themselves update
+release assets or Custota channels. Current production policy permits only
+verified official LineageOS 24.0 pdx235 nightly outputs. The normal provider
+selects the latest nightly. The `care-map-pdx235` development
 profile now selects the exact October 9 filename and authenticated SHA-256 from
 the official API, failing closed if the fixture is absent or its digest changes.
 This keeps the boot-failure repair separate from the newer LineageOS 24 / Android
@@ -189,10 +196,12 @@ identity. Check actual AVB/verity state and recovery behavior on-device.
 
 After the completed configured-signer artifact evidence and applicable enrolled-key
 and device acceptance are reviewed, promote the helper dependency before the
-ModOS microG consumer. Remove the temporary quarantine explicitly in a
-reviewed release change. At the owner's October 13 request, scheduled pdx235
-builds now select microG by default; this does not lift publication quarantine
-or establish the remaining device acceptance. Resolve #114 using that evidence, not test counts.
+ModOS microG consumer. At the owner's October 13 request, scheduled pdx235
+builds now select microG by default. Publication is enabled for supported
+LineageOS 24.0 pdx235 nightlies. It still requires the official API SHA-256,
+pinned LineageOS publisher key, fresh rootless/Magisk outputs, helper
+cryptographic and runtime care-map postflight, and valid release sidecars.
+Physical device acceptance remains separate from artifact validation.
 
 ## Validation ownership
 
@@ -218,4 +227,5 @@ The official prebuilt executable lock remains at 3.34.1: the signed upstream
 3.35.0 binary accepted an unsigned AVB header despite an explicit expected key.
 The guarded source engine closes that gap. These are regression checks on a
 frozen accepted fixture; new firmware still needs fresh verification and device
-acceptance. The pdx235 publication quarantine remains active.
+acceptance. Current publication policy permits supported LineageOS 24.0
+nightlies subject to the source and output checks described above.

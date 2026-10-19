@@ -43,14 +43,14 @@ def selected(name, event="schedule", message="", should_build="", artifact="",
                      {"startsWith": lambda text, prefix: text.startswith(prefix)}))
 
 
-PILOT = "release(pdx235): 24.0 pilot regression fixture"
+SCHEDULED_RELEASE = "release(pdx235): 24.0 regression fixture"
 
 
 def check_preflight(output, expected):
     values = [line.removeprefix("should_build=") for line in Path(output).read_text().splitlines()
               if line.startswith("should_build=")]
     assert values == [expected], values
-    for event, message in (("schedule", ""), ("push", PILOT)):
+    for event, message in (("schedule", ""), ("push", SCHEDULED_RELEASE)):
         assert selected("scheduled_build", event, message, values[0]) == (expected == "true")
 
 
@@ -63,9 +63,9 @@ def main():
     assert "    needs: schedule_config\n" in scheduled
     assert "    uses: ./.github/workflows/build-rom.yml\n" in scheduled
     # The guard is on the reusable job, before patching, signing or publication.
-    for event, message, eligible in (("schedule", "", True), ("push", PILOT, True),
+    for event, message, eligible in (("schedule", "", True), ("push", SCHEDULED_RELEASE, True),
                                       ("push", "ordinary change", False),
-                                      ("pull_request", PILOT, False),
+                                      ("pull_request", SCHEDULED_RELEASE, False),
                                       ("workflow_dispatch", "", False)):
         assert selected("schedule_config", event, message) == eligible
         for result, artifact in itertools.product(("true", "false", "", "unknown"), ("", "123")):
@@ -86,7 +86,7 @@ def main():
         assert not selected("scheduled_build", **args), args
     for route in routes:
         for event in ("schedule", "push", "pull_request"):
-            assert not selected(route, event=event, message=PILOT, should_build="true")
+            assert not selected(route, event=event, message=SCHEDULED_RELEASE, should_build="true")
     print("LineageOS workflow routing tests passed")
 
 

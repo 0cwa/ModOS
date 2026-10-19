@@ -228,8 +228,9 @@ existing `open_sealed_executable` binds each execution to those measured bytes.
 This development path assumes a trusted compiler/host/dependency cache and is
 repository-reviewed source authorization, not a chenxiaolong-signed executable
 release. Historical measured binary digests are evidence, not mutable replacement
-trust pins. afsr and Custota continue through the official executable lock. The pdx235 publication quarantine
-remains unchanged. A separate, default-off `export-device-candidate` request
+trust pins. afsr and Custota continue through the official executable lock.
+Supported LineageOS 24.0 pdx235 publication has a separate source and output
+verification policy. A separate, default-off `export-device-candidate` request
 permits device-acceptance artifacts only with this profile,
 `signing-mode=repository`, `release-type=build-only`, and no publication.
 With an empty `device-candidate-recipient-base64`, the `device-candidate`
@@ -244,7 +245,7 @@ instead. The certificate is validated before signing; this artifact contains
 one CMS AES-256-GCM envelope per OTA and one nonsecret transport manifest.
 Both modes use the same final-output allowlist. Private signing material and
 raw working directories are never exported. Candidate artifact delivery does
-not publish a GitHub release or lift the Custota publication quarantine.
+not publish a GitHub release or update Custota OTA metadata.
 
 Separate envelopes keep the paired output out of OpenSSL's combined-object
 ASN.1 size limit; the public AVB key appears identically in both, and the microG
@@ -303,7 +304,8 @@ or context rules. The image adapter uses signed APK/XML/native payloads; it
 does not execute module installer or post-fs-data shell scripts. Existing vendor
 and ODM app-context files remain unchanged, preserving the bootloop repair.
 These are source/build compatibility checks, not new physical-device acceptance.
-Publication quarantine stays in place.
+At the time of this October 13 note, publication remained quarantined. Current
+policy permits verified official LineageOS 24.0 pdx235 nightlies.
 
 ## Guarded source qualification on October 13
 
@@ -344,5 +346,7 @@ signer `chenxiaolong`, namespace `file`, Ed25519 fingerprint
 The checked-in executable lock, offline validator and independent lock regression
 fixture advance together; no executable signer, signing key, or release permission
 changes. The official binary **does not replace** the source-built guarded
-expected-care-map verifier in the pdx235 development path. Physical Android 17
-acceptance and pdx235 publication review remain separate.
+expected-care-map verifier in the pdx235 development path. At the time of this
+October 15 qualification, publication review remained outstanding. Current
+policy permits verified official LineageOS 24.0 pdx235 nightlies; physical
+Android 17 acceptance remains a separate task.

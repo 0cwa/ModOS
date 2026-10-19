@@ -2,53 +2,46 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 PixeneOS contributors
 
-# Temporary, non-configurable release quarantine for 0cwa/ModOS#114.
-# It is deliberately independent of the October 9 source digest and the
-# selected root mode. Removing it requires a separate reviewed security change
-# after care-map runtime conformance and physical-device acceptance.
-#
-# Source this file from the ROM profile gate and *both* publication helpers.
-# The approved public scope is the LineageOS 24.0 nightly series on pdx235.
-# Every ZIP requires the official builds API SHA-256, independent publisher
-# signature, and strict output cryptographic and runtime care-map postflight.
-# Future series and other devices/flavors remain outside this release policy.
-pdx235_pilot_source_matches() {
-  [[ "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true &&
-    "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
+# Published pdx235 builds are supported only for the LineageOS 24.0 nightly
+# series. The source API identity, independent publisher key, regenerated
+# signatures, and strict runtime care-map postflight remain mandatory.
+pdx235_supported_source_matches() {
+  [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
     "${GRAPHENEOS[UPDATE_CHANNEL]:-}" == nightly &&
     "${VERSION[GRAPHENEOS]:-}" =~ ^20[0-9]{6}$ &&
-    "${VERSION[GRAPHENEOS]}" > 20261011 &&
     "${GRAPHENEOS[OTA_TARGET]:-}" == "lineage-24.0-${VERSION[GRAPHENEOS]}-nightly-pdx235-signed" &&
     "${ROM_OTA_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]
 }
 
-enforce_pdx235_pilot_source() {
-  pdx235_pilot_source_matches && return 0
-  echo 'Error: pdx235 publishing requires an official, signed LineageOS 24.0 pdx235 nightly with valid API SHA-256.' >&2
+enforce_pdx235_supported_source() {
+  pdx235_supported_source_matches && return 0
+  echo 'Error: pdx235 publishing requires an official LineageOS 24.0 pdx235 nightly with a valid API SHA-256.' >&2
   return 1
 }
-enforce_pdx235_care_map_quarantine() {
-  if [[ "$#" -ne 3 ]]; then
-    echo "Error: pdx235 quarantine requires ROM family, device, and output scope." >&2
+enforce_pdx235_publication_scope() {
+  if [[ "$#" -lt 3 || "$#" -gt 5 ]]; then
+    echo "Error: pdx235 publication policy requires ROM family, device, and output scope." >&2
     return 1
   fi
 
   local rom_family="$1" device="$2" output_scope="$3"
+  local channel="${4:-${GRAPHENEOS_UPDATE_CHANNEL:-}}"
+  local version="${5:-${GRAPHENEOS_VERSION:-}}"
+  if [[ -z "${channel}" ]] && declare -p GRAPHENEOS >/dev/null 2>&1; then
+    channel="${GRAPHENEOS[UPDATE_CHANNEL]:-}"
+  fi
   if [[ "${rom_family}" == 'lineageos' && "${device}" == 'pdx235' &&
     "${output_scope}" != 'local-unpublished' ]]; then
-    # The release runner invokes this before provider selection, so it only
-    # accepts the explicit workflow intent here. After source selection the
-    # main pipeline verifies device/channel/version/date, API SHA-256 and
-    # full original-signer provenance before signing either output.
+    # This pre-source gate can only admit the explicitly supported public
+    # family/device/channel. Main verifies exact API target and digest before
+    # signing, and both publisher helpers independently verify their assets.
     if [[ "${output_scope}" == published &&
-      "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true ]]; then
-      if [[ -n "${GRAPHENEOS_VERSION:-}" ]]; then
-        [[ "${GRAPHENEOS_VERSION}" =~ ^20[0-9]{6}$ &&
-          "${GRAPHENEOS_VERSION}" > 20261011 ]] || return 1
-      fi
+      "${rom_family}" == lineageos && "${device}" == pdx235 &&
+      "${channel}" == nightly &&
+      ( -z "${version}" || "${version}" =~ ^20[0-9]{6}$ ) ]]; then
       return 0
     fi
-    echo "Error: ModOS#114 blocks LineageOS/pdx235 publication outside the reviewed 24.0 series." >&2
+    echo "Error: LineageOS/pdx235 publication is limited to the supported 24.0 nightly series." >&2
     return 1
   fi
 }

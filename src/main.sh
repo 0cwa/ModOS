@@ -29,7 +29,7 @@ function main() {
   # before downloading dependencies or accessing repository signing keys.
   if [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 &&
     "${OUTPUT_SCOPE}" == published ]]; then
-    enforce_pdx235_pilot_source
+    enforce_pdx235_supported_source
   fi
   # Check for requirements and download them accordingly
   check_and_download_dependencies

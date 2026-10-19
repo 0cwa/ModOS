@@ -48,16 +48,17 @@ function fetch_lineageos_ota_metadata() {
       ;;
   esac
 
-  if [[ "${PIXENEOS_PDX235_PILOT_RELEASE:-false}" == true ]]; then
+  if [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME}" == pdx235 &&
+    "${OUTPUT_SCOPE:-}" == published ]]; then
     [[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME}" == pdx235 &&
       "${GRAPHENEOS[UPDATE_CHANNEL]}" == nightly &&
-      "${OUTPUT_SCOPE:-}" == published && -z "${source_filename}" ]] || {
-      echo 'Error: pdx235 pilot source selected outside approved publication scope.' >&2
+      -z "${source_filename}" ]] || {
+      echo 'Error: pdx235 source selected outside supported publication scope.' >&2
       return 1
     }
-    # The source is selected from the current official builds API, not the
-    # one-off archived October 12 ZIP. The API digest and LineageOS whole-file
-    # signature remain mandatory for every scheduled release.
+    # Published pdx235 builds always use the supported 24.0 nightly series,
+    # selected from the official builds API. Its API digest and LineageOS
+    # whole-file signature remain mandatory.
     source_series='24.0'
   fi
 
