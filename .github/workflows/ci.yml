@@ -73,6 +73,7 @@ jobs:
           bash tests/release_existing_build_test.sh
           bash tests/release_existing_pair_test.sh
           bash tests/pdx235_existing_build_preflight_test.sh
+          python3 tests/lineage_workflow_routing_test.py
           bash tests/provider_acquisition_test.sh
           bash tests/executable_tool_lock_test.sh
           bash tests/executable_tool_bootstrap_test.sh
