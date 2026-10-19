@@ -67,7 +67,8 @@ selection independently, routes helper tool calls through authenticated sealed
 execution, and separates build-only jobs with read-only GitHub permissions and
 disposable signing. The explicit repository-signer/private encrypted handoff has
 passed the real workflow and retrieved-candidate verification. The source exception remains empty; LineageOS/pdx235
-publication remains quarantined and microG schedules remain off.
+publication is enabled for supported LineageOS 24.0 nightlies with source and
+output proof gates intact. Physical device acceptance remains outstanding.
 
 ## Remaining execution queue
 
@@ -75,7 +76,7 @@ publication remains quarantined and microG schedules remain off.
 | --- | --- | --- | --- |
 | 1 | pdx235 device | Confirm enrolled-key compatibility, install through the reviewed device procedure, collect first-boot observations and complete rootless/Magisk and Custota persistence acceptance. | Runtime property agreement, effective verity/snapuserd verification, successful-slot state, Magisk setup and microG self-check/spoofing/account/push/location behavior. Requires the actual device. |
 | 2 | Dependency/main promotion | Review consolidated source, helper compatibility/trust metadata and measured profile/device evidence; promote helper before its ModOS consumers. | Explicit reviewed dependency changes, coherent selection identities and no stale cached outputs. A source-built development artifact is not a vendor-signed executable-lock promotion. |
-| 3 | Release policy | Deliberately lift the pdx235 quarantine and enable any microG publication/schedules only after the applicable acceptance. | Reviewed publication change and real acceptance evidence; #114 closes on those results, not synthetic test counts. |
+| 3 | Release policy | Open publication for the supported LineageOS 24.0 pdx235 nightly series, with source identity and output postflight gates intact. | Implemented in the reviewed release-policy change; physical acceptance remains a separate device task. |
 
 The read-only [device collector](pdx235-device-evidence.md) is prepared. CI cannot
 supply the physical observations or prove the installed signing identity matches

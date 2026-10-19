@@ -119,9 +119,9 @@ unchanged authenticated group budget. Initial Code 28 failures came from an
 without a new partition-growth policy.
 
 Build-only jobs now request `contents: read` and ordinary runs use disposable
-keys without inheriting production signing secrets. The separately selected
-repository-signer candidate forwards only signing material; publishers remain
-skipped and quarantine remains active. A source-build development profile and
+keys without inheriting production signing secrets. At this stage of the work,
+the separately selected repository-signer candidate forwarded only signing
+material; publishers remained skipped. A source-build development profile and
 an optional authenticated encrypted private handoff are prepared. Ordinary
 production executable pins remain unchanged. The complete enabled-module profile
 has passed actual disposable-key output postflight. The actual read-only repository-key workflow at `0db76b4` succeeded in
@@ -189,10 +189,12 @@ identity. Check actual AVB/verity state and recovery behavior on-device.
 
 After the completed configured-signer artifact evidence and applicable enrolled-key
 and device acceptance are reviewed, promote the helper dependency before the
-ModOS microG consumer. Remove the temporary quarantine explicitly in a
-reviewed release change. At the owner's October 13 request, scheduled pdx235
-builds now select microG by default; this does not lift publication quarantine
-or establish the remaining device acceptance. Resolve #114 using that evidence, not test counts.
+ModOS microG consumer. At the owner's October 13 request, scheduled pdx235
+builds now select microG by default. Publication is enabled for supported
+LineageOS 24.0 pdx235 nightlies. It still requires the official API SHA-256,
+pinned LineageOS publisher key, fresh rootless/Magisk outputs, helper
+cryptographic and runtime care-map postflight, and valid release sidecars.
+Physical device acceptance remains separate from artifact validation.
 
 ## Validation ownership
 
@@ -218,4 +220,5 @@ The official prebuilt executable lock remains at 3.34.1: the signed upstream
 3.35.0 binary accepted an unsigned AVB header despite an explicit expected key.
 The guarded source engine closes that gap. These are regression checks on a
 frozen accepted fixture; new firmware still needs fresh verification and device
-acceptance. The pdx235 publication quarantine remains active.
+acceptance. Current publication policy permits supported LineageOS 24.0
+nightlies subject to the source and output checks described above.

@@ -66,8 +66,9 @@ images. The PR-only CI build exercises this normal route with disposable keys.
 The explicit `care-map-pdx235-lineage24` profile is still required to export
 a repository-signed private device-acceptance candidate.
 
-An Android 17 physical rootless upgrade and a separately reviewed
-**publication-quarantine** change are still prerequisites for publication.
-The ordinary path being able to build safely does not itself authorize release
-publishing. Do not fill the October 9 exception digest with an unrelated
-LineageOS 24 digest.
+Publication is enabled for the supported LineageOS 24.0 pdx235 nightly series.
+The ordinary build still has to pass the official API digest and publisher-key
+checks plus strict signed-output and runtime care-map postflight. Physical
+Android 17 upgrade and rootless/Magisk behavior remain separate acceptance
+work; successful publication checks do not prove device behavior. Do not fill
+the October 9 exception digest with an unrelated LineageOS 24 digest.

@@ -228,8 +228,9 @@ existing `open_sealed_executable` binds each execution to those measured bytes.
 This development path assumes a trusted compiler/host/dependency cache and is
 repository-reviewed source authorization, not a chenxiaolong-signed executable
 release. Historical measured binary digests are evidence, not mutable replacement
-trust pins. afsr and Custota continue through the official executable lock. The pdx235 publication quarantine
-remains unchanged. A separate, default-off `export-device-candidate` request
+trust pins. afsr and Custota continue through the official executable lock.
+Supported LineageOS 24.0 pdx235 publication has a separate source and output
+verification policy. A separate, default-off `export-device-candidate` request
 permits device-acceptance artifacts only with this profile,
 `signing-mode=repository`, `release-type=build-only`, and no publication.
 With an empty `device-candidate-recipient-base64`, the `device-candidate`
@@ -244,7 +245,7 @@ instead. The certificate is validated before signing; this artifact contains
 one CMS AES-256-GCM envelope per OTA and one nonsecret transport manifest.
 Both modes use the same final-output allowlist. Private signing material and
 raw working directories are never exported. Candidate artifact delivery does
-not publish a GitHub release or lift the Custota publication quarantine.
+not publish a GitHub release or update Custota OTA metadata.
 
 Separate envelopes keep the paired output out of OpenSSL's combined-object
 ASN.1 size limit; the public AVB key appears identically in both, and the microG

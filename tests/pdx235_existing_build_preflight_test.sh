@@ -153,7 +153,7 @@ assert 'bash src/ci/check_scheduled_pdx235_pair.sh' in flow
 assert "needs.schedule_config.outputs.should_build == 'true'" in flow
 preflight = Path('src/ci/check_scheduled_pdx235_pair.sh').read_text()
 assert 'source src/util_functions.sh' in preflight
-assert 'enforce_pdx235_pilot_source' in preflight
+assert 'enforce_pdx235_supported_source' in preflight
 assert 'bash src/ci/check_existing_pair.sh' in preflight
 assert 'GITHUB_REPOSITORY' in preflight
 assert 'SOURCE_OTA_SHA256' in preflight

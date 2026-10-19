@@ -25,7 +25,7 @@
 
 set -o nounset -o pipefail -o errexit
 
-# Recheck the same immutable release quarantine when invoked directly.
+# Recheck the same supported publication scope when invoked directly.
 _publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
 source "${_publish_ci_dir}/publish_custota_device_alias.sh"
@@ -91,8 +91,9 @@ if [[ "${OUTPUT_SCOPE}" == 'local-unpublished' ]]; then
 fi
 [[ "${OUTPUT_SCOPE}" == 'published' ]] ||
   die "OTA publication requires published output scope"
-enforce_pdx235_care_map_quarantine \
-  "${ROM_FAMILY}" "${DEVICE_NAME}" "${OUTPUT_SCOPE}" || exit 1
+enforce_pdx235_publication_scope \
+  "${ROM_FAMILY}" "${DEVICE_NAME}" "${OUTPUT_SCOPE}" \
+  "${GRAPHENEOS_UPDATE_CHANNEL-}" "${GRAPHENEOS_VERSION}" || exit 1
 
 for field in \
   ROM_FAMILY \
