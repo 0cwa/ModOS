@@ -76,7 +76,7 @@ output proof gates intact. Physical device acceptance remains outstanding.
 | --- | --- | --- | --- |
 | 1 | pdx235 device | Confirm enrolled-key compatibility, install through the reviewed device procedure, collect first-boot observations and complete rootless/Magisk and Custota persistence acceptance. | Runtime property agreement, effective verity/snapuserd verification, successful-slot state, Magisk setup and microG self-check/spoofing/account/push/location behavior. Requires the actual device. |
 | 2 | Dependency/main promotion | Review consolidated source, helper compatibility/trust metadata and measured profile/device evidence; promote helper before its ModOS consumers. | Explicit reviewed dependency changes, coherent selection identities and no stale cached outputs. A source-built development artifact is not a vendor-signed executable-lock promotion. |
-| 3 | Release policy | Open publication for the supported LineageOS 24.0 pdx235 nightly series, with source identity and output postflight gates intact. | Implemented in the reviewed release-policy change; physical acceptance remains a separate device task. |
+| 3 | Production release/device acceptance | Run the paired rootless/Magisk production build and publish through the verified LineageOS 24.0 pdx235 path; complete physical device acceptance. | Policy work is implemented. Verify the signed assets and feed pointers. Physical Magisk boot and production OTA behavior remain unobserved; complete rootless/Magisk and Custota checks on-device. |
 
 The read-only [device collector](pdx235-device-evidence.md) is prepared. CI cannot
 supply the physical observations or prove the installed signing identity matches
