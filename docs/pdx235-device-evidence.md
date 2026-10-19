@@ -53,7 +53,9 @@ The explicit LineageOS workflow now supports `development-profile=care-map-pdx23
 `release-type=build-only` and `signing-mode=repository` to retain the configured
 repository signing identity. Optional `export-device-candidate` with a public
 recipient certificate produces an authenticated encrypted private handoff; it
-keeps publication quarantined. The actual repository-key workflow, exact encrypted
+keeps that candidate workflow build-only; it does not itself publish. The
+separate production policy now permits verified official LineageOS 24.0
+pdx235 nightlies. The actual repository-key workflow, exact encrypted
 transport/decryption and independent local candidate verification have passed;
 [the review receipt](evidence/pdx235-20261012.json) records their identities.
 Physical acceptance and enrolled-key matching remain pending. Confirm that the

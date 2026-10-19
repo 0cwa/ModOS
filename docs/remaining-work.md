@@ -1,6 +1,6 @@
 # Remaining work and execution order
 
-Updated 2026-10-12 for the goal integration branch. This follows the initial audit
+Updated 2026-10-19 for the goal integration branch. This follows the initial audit
 of ModOS main `6572a6e`, feature PRs #96/#97, quarantine #121 and helper research
 #7/#10/#11/#12. Implemented branch work, measured local artifact evidence, main
 promotion and physical acceptance are separate states.
@@ -131,4 +131,5 @@ prebuilt avbroot 3.35.0 for the executable trust lock. Its unsigned-header
 behavior was already present in 3.34.1; the guarded source verifier remains
 necessary for signed-header enforcement.
 See [qualification evidence](evidence/avbroot-20261013.json). Fresh firmware/device
-acceptance and the publication quarantine remain separate requirements.
+acceptance remains outstanding; publication is enabled for verified official
+LineageOS 24.0 pdx235 nightlies under the source and output checks above.

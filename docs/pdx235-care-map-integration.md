@@ -13,7 +13,8 @@ The phone recovered by booting its previous slot. The development helper now
 keeps module app contexts in the platform file only; binary/CIL patches remain.
 See [the failure and repair record](pdx235-bootloop-20261013.md). Earlier artifact
 checks below do not establish that the original candidate can boot. Fresh device
-acceptance is required for the corrected candidate; publication stays quarantined.
+acceptance is still required before installation. The later publication-policy
+change permits only verified official LineageOS 24.0 pdx235 nightly outputs.
 
 ## Current state
 
@@ -140,8 +141,10 @@ Explicit `export-device-candidate=true` permits normal signed OTA ZIPs in the
 `device-candidate` GitHub artifact when the optional recipient is empty. Extract
 GitHub's outer artifact ZIP once and sideload the chosen inner OTA ZIP. A public
 recipient certificate selects the existing encrypted private handoff instead.
-Both are build-only device-acceptance transport; release assets and Custota
-channels remain quarantined. The normal provider selects the latest nightly. The `care-map-pdx235` development
+Both are build-only device-acceptance transport and do not themselves update
+release assets or Custota channels. Current production policy permits only
+verified official LineageOS 24.0 pdx235 nightly outputs. The normal provider
+selects the latest nightly. The `care-map-pdx235` development
 profile now selects the exact October 9 filename and authenticated SHA-256 from
 the official API, failing closed if the fixture is absent or its digest changes.
 This keeps the boot-failure repair separate from the newer LineageOS 24 / Android

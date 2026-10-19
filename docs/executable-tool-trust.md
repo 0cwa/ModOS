@@ -304,7 +304,8 @@ or context rules. The image adapter uses signed APK/XML/native payloads; it
 does not execute module installer or post-fs-data shell scripts. Existing vendor
 and ODM app-context files remain unchanged, preserving the bootloop repair.
 These are source/build compatibility checks, not new physical-device acceptance.
-Publication quarantine stays in place.
+At the time of this October 13 note, publication remained quarantined. Current
+policy permits verified official LineageOS 24.0 pdx235 nightlies.
 
 ## Guarded source qualification on October 13
 
@@ -345,5 +346,7 @@ signer `chenxiaolong`, namespace `file`, Ed25519 fingerprint
 The checked-in executable lock, offline validator and independent lock regression
 fixture advance together; no executable signer, signing key, or release permission
 changes. The official binary **does not replace** the source-built guarded
-expected-care-map verifier in the pdx235 development path. Physical Android 17
-acceptance and pdx235 publication review remain separate.
+expected-care-map verifier in the pdx235 development path. At the time of this
+October 15 qualification, publication review remained outstanding. Current
+policy permits verified official LineageOS 24.0 pdx235 nightlies; physical
+Android 17 acceptance remains a separate task.
