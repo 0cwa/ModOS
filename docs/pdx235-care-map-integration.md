@@ -57,11 +57,15 @@ carried with the helper. The local proof binary SHA-256 was
 This measured digest records that experiment; it is not a production executable
 trust pin.
 
-The production source-exception digest remains empty and strict source
-verification remains active. The LineageOS/pdx235 output policy permits only
-`local-unpublished`; direct single and paired publication helpers enforce
-the same quarantine. Pre-existing output ZIPs or associated evidence are
-rejected rather than accepted through the historical existence shortcut.
+The production source-exception digest remains empty; supported 24.0 releases
+use the ordinary strict verification path. Explicit development profiles
+permit only `local-unpublished` candidate builds. Production publication is
+limited to official LineageOS 24.0 pdx235 nightlies with the API SHA-256 and
+pinned publisher identity verified before signing, plus strict signed-output
+and runtime care-map postflight. Direct single and paired publishers enforce
+the supported publication scope and validate their release assets. Pre-existing
+output ZIPs or associated evidence are rejected rather than accepted through
+the historical existence shortcut.
 
 Source publisher checks bind the extracted PEM certificate both to the
 independently trusted SPKI and to the unique certificate member in the
