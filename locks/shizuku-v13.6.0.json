@@ -1,0 +1,33 @@
+{
+  "modules": [
+    {
+      "artifacts": [
+        {
+          "allowed_origins": [
+            "https://github.com",
+            "https://release-assets.githubusercontent.com"
+          ],
+          "apk": {
+            "package_name": "moe.shizuku.privileged.api",
+            "signer_sha256": "268b5590e868fb08bae7e0ac413564cd1ff88f5ccff74af9dbd0dc918e30db30",
+            "version_code": 1086
+          },
+          "archive": null,
+          "id": "manager-apk",
+          "immutable_url": "https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk",
+          "kind": "apk",
+          "legal": null,
+          "role": "injection-input",
+          "sha256": "6e273ab0e991c4e79bc8b1bbb9b9dd739ccac1a8712a541a214078886b7b790f",
+          "size": 2571773,
+          "source": null,
+          "source_verification": null,
+          "version": "13.6.0"
+        }
+      ],
+      "id": "shizuku",
+      "version": "v13.6.0"
+    }
+  ],
+  "schema_version": 1
+}

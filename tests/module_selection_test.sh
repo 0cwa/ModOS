@@ -194,6 +194,7 @@ reset_fixture() {
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
   ADDITIONALS[MICROG]="false"
+  ADDITIONALS[SHIZUKU]="false"
   ADDITIONALS[DEBUG]="false"
   ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]="false"
   ADDITIONALS[ROOT]="false"
@@ -407,6 +408,61 @@ test_microg_locked_preparation_and_arguments() {
     fail "microG profile lacks restricted spoofing capability"
   grep -Fxq "product_priv_app = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
     fail "microG profile lacks product priv-app capability"
+}
+
+enable_shizuku_fixture() {
+  ADDITIONALS[SHIZUKU]="true"
+  ROOT_MODE="rootless"
+  RESOLVED_ROOT_MODE=""
+  mkdir -p "${WORKDIR}/tools/my-avbroot-setup/lib/modules"
+  cat >"${WORKDIR}/tools/my-avbroot-setup/lib/modules/__init__.py" <<'PY'
+def all_modules():
+    return legacy_cli_module_types()
+
+def legacy_cli_module_types():
+    return ()
+PY
+  cat >"${WORKDIR}/tools/my-avbroot-setup/lib/modules/registry.py" <<'PY'
+def legacy_cli_module_types():
+    result: list[type[LegacyCliModule]] = []
+    return tuple(result)
+PY
+}
+
+test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices() {
+  local profile family device
+  local -a cases=(
+    "grapheneos bramble"
+    "grapheneos shiba"
+    "lineageos pdx235"
+    "lineageos provider_device"
+  )
+
+  for profile in "${cases[@]}"; do
+    family="${profile%% *}"
+    device="${profile#* }"
+    reset_fixture "shizuku-${family}-${device}"
+    enable_shizuku_fixture
+    ROM_FAMILY="${family}"
+    DEVICE_NAME="${device}"
+
+    run_patch
+
+    assert_pair "--module-shizuku" "${WORKDIR}/modules/shizuku.zip" \
+      "Shizuku ${ROM_FAMILY}/${DEVICE_NAME} selection"
+    assert_pair "--module-shizuku-sig" "${WORKDIR}/signatures/shizuku.zip.sig" \
+      "Shizuku ${ROM_FAMILY}/${DEVICE_NAME} signature"
+    assert_prepare_stages "Shizuku ${ROM_FAMILY}/${DEVICE_NAME} preparation" \
+      artifacts-fetch
+  done
+}
+
+test_shizuku_rejects_shared_rootless_magisk_product_image() {
+  reset_fixture shizuku-both-modes
+  ADDITIONALS[SHIZUKU]="true"
+  ROOT_MODE="both"
+  assert_patch_fails_before_execution \
+    "Shizuku cannot share one injected product image across root modes"
 }
 
 test_lineage_both_modes_clear_vbmeta_flags() {
@@ -779,6 +835,8 @@ test_special_cases_remain_available
 test_disable_system_updater_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
+test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices
+test_shizuku_rejects_shared_rootless_magisk_product_image
 test_lineage_both_modes_clear_vbmeta_flags
 test_care_map_compatibility_scope
 test_pdx235_publisher_preflight

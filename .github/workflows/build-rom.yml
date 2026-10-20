@@ -57,6 +57,11 @@ on:
         required: false
         type: boolean
         default: false
+      shizuku:
+        description: Install official Shizuku manager (supported ROM profile; separate rootless/Magisk builds)
+        required: false
+        type: boolean
+        default: false
       update-channel:
         required: true
         type: string
@@ -134,6 +139,7 @@ env:
   ADDITIONALS_MICROG: ${{ inputs.microg }}
   ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ inputs.disable-system-updater }}
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
+  ADDITIONALS_SHIZUKU: ${{ inputs.shizuku }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 
 # Publishing inherits the caller job's permission ceiling. A reusable

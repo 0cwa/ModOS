@@ -234,6 +234,7 @@ function append_enabled_module_arguments() {
     "alterinstaller:ALTERINSTALLER"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "boot-animation:BOOT_ANIMATION"
+    "shizuku:SHIZUKU"
   )
 
   for entry in "${module_entries[@]}"; do
@@ -397,6 +398,90 @@ function prepare_disable_system_updater_module() {
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/disable-system-updater.zip"
   : >"${WORKDIR}/signatures/disable-system-updater.zip.sig"
+  export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+}
+
+# Register the local Shizuku adapter and fetch its digest-locked official APK.
+# The adapter checks APK bytes and ExtFs checks product file-context labels;
+# no privileged permission allowlist or custom SELinux policy is added.
+function prepare_shizuku_module() {
+  local helper_root="${1}"
+  local repository_root
+  local lock_path
+  local cache_path="${WORKDIR}/locked-artifacts"
+  local expected_apk="${cache_path}/sha256/6e/6e273ab0e991c4e79bc8b1bbb9b9dd739ccac1a8712a541a214078886b7b790f"
+  local module_tool="${helper_root}/module-tool.py"
+  local init_file="${helper_root}/lib/modules/__init__.py"
+  local registry_file="${helper_root}/lib/modules/registry.py"
+  local module_source="${helper_root}/lib/modules/shizuku.py"
+
+  if [[ "${ADDITIONALS[SHIZUKU]}" != 'true' ]]; then
+    return 0
+  fi
+  repository_root="$(git rev-parse --show-toplevel)" || return 1
+  lock_path="${repository_root}/locks/shizuku-v13.6.0.json"
+  resolve_root_mode || return 1
+  if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
+    echo "Error: Shizuku cannot distinguish rootless and Magisk server startup in ROOT_MODE=both." >&2
+    return 1
+  fi
+  if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
+    echo "Error: the pinned helper lacks the locked module tool." >&2
+    return 1
+  fi
+  if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
+    ! -f src/shizuku.py || -L src/shizuku.py ]]; then
+    echo "Error: the Shizuku lock or adapter path is missing or unsafe." >&2
+    return 1
+  fi
+  if [[ ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
+    -L "${module_source}" ]]; then
+    echo "Error: the pinned helper lacks a safe module registry path." >&2
+    return 1
+  fi
+  if ! python "${module_tool}" artifacts fetch \
+    --lock "${lock_path}" \
+    --cache "${cache_path}" \
+    --module shizuku >/dev/null; then
+    echo "Error: locked Shizuku artifact acquisition failed." >&2
+    return 1
+  fi
+
+  cp -- src/shizuku.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+  if ! grep -Fq 'from lib.modules.shizuku import ShizukuMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.shizuku import ShizukuMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(ShizukuMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(ShizukuMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
+  : >"${WORKDIR}/modules/shizuku.zip"
+  : >"${WORKDIR}/signatures/shizuku.zip.sig"
+  export PIXENEOS_SHIZUKU_APK_PATH="${expected_apk}"
+  export PIXENEOS_SHIZUKU_ROOT_MODE="${RESOLVED_ROOT_MODE}"
   export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
 }
 
@@ -769,6 +854,10 @@ function patch_ota() {
     fi
     if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" == 'true' ]] &&
       ! prepare_disable_system_updater_module "${my_avbroot_setup}"; then
+      return 1
+    fi
+    if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]] &&
+      ! prepare_shizuku_module "${my_avbroot_setup}"; then
       return 1
     fi
     append_enabled_module_arguments args

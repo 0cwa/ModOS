@@ -268,6 +268,42 @@ PY
     fail "dark boot-animation payload did not change the fingerprint"
 )
 
+test_shizuku_selection_follows_supported_rom_profiles() (
+  local profile family device
+  local -a cases=(
+    "grapheneos bramble"
+    "grapheneos shiba"
+    "lineageos pdx235"
+    "lineageos provider_device"
+  )
+
+  load_contract
+  set_selection_fixture
+  _locked_input_digest() {
+    [[ "${1}" == "locks/shizuku-v13.6.0.json" ]] || return 1
+    printf '%064d\n' 0
+  }
+  ADDITIONALS[SHIZUKU]="true"
+  ROOT_MODE="rootless"
+
+  for profile in "${cases[@]}"; do
+    family="${profile%% *}"
+    device="${profile#* }"
+    ROM_FAMILY="${family}"
+    DEVICE_NAME="${device}"
+    resolve_rom_profile
+    module_selection_fingerprint >/dev/null ||
+      fail "Shizuku selection rejected ${family}/${device} under a supported profile"
+    assert_equals "rootless" "${SELECTION_SHIZUKU_ROOT_MODE}" \
+      "Shizuku selection mode for ${family}/${device}"
+  done
+
+  ROOT_MODE="both"
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "Shizuku selection unexpectedly accepted shared rootless/Magisk mode"
+  fi
+)
+
 test_output_filename_contains_fingerprint() (
   local full
 

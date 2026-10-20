@@ -305,6 +305,84 @@ the helper lock and adapter identities together, then advance the immutable
 helper pin and compatibility manifests. CI rejects a release selector without
 its matching helper lock. See the helper
 [lock update procedure](https://github.com/0cwa/my-avbroot-setup/blob/master/docs/microg.md).
+
+### Shizuku module
+
+Set `'ADDITIONALS[SHIZUKU]' = true` to install the digest-locked official
+Shizuku v13.6.0 manager as a regular product app. It is not a privileged app,
+and ModOS does not add a privileged-permission allowlist or automatically
+approve client apps. Shizuku's normal per-client approval remains in effect.
+The locked APK's SHA-256 is `6e273ab0e991c4e79bc8b1bbb9b9dd739ccac1a8712a541a214078886b7b790f`;
+Google apksig 8.7.3 verified its v2 signature and the single Rikka signer
+certificate (`26:8B:55:90:E8:68:FB:08:BA:E7:E0:AC:41:35:64:CD:1F:F8:8F:5C:CF:F7:4A:F9:DB:D0:DC:91:8E:30:DB:30`).
+
+Use separate `ROOT_MODE = "rootless"` or `ROOT_MODE = "magisk"` builds. For
+rootless builds, an init service invokes the official native starter after
+boot without starting wireless debugging. The adapter installs the starter at
+the path Shizuku v13.6.0 derives from the manager APK location:
+`/product/app/Shizuku/lib/<ABI>/libshizuku.so` (for example, `arm64`), plus
+the matching `librish.so` that the server loads from that same directory. The
+service's `user shell` and `group shell` settings select UID/GID 2000; they do
+not establish the process's SELinux domain or Binder access. Those runtime
+properties, reboot behavior, and startup under enforcing SELinux still need
+representative-device acceptance. Complete Shizuku's one-time manager setup
+first. Magisk builds install the same manager and use its ROOT startup after
+the user's one-time setup and approval. `ROOT_MODE = "both"` is rejected
+because this helper applies one shared product image to both outputs.
+
+Selection follows ModOS's supported ROM profiles (GrapheneOS and LineageOS)
+and the selected profile's device/OTA provider, rather than the local device
+example in `env.toml`. The project currently schedules GrapheneOS for shiba,
+accepts a caller-selected device ID in its GrapheneOS build flow, and qualifies
+LineageOS publication for pdx235 24.0 nightlies. Both manual release flows
+expose Shizuku as an opt-in; scheduled definitions keep it disabled. Those
+release targets are not a complete device allowlist for the adapter. The
+adapter uses one common product/init layout. It fails the build if the target
+lacks the required product image, rootless system image, standard
+`/system/bin/sh` executable and `shell_exec` label, a supported native library
+set in the locked APK, or file-context labels for the installed product paths.
+Its runtime launcher exits if `ro.product.cpu.abi` is absent or unsupported.
+Magisk mode does not need the rootless system shell checks. The adapter adds
+no custom SELinux rules. `ROOT_MODE = "both"` remains unsupported because the helper injects one
+shared product image before splitting output modes.
+
+This is source-level support across the project profiles, not runtime
+validation of every profile/device combination. Startup under init, the
+runtime SELinux domain, Binder availability, reboot behavior, and enforcing
+SELinux behavior still need representative-device acceptance for each target
+combination. Do not infer those runtime properties from the configured shell
+UID/GID or `shell_exec` file label.
+
+After boot, connect the device over USB ADB and run the read-only check for the
+build mode:
+
+```shell
+bash tests/shizuku_post_boot_check.sh rootless
+# or
+bash tests/shizuku_post_boot_check.sh magisk
+```
+
+The script uses `adb -d` for every device command and never connects over the
+network. A failed or unrecognized Package Manager response is reported as
+unknown; a successful query with no package path is a failure only when the
+response is empty. Process identity is checked
+only when `ps` returns the expected `UID PID NAME` header and numeric UID/PID
+columns. The script requires exactly one `shizuku_server` process with UID
+2000 for rootless or UID 0 for Magisk; malformed output is unknown, while a
+missing process, duplicate process, or unexpected UID is a failure. It also
+checks the manager's Binder provider and the `adb_wifi_enabled` global setting
+when Android exposes it. A missing or unsupported setting is reported as
+unknown. Shizuku v13.6.0 sends its Binder
+through the manager provider at `content://moe.shizuku.privileged.api.shizuku`
+using `getBinder`; it does not register a named Binder service. The provider
+check is a read-only Binder probe. This script does not prove the process's
+SELinux domain, exercise a client app, or inspect per-client approval state.
+Open Shizuku and a client app manually to confirm those behaviors. The script
+does not reboot, install packages, change settings, or request root or client
+permissions. Exit status is 0 when all automated checks pass, 1 if any required
+check fails (even if another check is inconclusive), and 2 when no required
+check fails but at least one required check is unavailable or inconclusive.
+
 ### Disable the stock ROM updater
 
 Set `'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true` under `[build]` to remove the stock OTA updater from the patched ROM. For the supported profiles, PixeneOS removes GrapheneOS's `app.seamlessupdate.client` updater from the system partition or LineageOS's `org.lineageos.updater` from `system_ext`, along with updater-specific permission/default-permission configuration files when present.

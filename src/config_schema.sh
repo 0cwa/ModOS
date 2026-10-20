@@ -104,6 +104,8 @@ _config_schema_define fdroid_privileged_extension \
   'ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]' build boolean \
   ADDITIONALS array FDROID_PRIVILEGED_EXTENSION \
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION false true caller-or-existing-or-default
+_config_schema_define shizuku 'ADDITIONALS[SHIZUKU]' build boolean \
+  ADDITIONALS array SHIZUKU ADDITIONALS_SHIZUKU false true caller-or-existing-or-default
 _config_schema_define project_name PROJECT_NAME github string \
   PROJECT_NAME scalar '' PROJECT_NAME ModOS false caller-or-default
 _config_schema_define release_owner PIXENEOS_RELEASE_OWNER github string \

@@ -206,6 +206,8 @@ function module_selection_fingerprint() {
   local magisk_repository="disabled"
   local magisk_version="disabled"
   local boot_animation_digest="disabled"
+  local shizuku_lock_digest="disabled"
+  local shizuku_root_mode="disabled"
   local entry
   local -a module_entries=(
     "afsr:AFSR"
@@ -217,6 +219,7 @@ function module_selection_fingerprint() {
     "msd:MSD"
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
+    "shizuku:SHIZUKU"
   )
 
   resolve_rom_profile || return 1
@@ -231,6 +234,19 @@ function module_selection_fingerprint() {
       "ADDITIONALS_${entry#*:}" \
       "${ADDITIONALS[${entry#*:}]}" || return 1
   done
+
+  if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]]; then
+    resolve_root_mode || return 1
+    shizuku_root_mode="${RESOLVED_ROOT_MODE}"
+    if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
+      echo "Error: Shizuku requires separate rootless or Magisk builds; ROOT_MODE=both shares the product image." >&2
+      return 1
+    fi
+    shizuku_lock_digest="$(_locked_input_digest locks/shizuku-v13.6.0.json)" || {
+      echo "Error: the Shizuku lock is not clean and checked in." >&2
+      return 1
+    }
+  fi
 
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]]; then
     boot_animation_digest="$(_boot_animation_payload_digest)" || {
@@ -303,6 +319,9 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_MSD="${ADDITIONALS[MSD]}"
   SELECTION_MODULE_OEMUNLOCKONBOOT="${ADDITIONALS[OEMUNLOCKONBOOT]}"
   SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
+  SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
+  SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"
+  SELECTION_SHIZUKU_ROOT_MODE="${shizuku_root_mode}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
 

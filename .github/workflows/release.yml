@@ -48,6 +48,11 @@ on:
         required: false
         type: boolean
         default: false
+      shizuku:
+        description: Install official Shizuku manager (supported ROM profile; separate rootless/Magisk builds)
+        required: false
+        type: boolean
+        default: false
       magisk-preinit-device:
         required: false
         type: string
@@ -141,6 +146,11 @@ on:
         default: false
       fdroid-privileged-extension:
         description: Include the locked F-Droid Privileged Extension module
+        required: false
+        type: boolean
+        default: false
+      shizuku:
+        description: Install official Shizuku manager (supported ROM profile; separate rootless/Magisk builds)
         required: false
         type: boolean
         default: false
@@ -264,9 +274,11 @@ jobs:
           ADDITIONALS_OEMUNLOCKONBOOT: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}
           ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.disable_system_updater == 'true' || inputs.disable-system-updater }}
           ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
+          ADDITIONALS_SHIZUKU: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
           ADDITIONALS_DEBUG: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
           ADDITIONALS_BOOT_ANIMATION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.boot_animation == 'true' || github.event_name != 'schedule' && inputs.boot-animation }}
+          ROOT_MODE: ${{ github.event_name != 'schedule' && inputs.root-mode || '' }}
           ROOT_MODE_SCHEDULE: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.root_mode || '' }}
         run: |
           set -euo pipefail
@@ -358,6 +370,7 @@ jobs:
       oemunlockonboot: ${{ github.event_name == 'schedule' && needs.preflight.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}
       disable-system-updater: ${{ github.event_name == 'schedule' && needs.preflight.outputs.disable_system_updater == 'true' || inputs.disable-system-updater }}
       fdroid-privileged-extension: ${{ github.event_name == 'schedule' && needs.preflight.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
+      shizuku: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
       compatible-sepolicy-patching: ${{ github.event_name == 'schedule' && needs.preflight.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
       allow-unauthorized-adb: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
       boot-animation: ${{ github.event_name == 'schedule' && needs.preflight.outputs.boot_animation == 'true' || github.event_name != 'schedule' && inputs.boot-animation }}

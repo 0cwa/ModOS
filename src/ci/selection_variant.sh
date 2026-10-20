@@ -35,6 +35,9 @@ function selection_variant_manifest() {
     SELECTION_MODULE_MSD
     SELECTION_MODULE_OEMUNLOCKONBOOT
     SELECTION_DISABLE_SYSTEM_UPDATER
+    SELECTION_MODULE_SHIZUKU
+    SELECTION_SHIZUKU_LOCK_SHA256
+    SELECTION_SHIZUKU_ROOT_MODE
     SELECTION_BOOT_ANIMATION
   )
 
@@ -60,6 +63,7 @@ function selection_variant_manifest() {
     SELECTION_MODULE_MSD \
     SELECTION_MODULE_OEMUNLOCKONBOOT \
     SELECTION_DISABLE_SYSTEM_UPDATER \
+    SELECTION_MODULE_SHIZUKU \
     SELECTION_BOOT_ANIMATION; do
     value="${!field}"
     if [[ "${value}" != 'true' && "${value}" != 'false' ]]; then
@@ -68,13 +72,21 @@ function selection_variant_manifest() {
     fi
   done
 
-  for field in SELECTION_LOCK_SHA256 SELECTION_PROFILE_SHA256; do
+  for field in SELECTION_LOCK_SHA256 SELECTION_PROFILE_SHA256 \
+    SELECTION_SHIZUKU_LOCK_SHA256; do
     value="${!field}"
     if [[ "${value}" != 'disabled' && ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
       echo "Error: selection identity field ${field} is not a SHA-256 digest." >&2
       return 1
     fi
   done
+
+  if [[ "${SELECTION_SHIZUKU_ROOT_MODE}" != disabled &&
+    "${SELECTION_SHIZUKU_ROOT_MODE}" != rootless &&
+    "${SELECTION_SHIZUKU_ROOT_MODE}" != magisk ]]; then
+    echo "Error: selection identity field SELECTION_SHIZUKU_ROOT_MODE is invalid." >&2
+    return 1
+  fi
 
   if [[ "${SELECTION_BOOT_ANIMATION}" == 'true' ]]; then
     if [[ ! "${SELECTION_BOOT_ANIMATION_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]; then
@@ -105,7 +117,10 @@ function selection_variant_manifest() {
     "module.microg=${SELECTION_MODULE_MICROG}" \
     "module.msd=${SELECTION_MODULE_MSD}" \
     "module.oemunlockonboot=${SELECTION_MODULE_OEMUNLOCKONBOOT}" \
-    "disable_system_updater=${SELECTION_DISABLE_SYSTEM_UPDATER}"
+    "disable_system_updater=${SELECTION_DISABLE_SYSTEM_UPDATER}" \
+    "module.shizuku=${SELECTION_MODULE_SHIZUKU}" \
+    "shizuku_lock_sha256=${SELECTION_SHIZUKU_LOCK_SHA256}" \
+    "shizuku_root_mode=${SELECTION_SHIZUKU_ROOT_MODE}"
 
   if [[ "${SELECTION_ROOT}" == 'true' ]]; then
     if [[ ! "${SELECTION_MAGISK_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then

@@ -59,6 +59,16 @@ def main():
         check_preflight(*sys.argv[1:])
         return
 
+    workflow = FLOW.read_text()
+    shizuku_input = re.search(
+        r"^      shizuku:\n(.*?)(?=^      \w|\Z)", workflow, re.M | re.S
+    )
+    assert shizuku_input, "LineageOS workflow lacks the Shizuku input"
+    assert re.search(r"^        type: boolean$", shizuku_input[1], re.M)
+    assert re.search(r"^        default: false$", shizuku_input[1], re.M)
+    assert "      shizuku: ${{ inputs.shizuku }}" in job("manual_build")
+    assert "      shizuku: false" in job("scheduled_build")
+
     scheduled = job("scheduled_build")
     assert "    needs: schedule_config\n" in scheduled
     assert "    uses: ./.github/workflows/build-rom.yml\n" in scheduled

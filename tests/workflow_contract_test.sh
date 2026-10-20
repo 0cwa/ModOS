@@ -513,9 +513,12 @@ test_release_triggers() {
   assert_dispatch_default "${lineage}" root true
   assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
   assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" shizuku false
   assert_dispatch_default "${lineage}" disable-system-updater false
   assert_dispatch_default "${lineage}" boot-animation true
   assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
+  assert_contains "${lineage}" 'shizuku:[[:space:]]*\$\{\{ inputs\.shizuku \}\}' "LineageOS manual Shizuku selection must be forwarded"
+  assert_contains "${lineage}" 'shizuku:[[:space:]]*false' "LineageOS scheduled Shizuku selection must remain disabled"
 }
 
 test_config_loading_isolated_to_scheduled_releases() {

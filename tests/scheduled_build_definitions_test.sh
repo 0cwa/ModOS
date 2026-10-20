@@ -36,6 +36,8 @@ check_definition() {
       fail "${file}: wrong compatible-SEPolicy selection"
     [[ "$(toml_resolve_value force_update '')" == false ]] ||
       fail "${file}: scheduled force update must default to false"
+    [[ "$(toml_resolve_value shizuku false)" == false ]] ||
+      fail "${file}: scheduled Shizuku selection must remain default-off"
 
     local expected_microg=false
     [[ "${expected_family}" != lineageos ]] || expected_microg=true
