@@ -38,12 +38,12 @@ cmp -s -- "${source_path}" "${temporary_path}" || {
   exit 1
 }
 mv -n -- "${temporary_path}" "${destination_path}"
-trap - EXIT
 
 [[ -f "${destination_path}" && ! -L "${destination_path}" && -s "${destination_path}" ]] &&
   cmp -s -- "${source_path}" "${destination_path}" || {
     echo 'Error: published pdx235.json failed post-copy verification.' >&2
     exit 1
   }
+trap - EXIT
 
 echo 'Prepared pdx235.json from verified XQ-DC72.json.'

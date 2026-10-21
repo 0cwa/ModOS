@@ -63,6 +63,24 @@ if bash "${prepare_script}" >/dev/null 2>&1; then
 fi
 [[ -L pdx235.json ]] || die 'unsafe canonical symlink was modified'
 
+run_case destination-race
+printf 'generated\n' >XQ-DC72.json
+mkdir fake-bin
+cat >fake-bin/mv <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$#" -eq 4 && "$1" == -n && "$2" == -- ]] || exit 2
+printf 'raced\n' >"$4"
+SH
+chmod +x fake-bin/mv
+if PATH="${PWD}/fake-bin:${PATH}" bash "${prepare_script}" >/dev/null 2>&1; then
+  die 'destination race was accepted'
+fi
+grep -Fxq 'raced' pdx235.json || die 'simulated raced destination was not preserved'
+if compgen -G '.pdx235.json.tmp.*' >/dev/null; then
+  die 'temporary metadata file remained after destination-race rejection'
+fi
+
 workflow="${repo_root}/.github/workflows/build-rom.yml"
 python3 - "${workflow}" <<'PY'
 import pathlib
