@@ -13,6 +13,7 @@ check_definition() {
   local expected_channel="${4}"
   local expected_preinit="${5}"
   local expected_sepolicy="${6}"
+  local expected_fsck_sysfs_sepolicy="${7}"
 
   (
     source src/util_functions.sh
@@ -34,6 +35,8 @@ check_definition() {
       fail "${file}: scheduled custom boot animation must be enabled"
     [[ "$(toml_resolve_value compatible_sepolicy_patching '')" == "${expected_sepolicy}" ]] ||
       fail "${file}: wrong compatible-SEPolicy selection"
+    [[ "$(toml_resolve_value fsck_sysfs_sepolicy '')" == "${expected_fsck_sysfs_sepolicy}" ]] ||
+      fail "${file}: wrong fsck sysfs-SEPolicy selection"
     local expected_exfat=false
     [[ "${expected_family}" != lineageos ]] || expected_exfat=true
     [[ "$(toml_resolve_value exfatprogs_fsck false)" == "${expected_exfat}" ]] ||
@@ -57,9 +60,9 @@ check_definition() {
   )
 }
 
-check_definition   .github/schedules/grapheneos-shiba.toml   shiba grapheneos stable sda10 false
+check_definition   .github/schedules/grapheneos-shiba.toml   shiba grapheneos stable sda10 false false
 
-check_definition   .github/schedules/lineageos-pdx235.toml   pdx235 lineageos nightly sda47 true
+check_definition   .github/schedules/lineageos-pdx235.toml   pdx235 lineageos nightly sda47 true true
 
 check_loader() {
   local file="${1}"
@@ -89,8 +92,14 @@ check_loader() {
   [[ "${expected_family}" != lineageos ]] || expected_exfat=true
   grep -Fxq "exfatprogs_fsck=${expected_exfat}" "${output_file}" ||
     fail "${file}: loader emitted wrong exfatprogs fsck selection"
+  local expected_fsck_sysfs_sepolicy=false
+  [[ "${expected_family}" != lineageos ]] || expected_fsck_sysfs_sepolicy=true
+  grep -Fxq "fsck_sysfs_sepolicy=${expected_fsck_sysfs_sepolicy}" "${output_file}" ||
+    fail "${file}: loader emitted wrong fsck sysfs-SEPolicy selection"
   grep -Fxq "ADDITIONALS_EXFATPROGS_FSCK=${expected_exfat}" "${env_file}" ||
     fail "${file}: loader exported wrong exfatprogs fsck selection"
+  grep -Fxq "ADDITIONALS_FSCK_SYSFS_SEPOLICY=${expected_fsck_sysfs_sepolicy}" "${env_file}" ||
+    fail "${file}: loader exported wrong fsck sysfs-SEPolicy selection"
   grep -Fxq 'ADDITIONALS_DISABLE_SYSTEM_UPDATER=true' "${env_file}" ||
     fail "${file}: loader did not export stock updater removal"
   grep -Fxq 'ADDITIONALS_BOOT_ANIMATION=true' "${env_file}" ||

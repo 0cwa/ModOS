@@ -108,6 +108,8 @@ _config_schema_define shizuku 'ADDITIONALS[SHIZUKU]' build boolean \
   ADDITIONALS array SHIZUKU ADDITIONALS_SHIZUKU false true caller-or-existing-or-default
 _config_schema_define exfatprogs_fsck 'ADDITIONALS[EXFATPROGS_FSCK]' build boolean \
   ADDITIONALS array EXFATPROGS_FSCK ADDITIONALS_EXFATPROGS_FSCK false true caller-or-existing-or-default
+_config_schema_define fsck_sysfs_sepolicy 'ADDITIONALS[FSCK_SYSFS_SEPOLICY]' build boolean \
+  ADDITIONALS array FSCK_SYSFS_SEPOLICY ADDITIONALS_FSCK_SYSFS_SEPOLICY false true caller-or-existing-or-default
 _config_schema_define project_name PROJECT_NAME github string \
   PROJECT_NAME scalar '' PROJECT_NAME ModOS false caller-or-default
 _config_schema_define release_owner PIXENEOS_RELEASE_OWNER github string \

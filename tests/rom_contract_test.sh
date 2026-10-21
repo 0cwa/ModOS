@@ -304,6 +304,35 @@ test_shizuku_selection_follows_supported_rom_profiles() (
   fi
 )
 
+test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted() (
+  local disabled enabled
+
+  resolve_libclang_identity() {
+    printf '%s\n' \
+      'libclang_selected_path=/fixture/libclang.so' \
+      'libclang_path=/fixture/libclang.so' \
+      'libclang_sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' \
+      'libclang_owner=fixture:1.0'
+  }
+
+  load_contract
+  set_selection_fixture
+  ROM_FAMILY="lineageos"
+  DEVICE_NAME="pdx235"
+  ADDITIONALS[FSCK_SYSFS_SEPOLICY]="false"
+  disabled="$(fingerprint)"
+
+  ADDITIONALS[FSCK_SYSFS_SEPOLICY]="true"
+  enabled="$(fingerprint)"
+  [[ "${enabled}" != "${disabled}" ]] ||
+    fail "fsck sysfs SELinux selection did not change the fingerprint"
+
+  DEVICE_NAME="shiba"
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "fsck sysfs SELinux selection unexpectedly accepted a non-pdx235 device"
+  fi
+)
+
 test_output_filename_contains_fingerprint() (
   local full
 
@@ -428,6 +457,7 @@ test_magisk_compatibility_defaults
 test_unknown_rom_fails_closed
 test_invalid_compatible_sepolicy_fails_closed
 test_selection_fingerprint
+test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted
 test_output_filename_contains_fingerprint
 test_output_policy
 
