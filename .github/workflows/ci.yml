@@ -213,6 +213,7 @@ jobs:
           [[ "${scratch}" == /* && -d "${scratch}" && ! -L "${scratch}" ]] ||
             { echo "::error::A real absolute large scratch directory is required"; exit 1; }
           scratch="$(realpath -e -- "${scratch}")"
+          echo "MODOS_LINEAGE_LARGE_SCRATCH=${scratch}" >> "${GITHUB_ENV}"
           free="$(df -PB1 -- "${scratch}" | awk 'END {print $4}')"
           (( free >= 220000000000 )) ||
             { echo "::error::Baseline source build needs at least 220GB available"; exit 1; }
