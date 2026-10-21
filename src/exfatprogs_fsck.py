@@ -298,20 +298,47 @@ def _metadata_snapshot(entry: Any) -> tuple[Any, ...]:
     )
 
 
+def _metadata_diagnostics(entry: Any) -> dict[str, Any]:
+    """Describe only the metadata fields needed by the fail-closed guard."""
+    file_mode = entry.file_mode
+    xattrs = entry.xattrs if isinstance(entry.xattrs, dict) else {}
+    selinux_present = "security.selinux" in xattrs
+    label = xattrs.get("security.selinux")
+    selinux_empty = selinux_present and (
+        not isinstance(label, str) or not label.rstrip("\0")
+    )
+    return {
+        "file_type": entry.file_type,
+        "executable_bit": isinstance(file_mode, int) and bool(file_mode & 0o111),
+        "uid_present": entry.uid is not None,
+        "gid_present": entry.gid is not None,
+        "selinux_label_present": selinux_present,
+        "selinux_label_empty": selinux_empty,
+    }
+
+
 def _inject_system_binary(system_fs: Any, binary: bytes) -> None:
     entries = [entry for entry in system_fs.info.entries if entry.path == TARGET_PATH]
     if len(entries) != 1:
         raise ExfatFsckError("system image does not contain exactly one fsck.exfat entry")
     target_entry = entries[0]
+    diagnostics = _metadata_diagnostics(target_entry)
     if (
-        target_entry.file_type != "RegularFile"
-        or target_entry.file_mode is None
-        or target_entry.file_mode & 0o111 == 0
-        or target_entry.uid is None
-        or target_entry.gid is None
-        or not target_entry.xattrs.get("security.selinux")
+        diagnostics["file_type"] != "RegularFile"
+        or not diagnostics["executable_bit"]
+        or not diagnostics["uid_present"]
+        or not diagnostics["gid_present"]
+        or not diagnostics["selinux_label_present"]
+        or diagnostics["selinux_label_empty"]
     ):
-        raise ExfatFsckError("system image fsck.exfat metadata is incomplete or unexpected")
+        summary = ", ".join(
+            f"{key}={value}"
+            for key, value in diagnostics.items()
+        )
+        raise ExfatFsckError(
+            "system image fsck.exfat metadata is incomplete or unexpected: "
+            f"{summary}"
+        )
 
     tree_path = system_fs.tree / "system" / "bin" / "fsck.exfat"
     for path in (system_fs.tree, system_fs.tree / "system", system_fs.tree / "system" / "bin"):
