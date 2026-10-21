@@ -388,7 +388,7 @@ def main() -> int:
                 args.source_root, args.output_dir, args.jobs, args.baseline_report,
                 args.baseline_binary, args.reference_vold,
             )
-    except (BuildError, OSError, subprocess.SubprocessError) as exc:
+    except (BuildError, ValueError, OSError, subprocess.SubprocessError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0
