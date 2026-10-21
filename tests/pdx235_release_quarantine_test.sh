@@ -86,24 +86,49 @@ done
 ADDITIONALS[EXFATPROGS_FSCK]=true
 provided_source_bundle_path="${EXFAT_SOURCE_BUNDLE_PATH:-}"
 provided_source_bundle_sha256="${EXFAT_SOURCE_BUNDLE_SHA256:-}"
+provided_source_bundle_verified="${EXFAT_SOURCE_BUNDLE_VERIFIED:-}"
 unset EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
+source_bundle_inputs_satisfy_requirement() {
+  local path="${1:-}" digest="${2:-}" verified="${3:-}" required="${4:-false}"
+  if [[ -n "${path}" && -f "${path}" && ! -L "${path}" &&
+    "${digest}" =~ ^[0-9a-f]{64}$ && "${verified}" == true ]]; then
+    return 0
+  fi
+  [[ "${required}" != true ]]
+}
+if source_bundle_inputs_satisfy_requirement '' '' '' true; then
+  fail 'required bundle inputs were not rejected when missing'
+fi
+if ! source_bundle_inputs_satisfy_requirement '' '' '' false; then
+  fail 'optional bundle inputs were not allowed to be absent'
+fi
+if source_bundle_inputs_satisfy_requirement "$0" "$(printf '%065d' 0)" true true; then
+  fail 'overlong source-bundle digest passed the anchored requirement check'
+fi
 expect_allow 'exfat remains available for local-unpublished output' enforce_output_policy local-unpublished
 expect_reject 'exfat publication requires a verified source bundle' enforce_output_policy published
-if [[ -z "${provided_source_bundle_path}" ||
-  ! -f "${provided_source_bundle_path}" ||
-  ! "${provided_source_bundle_sha256}" =~ ^[0-9a-f]{64} ]]; then
-  fail 'test requires the deterministic source bundle produced by the CI build step'
+if ! source_bundle_inputs_satisfy_requirement \
+  "${provided_source_bundle_path}" "${provided_source_bundle_sha256}" \
+  "${provided_source_bundle_verified}" "${REQUIRE_EXFAT_SOURCE_BUNDLE:-false}"; then
+  fail 'required deterministic source bundle is missing or invalid'
 fi
-source_bundle="${tmp}/$(basename -- "${provided_source_bundle_path}")"
-cp -- "${provided_source_bundle_path}" "${source_bundle}"
-EXFAT_SOURCE_BUNDLE_PATH="${source_bundle}"
-EXFAT_SOURCE_BUNDLE_SHA256="${provided_source_bundle_sha256}"
-EXFAT_SOURCE_BUNDLE_VERIFIED=true
-export EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
-expect_allow 'verified source bundle permits exfat publication' enforce_output_policy published
-printf 'tampered' >>"${source_bundle}"
-expect_reject 'changed source bundle blocks exfat publication' enforce_output_policy published
-unset EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
+if [[ -n "${provided_source_bundle_path}" && -f "${provided_source_bundle_path}" &&
+  ! -L "${provided_source_bundle_path}" &&
+  "${provided_source_bundle_sha256}" =~ ^[0-9a-f]{64}$ &&
+  "${provided_source_bundle_verified}" == true ]]; then
+  source_bundle="${tmp}/$(basename -- "${provided_source_bundle_path}")"
+  cp -- "${provided_source_bundle_path}" "${source_bundle}"
+  EXFAT_SOURCE_BUNDLE_PATH="${source_bundle}"
+  EXFAT_SOURCE_BUNDLE_SHA256="${provided_source_bundle_sha256}"
+  EXFAT_SOURCE_BUNDLE_VERIFIED=true
+  export EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
+  expect_allow 'verified source bundle permits exfat publication' enforce_output_policy published
+  printf 'tampered' >>"${source_bundle}"
+  expect_reject 'changed source bundle blocks exfat publication' enforce_output_policy published
+  unset EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
+else
+  echo 'SKIP: source-bundle acceptance/tamper cases (no verified bundle supplied)'
+fi
 ADDITIONALS[EXFATPROGS_FSCK]=false
 
 # Both release helpers still fail closed on malformed direct invocation before

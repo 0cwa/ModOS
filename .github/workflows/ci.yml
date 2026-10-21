@@ -69,6 +69,8 @@ jobs:
 
       - name: Run deterministic tests
         shell: bash
+        env:
+          REQUIRE_EXFAT_SOURCE_BUNDLE: "true"
         run: |
           set -euo pipefail
           bash tests/declarations_config_test.sh
