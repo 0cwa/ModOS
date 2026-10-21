@@ -214,12 +214,38 @@ def _build_properties(system_fs: Any) -> dict[str, str]:
     return properties
 
 
+def _metadata_snapshot(entry: Any) -> tuple[Any, ...]:
+    """The pinned ExtFs entry must survive a binary overwrite unchanged."""
+    return (
+        entry.source,
+        entry.file_type,
+        entry.file_mode,
+        entry.uid,
+        entry.gid,
+        entry.atime,
+        entry.ctime,
+        entry.mtime,
+        entry.crtime,
+        entry.device_major,
+        entry.device_minor,
+        entry.symlink_target,
+        dict(entry.xattrs),
+    )
+
+
 def inject_vold(system_fs: Any, artifact_dir: Path, base_build_id: str) -> str:
     if base_build_id != BASE_BUILD_ID:
         raise VoldModuleError("selected OTA build does not match the pinned vold source build")
     binary, _ = _artifact(artifact_dir)
     properties = _build_properties(system_fs)
-    if properties.get("ro.product.device") != "pdx235":
+    # Modern Android partitions normally advertise ro.product.system.device,
+    # whereas ro.product.device is resolved by init from several partitions.
+    device_values = [
+        properties[key]
+        for key in ("ro.product.system.device", "ro.product.device", "ro.build.product")
+        if key in properties
+    ]
+    if not device_values or any(value != "pdx235" for value in device_values):
         raise VoldModuleError("target system image does not identify as pdx235")
     if (
         properties.get("ro.lineage.build.version") != "24.0"
@@ -228,31 +254,50 @@ def inject_vold(system_fs: Any, artifact_dir: Path, base_build_id: str) -> str:
         raise VoldModuleError("target system image does not match the pinned 20261016 LineageOS build")
 
     entries = [entry for entry in system_fs.info.entries if entry.path == TARGET]
-    target_path = system_fs.tree / TARGET.relative_to("/")
     if len(entries) != 1 or entries[0].file_type != "RegularFile":
         raise VoldModuleError("target /system/bin/vold filesystem metadata is missing or not regular")
-    if not entries[0].file_mode & 0o111:
+    entry = entries[0]
+    if not isinstance(entry.file_mode, int) or not entry.file_mode & 0o111:
         raise VoldModuleError("target /system/bin/vold is not executable in filesystem metadata")
-    try:
-        target_metadata = target_path.lstat()
-    except OSError as exc:
-        raise VoldModuleError("target /system/bin/vold is missing from the unpacked system image") from exc
-    if stat.S_ISLNK(target_metadata.st_mode) or not stat.S_ISREG(target_metadata.st_mode):
-        raise VoldModuleError("target /system/bin/vold tree path is not a safe regular file")
-    old_binary = _read_regular_file(target_path, MAX_BINARY_SIZE)
-    old_identity = _elf_identity(old_binary)
-    new_identity = _elf_identity(binary)
-    if old_identity != new_identity:
-        raise VoldModuleError("source-built vold ELF ABI or dependencies differ from the OTA vold")
+    if entry.uid not in (None, 0) or entry.gid not in (None, 0):
+        raise VoldModuleError("target /system/bin/vold must be root-owned")
+    if not isinstance(entry.xattrs, dict):
+        raise VoldModuleError("target /system/bin/vold lacks usable SELinux metadata")
+    label = entry.xattrs.get("security.selinux")
+    if not isinstance(label, str) or label.rstrip("\0") != "u:object_r:vold_exec:s0":
+        raise VoldModuleError("target /system/bin/vold has an unexpected SELinux xattr")
 
     labels = [label for pattern, label in system_fs.contexts if pattern.fullmatch(str(TARGET))]
-    if not labels or labels[0] != "u:object_r:vold_exec:s0":
-        raise VoldModuleError("target /system/bin/vold lacks the expected vold_exec SELinux label")
+    if not labels or any(label != "u:object_r:vold_exec:s0" for label in labels):
+        raise VoldModuleError("target /system/bin/vold lacks the expected context mapping")
 
-    # ExtFs reuses the existing image metadata for an existing regular file.
-    # Do not unlink/recreate the path: that would change its mode/owner/context.
-    with system_fs.open(str(TARGET), "wb") as stream:
-        stream.write(binary)
+    # ExtFs may represent a root owner as None, which gets packed back as 0.
+    # Make that convention explicit before taking the metadata snapshot.
+    if entry.uid is None:
+        entry.uid = 0
+    if entry.gid is None:
+        entry.gid = 0
+
+    target_path = system_fs.tree / TARGET.relative_to("/")
+    for parent in (system_fs.tree, system_fs.tree / "system", system_fs.tree / "system" / "bin"):
+        try:
+            mode = parent.lstat().st_mode
+        except OSError as exc:
+            raise VoldModuleError("target /system/bin/vold parent directory is unavailable") from exc
+        if not stat.S_ISDIR(mode):
+            raise VoldModuleError("target /system/bin/vold parent directory is unsafe")
+    old_binary = _read_regular_file(target_path, MAX_BINARY_SIZE)
+    if _elf_identity(old_binary) != _elf_identity(binary):
+        raise VoldModuleError("source-built vold ELF ABI or dependencies differ from the OTA vold")
+
+    before = _metadata_snapshot(entry)
+    try:
+        with system_fs.open(str(TARGET), "wb", mode=entry.file_mode) as stream:
+            stream.write(binary)
+    except (OSError, ValueError) as exc:
+        raise VoldModuleError("target /system/bin/vold could not be replaced") from exc
+    if _metadata_snapshot(entry) != before:
+        raise VoldModuleError("vold injection changed filesystem entry metadata")
     if _read_regular_file(target_path, MAX_BINARY_SIZE) != binary:
         raise VoldModuleError("injected vold differs from the verified source-built binary")
     if len([entry for entry in system_fs.info.entries if entry.path == TARGET]) != 1:
