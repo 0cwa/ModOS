@@ -1,0 +1,9 @@
+The policy boilerplate in fsck_sysfs_audit_rules.conf is adapted from
+`external/selinux/libsepol/tests/policies/test-neverallow/policy.conf` at
+SELinux submodule commit `085c131ad1b984bfa8ffdafee7a976e9d89f403c`.
+The fixture source and compiled policy are retained for testing only. The
+relevant upstream libsepol license is at
+`vendor/sepatch/external/selinux/libsepol/LICENSE` (LGPL-2.1-or-later).
+
+Regenerate the binary with:
+`checkpolicy -N -c 31 -o fsck_sysfs_audit_rules.policy fsck_sysfs_audit_rules.conf`

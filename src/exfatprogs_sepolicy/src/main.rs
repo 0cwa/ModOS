@@ -72,19 +72,18 @@ fn patch(path: &Path) -> Result<bool, String> {
     }
 
     let mut verify_warnings = Vec::new();
-    let mut verified = PolicyDb::from_raw(&output, &mut verify_warnings).map_err(|error| {
+    let verified = PolicyDb::from_raw(&output, &mut verify_warnings).map_err(|error| {
         format!("serialized policy failed validation: {error}; {verify_warnings:?}")
     })?;
     let verified_source = required_id(verified.get_type_id("fsck_untrusted"), "fsck_untrusted");
     let verified_target = required_id(verified.get_type_id("sysfs"), "sysfs");
     let verified_class = required_id(verified.get_class_id("dir"), "dir");
     let verified_permission = required_id(verified.get_perm_id(verified_class, "read"), "dir.read");
-    if verified.set_rule(
+    if !verified.has_allow_rule(
         verified_source,
         verified_target,
         verified_class,
         verified_permission,
-        RuleAction::Allow,
     ) {
         return Err("serialized policy did not retain the exact allow rule".into());
     }
@@ -128,5 +127,66 @@ fn main() {
         Ok(true) => println!("exfatprogs-sepolicy-patcher: added fsck_untrusted sysfs:dir read"),
         Ok(false) => println!("exfatprogs-sepolicy-patcher: exact allow rule already present"),
         Err(error) => fail(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    const POLICY_FIXTURE: &[u8] = include_bytes!("../tests/fixtures/fsck_sysfs_audit_rules.policy");
+    static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
+
+    fn ids(
+        policy: &PolicyDb,
+    ) -> (
+        sepatch::TypeId,
+        sepatch::TypeId,
+        sepatch::ClassId,
+        sepatch::PermId,
+    ) {
+        let source = required_id(policy.get_type_id("fsck_untrusted"), "fsck_untrusted");
+        let target = required_id(policy.get_type_id("sysfs"), "sysfs");
+        let class = required_id(policy.get_class_id("dir"), "dir");
+        let permission = required_id(policy.get_perm_id(class, "read"), "dir.read");
+        (source, target, class, permission)
+    }
+
+    #[test]
+    fn audit_rule_normalization_does_not_confuse_allow_readback() {
+        let mut warnings = Vec::new();
+        let mut policy = PolicyDb::from_raw(POLICY_FIXTURE, &mut warnings).unwrap();
+        let (source, target, class, permission) = ids(&policy);
+
+        // The exact allow bit is already set, but set_rule also removes the
+        // same permission from auditallow/auditdeny tables and reports that
+        // aggregate mutation. The readback API must report the allow bit itself.
+        assert!(policy.has_allow_rule(source, target, class, permission));
+        let unrelated_target = required_id(policy.get_type_id("keep_t"), "keep_t");
+        assert!(!policy.has_allow_rule(source, unrelated_target, class, permission));
+        assert!(policy.set_rule(source, target, class, permission, RuleAction::Allow));
+
+        let filename = format!(
+            "modos-fsck-sysfs-policy-test-{}-{}.policy",
+            std::process::id(),
+            NEXT_TEMP_FILE.fetch_add(1, Ordering::Relaxed),
+        );
+        let path = std::env::temp_dir().join(filename);
+        fs::write(&path, POLICY_FIXTURE).unwrap();
+        let result = patch(&path);
+        assert!(result.is_ok(), "patch failed: {result:?}");
+
+        let output = fs::read(&path).unwrap();
+        let _ = fs::remove_file(&path);
+        let mut verify_warnings = Vec::new();
+        let verified = PolicyDb::from_raw(&output, &mut verify_warnings).unwrap();
+        let (source, target, class, permission) = ids(&verified);
+        assert!(verified.has_allow_rule(source, target, class, permission));
+
+        let other_source = required_id(verified.get_type_id("keep_t"), "keep_t");
+        let file_class = required_id(verified.get_class_id("file"), "file");
+        let write_permission = required_id(verified.get_perm_id(file_class, "write"), "file.write");
+        assert!(verified.has_allow_rule(other_source, other_source, file_class, write_permission));
     }
 }
