@@ -76,12 +76,27 @@ def _archive_entries(files: dict[str, bytes]) -> bytes:
     return raw.getvalue()
 
 
+def _framework_members(artifact: dict) -> list[dict]:
+    provenance = json.loads(PROVENANCE.read_text())
+    offer = provenance.get("source_offer")
+    if not isinstance(offer, dict) or (
+        offer.get("termux_build_framework_commit") != artifact.get("version")
+        or offer.get("termux_build_framework_archive_size") != artifact.get("size")
+        or offer.get("termux_build_framework_archive_sha256") != artifact.get("sha256")
+    ):
+        raise ValueError("Termux framework provenance differs from the artifact lock")
+    members = offer.get("termux_build_framework_closure_members")
+    if not isinstance(members, list) or len(members) != offer.get("termux_build_framework_closure_file_count"):
+        raise ValueError("Termux framework closure provenance is incomplete")
+    return members
+
+
 def _extract_framework(framework: bytes, artifact: dict) -> dict[str, bytes]:
     prefix = f"{FRAMEWORK_ROOT}{artifact['version']}/"
     with tarfile.open(fileobj=io.BytesIO(framework), mode="r:gz") as archive:
         members = {member.name: member for member in archive.getmembers()}
         result = {}
-        for item in artifact["members"]:
+        for item in _framework_members(artifact):
             archive_path = prefix + item["path"]
             member = members.get(archive_path)
             if member is None or not member.isfile() or member.size != item["size"]:
