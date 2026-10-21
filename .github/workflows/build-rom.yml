@@ -184,7 +184,7 @@ jobs:
           DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
           PUBLISH_REQUEST: ${{ inputs.publish }}
         run: |
-          if [[ "${ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT}" == true ]] &&
+          if [[ "${ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT:-false}" == true ]] &&
             [[ "${ROM_FAMILY}" != lineageos || "${DEVICE_NAME}" != pdx235 ]]; then
             echo '::error::Source-built vold is supported only for LineageOS pdx235'
             exit 1
