@@ -1,7 +1,7 @@
 {
   "version": 2,
   "full": {
-    "location_ota": "https://github.com/0cwa/ModOS/releases/download/20261016/pdx235-20261016-rootless-1d26c91f67d08ebae19f995579801f8ca44941671dcfe4c10e97c8a5106642e1-ee3cc3b.zip",
-    "location_csig": "https://github.com/0cwa/ModOS/releases/download/20261016/pdx235-20261016-rootless-1d26c91f67d08ebae19f995579801f8ca44941671dcfe4c10e97c8a5106642e1-ee3cc3b.zip.csig"
+    "location_ota": "https://github.com/0cwa/ModOS/releases/download/20261016/pdx235-20261016-rootless-32f5af3999a2828935b0ebb89aa7e46c2c215ec759d4db8e963e769ab8b2236c-92362a5.zip",
+    "location_csig": "https://github.com/0cwa/ModOS/releases/download/20261016/pdx235-20261016-rootless-32f5af3999a2828935b0ebb89aa7e46c2c215ec759d4db8e963e769ab8b2236c-92362a5.zip.csig"
   }
 }
