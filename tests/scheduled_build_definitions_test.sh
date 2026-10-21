@@ -204,9 +204,10 @@ else
 fi
 
 # A tampered GrapheneOS schedule may not select the Lineage-only vold daemon.
-vold_tampered="$(mktemp)"
+vold_tampered="$(mktemp --suffix=.toml)"
 vold_output="$(mktemp)"
 vold_env="$(mktemp)"
+vold_error="$(mktemp)"
 python3 - "${vold_tampered}" <<'PYVOLD'
 from pathlib import Path
 import sys
@@ -218,10 +219,14 @@ Path(sys.argv[1]).write_text(source.replace(old, old.replace("false", "true")))
 PYVOLD
 if SCHEDULE_DEFINITION="${vold_tampered}" GITHUB_OUTPUT="${vold_output}" \
    GITHUB_ENV="${vold_env}" EXPECTED_ROM_FAMILY=grapheneos \
-   bash src/ci/load_schedule_definition.sh >/dev/null 2>&1; then
+   bash src/ci/load_schedule_definition.sh >/dev/null 2>"${vold_error}"; then
   fail "GrapheneOS schedule accepted the Lineage-only vold module"
 fi
-rm -f -- "${vold_tampered}" "${vold_output}" "${vold_env}"
+grep -Fq 'Source-built vold is supported only for LineageOS pdx235' "${vold_error}" ||
+  fail "GrapheneOS vold rejection did not come from the device-scope guard"
+[[ ! -s "${vold_output}" && ! -s "${vold_env}" ]] ||
+  fail "GrapheneOS vold schedule leaked forbidden outputs"
+rm -f -- "${vold_tampered}" "${vold_output}" "${vold_env}" "${vold_error}"
 
 echo "scheduled build definition tests passed"
 
