@@ -58,6 +58,9 @@ jobs:
       - name: Check microG release against immutable helper lock
         run: python3 src/ci/check_microg_helper_lock.py
 
+      - name: Verify pinned exfatprogs package with image adapter
+        run: python3 src/ci/check_exfatprogs_artifact.py
+
       - name: Run deterministic tests
         shell: bash
         run: |

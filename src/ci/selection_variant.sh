@@ -38,6 +38,11 @@ function selection_variant_manifest() {
     SELECTION_MODULE_SHIZUKU
     SELECTION_SHIZUKU_LOCK_SHA256
     SELECTION_SHIZUKU_ROOT_MODE
+    SELECTION_MODULE_EXFATPROGS_FSCK
+    SELECTION_EXFATPROGS_FSCK_LOCK_SHA256
+    SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256
+    SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256
+    SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256
     SELECTION_BOOT_ANIMATION
   )
 
@@ -64,6 +69,7 @@ function selection_variant_manifest() {
     SELECTION_MODULE_OEMUNLOCKONBOOT \
     SELECTION_DISABLE_SYSTEM_UPDATER \
     SELECTION_MODULE_SHIZUKU \
+    SELECTION_MODULE_EXFATPROGS_FSCK \
     SELECTION_BOOT_ANIMATION; do
     value="${!field}"
     if [[ "${value}" != 'true' && "${value}" != 'false' ]]; then
@@ -73,7 +79,10 @@ function selection_variant_manifest() {
   done
 
   for field in SELECTION_LOCK_SHA256 SELECTION_PROFILE_SHA256 \
-    SELECTION_SHIZUKU_LOCK_SHA256; do
+    SELECTION_SHIZUKU_LOCK_SHA256 SELECTION_EXFATPROGS_FSCK_LOCK_SHA256 \
+    SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256 \
+    SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256 \
+    SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256; do
     value="${!field}"
     if [[ "${value}" != 'disabled' && ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
       echo "Error: selection identity field ${field} is not a SHA-256 digest." >&2
@@ -93,6 +102,28 @@ function selection_variant_manifest() {
       echo "Error: enabled boot animation lacks a SHA-256 digest." >&2
       return 1
     fi
+  fi
+
+  if [[ "${SELECTION_MODULE_EXFATPROGS_FSCK}" == 'true' ]]; then
+    for field in SELECTION_EXFATPROGS_FSCK_LOCK_SHA256 \
+      SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256 \
+      SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256 \
+      SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256; do
+      if [[ ! "${!field}" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "Error: enabled exfatprogs fsck lacks a checked digest in ${field}." >&2
+        return 1
+      fi
+    done
+  else
+    for field in SELECTION_EXFATPROGS_FSCK_LOCK_SHA256 \
+      SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256 \
+      SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256 \
+      SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256; do
+      if [[ "${!field}" != 'disabled' ]]; then
+        echo "Error: disabled exfatprogs fsck has an unexpected digest in ${field}." >&2
+        return 1
+      fi
+    done
   fi
 
   printf '%s\n' \
@@ -120,7 +151,12 @@ function selection_variant_manifest() {
     "disable_system_updater=${SELECTION_DISABLE_SYSTEM_UPDATER}" \
     "module.shizuku=${SELECTION_MODULE_SHIZUKU}" \
     "shizuku_lock_sha256=${SELECTION_SHIZUKU_LOCK_SHA256}" \
-    "shizuku_root_mode=${SELECTION_SHIZUKU_ROOT_MODE}"
+    "shizuku_root_mode=${SELECTION_SHIZUKU_ROOT_MODE}" \
+    "module.exfatprogs-fsck=${SELECTION_MODULE_EXFATPROGS_FSCK}" \
+    "exfatprogs_fsck_lock_sha256=${SELECTION_EXFATPROGS_FSCK_LOCK_SHA256}" \
+    "exfatprogs_fsck_adapter_sha256=${SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256}" \
+    "exfatprogs_fsck_payload_sha256=${SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256}" \
+    "exfatprogs_fsck_provenance_sha256=${SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256}"
 
   if [[ "${SELECTION_ROOT}" == 'true' ]]; then
     if [[ ! "${SELECTION_MAGISK_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then

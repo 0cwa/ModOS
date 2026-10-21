@@ -1,0 +1,89 @@
+{
+  "modules": [
+    {
+      "artifacts": [
+        {
+          "allowed_origins": [
+            "https://packages.termux.dev"
+          ],
+          "apk": null,
+          "archive": null,
+          "id": "exfatprogs-aarch64-deb",
+          "immutable_url": "https://packages.termux.dev/apt/termux-main/pool/main/e/exfatprogs/exfatprogs_1.4.3_aarch64.deb",
+          "kind": "other",
+          "legal": {
+            "allowed_output_scopes": [
+              "local-unpublished"
+            ],
+            "license": "GPL-2.0",
+            "source_offer_required": true
+          },
+          "role": "injection-input",
+          "sha256": "b177a2254245170dac3dab200e972e8dc7ac06777713d033da8e1516e32685e9",
+          "size": 89540,
+          "source": {
+            "corresponding_source_artifact": "exfatprogs-source",
+            "revision": "1.4.3",
+            "url": "https://github.com/exfatprogs/exfatprogs"
+          },
+          "source_verification": {
+            "metadata_name": "InRelease",
+            "metadata_sha256": "fc02e360f8b446720de47d67e95f0bed51aa07a3c3e63d7c8b6f0595dcef5e05",
+            "repository_url": "https://packages.termux.dev/apt/termux-main",
+            "signature_types": [
+              "openpgp-primary"
+            ]
+          },
+          "version": "1.4.3"
+        },
+        {
+          "allowed_origins": [
+            "https://codeload.github.com",
+            "https://github.com"
+          ],
+          "apk": null,
+          "archive": null,
+          "id": "exfatprogs-source",
+          "immutable_url": "https://github.com/exfatprogs/exfatprogs/archive/refs/tags/1.4.3.tar.gz",
+          "kind": "other",
+          "legal": {
+            "allowed_output_scopes": [
+              "local-unpublished",
+              "private",
+              "shared",
+              "published"
+            ],
+            "license": "GPL-2.0",
+            "source_offer_required": false
+          },
+          "role": "corresponding-source",
+          "sha256": "d745a0e7f97e1c36fad97148062ba4c496724e212d6075ff3129355d9054e218",
+          "size": 236950,
+          "source": null,
+          "source_verification": null,
+          "version": "1.4.3"
+        },
+        {
+          "allowed_origins": [
+            "https://raw.githubusercontent.com"
+          ],
+          "apk": null,
+          "archive": null,
+          "id": "termux-exfatprogs-recipe",
+          "immutable_url": "https://raw.githubusercontent.com/termux/termux-packages/76ffc81c5802ca140d27080c8d4c431243e3e10e/packages/exfatprogs/build.sh",
+          "kind": "other",
+          "legal": null,
+          "role": "verification-evidence",
+          "sha256": "22fe42c9a2c001461b2ee874e0e7c02dd37d49968140365909c3deb14de28260",
+          "size": 585,
+          "source": null,
+          "source_verification": null,
+          "version": "76ffc81c5802ca140d27080c8d4c431243e3e10e"
+        }
+      ],
+      "id": "exfatprogs-fsck",
+      "version": "1.4.3"
+    }
+  ],
+  "schema_version": 1
+}

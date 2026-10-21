@@ -208,6 +208,10 @@ function module_selection_fingerprint() {
   local boot_animation_digest="disabled"
   local shizuku_lock_digest="disabled"
   local shizuku_root_mode="disabled"
+  local exfatprogs_fsck_lock_digest="disabled"
+  local exfatprogs_fsck_adapter_digest="disabled"
+  local exfatprogs_fsck_payload_digest="disabled"
+  local exfatprogs_fsck_provenance_digest="disabled"
   local entry
   local -a module_entries=(
     "afsr:AFSR"
@@ -220,6 +224,7 @@ function module_selection_fingerprint() {
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "shizuku:SHIZUKU"
+    "exfatprogs-fsck:EXFATPROGS_FSCK"
   )
 
   resolve_rom_profile || return 1
@@ -246,6 +251,30 @@ function module_selection_fingerprint() {
       echo "Error: the Shizuku lock is not clean and checked in." >&2
       return 1
     }
+  fi
+
+  if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ]]; then
+    if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
+      echo "Error: exfatprogs fsck replacement is supported only for LineageOS pdx235." >&2
+      return 1
+    fi
+    if [[ "${OUTPUT_SCOPE}" != 'local-unpublished' ]]; then
+      echo "Error: exfatprogs fsck is limited to local-unpublished output until its corresponding source is included in published releases." >&2
+      return 1
+    fi
+    exfatprogs_fsck_lock_digest="$(_locked_input_digest locks/exfatprogs-termux-v1.4.3.json)" || {
+      echo "Error: the exfatprogs package lock is not clean and checked in." >&2
+      return 1
+    }
+    exfatprogs_fsck_adapter_digest="$(_locked_input_digest src/exfatprogs_fsck.py)" || {
+      echo "Error: the exfatprogs adapter is not clean and checked in." >&2
+      return 1
+    }
+    exfatprogs_fsck_provenance_digest="$(_locked_input_digest locks/exfatprogs-termux-v1.4.3-provenance.json)" || {
+      echo "Error: the exfatprogs source provenance is not clean and checked in." >&2
+      return 1
+    }
+    exfatprogs_fsck_payload_digest='06e018cc175e9702508b6a76e66486e28125fef434a0a5c0f7611f3cd3ad147e'
   fi
 
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]]; then
@@ -322,6 +351,11 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
   SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"
   SELECTION_SHIZUKU_ROOT_MODE="${shizuku_root_mode}"
+  SELECTION_MODULE_EXFATPROGS_FSCK="${ADDITIONALS[EXFATPROGS_FSCK]}"
+  SELECTION_EXFATPROGS_FSCK_LOCK_SHA256="${exfatprogs_fsck_lock_digest}"
+  SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256="${exfatprogs_fsck_adapter_digest}"
+  SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256="${exfatprogs_fsck_payload_digest}"
+  SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256="${exfatprogs_fsck_provenance_digest}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
 
