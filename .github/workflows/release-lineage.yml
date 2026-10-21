@@ -138,6 +138,7 @@ jobs:
       fdroid_privileged_extension: ${{ steps.definition.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
+      exfatprogs_fsck: ${{ steps.definition.outputs.exfatprogs_fsck }}
       should_build: ${{ steps.existing.outputs.should_build }}
     steps:
       - name: Checkout code
@@ -183,9 +184,9 @@ jobs:
       disable-system-updater: ${{ needs.schedule_config.outputs.disable_system_updater == 'true' }}
       microg: ${{ needs.schedule_config.outputs.microg == 'true' }}
       shizuku: false
-      exfatprogs-fsck: false
       fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
+      exfatprogs-fsck: ${{ needs.schedule_config.outputs.exfatprogs_fsck == 'true' }}
       allow-unauthorized-adb: false
       boot-animation: ${{ needs.schedule_config.outputs.boot_animation == 'true' }}
       release-type: default
