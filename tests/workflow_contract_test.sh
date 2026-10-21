@@ -386,6 +386,27 @@ with tempfile.TemporaryDirectory() as scratch:
                             ('PUBLISH_REQUEST', 'true')]:
         assert subprocess.run(['bash', '-euc', script], env={**base, name: forbidden},
                               capture_output=True).returncode != 0, name
+
+    # Exercise the exact reusable-build request gate, including the forbidden
+    # case where the device ID is pdx235 but the ROM is GrapheneOS.
+    normal = {**base, 'EXPORT_DEVICE_CANDIDATE': 'false',
+              'DEVELOPMENT_PROFILE': 'none'}
+    for module in ('ADDITIONALS_EXFATPROGS_FSCK', 'ADDITIONALS_FSCK_SYSFS_SEPOLICY'):
+        for family, device in (('grapheneos', 'shiba'), ('grapheneos', 'pdx235'),
+                               ('lineageos', 'shiba')):
+            rejected = subprocess.run(
+                ['bash', '-euc', script],
+                env={**normal, 'ROM_FAMILY': family, 'DEVICE_NAME': device, module: 'true'},
+                capture_output=True)
+            assert rejected.returncode != 0, (module, family, device)
+            assert b'fsck.exfat/SELinux modules require LineageOS pdx235' in rejected.stdout
+
+        allowed = subprocess.run(
+            ['bash', '-euc', script],
+            env={**normal, 'ROM_FAMILY': 'lineageos', 'DEVICE_NAME': 'pdx235',
+                 module: 'true'},
+            capture_output=True)
+        assert allowed.returncode == 0, (module, allowed.stderr)
 # The one artifact destination is the export script's fresh allowlisted stage,
 # after normal patch/postflight and metadata steps; no working-directory glob.
 upload = workflow.split('      - name: Upload device candidate\n', 1)[1].split('      - name:', 1)[0]
