@@ -160,6 +160,26 @@ else
   fail "LineageOS schedule jobs are missing"
 fi
 
+# A tampered GrapheneOS schedule may not select the Lineage-only vold daemon.
+vold_tampered="$(mktemp)"
+vold_output="$(mktemp)"
+vold_env="$(mktemp)"
+python3 - "${vold_tampered}" <<'PYVOLD'
+from pathlib import Path
+import sys
+
+source = Path(".github/schedules/grapheneos-shiba.toml").read_text()
+old = "'ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]' = false"
+assert source.count(old) == 1
+Path(sys.argv[1]).write_text(source.replace(old, old.replace("false", "true")))
+PYVOLD
+if SCHEDULE_DEFINITION="${vold_tampered}" GITHUB_OUTPUT="${vold_output}" \
+   GITHUB_ENV="${vold_env}" EXPECTED_ROM_FAMILY=grapheneos \
+   bash src/ci/load_schedule_definition.sh >/dev/null 2>&1; then
+  fail "GrapheneOS schedule accepted the Lineage-only vold module"
+fi
+rm -f -- "${vold_tampered}" "${vold_output}" "${vold_env}"
+
 echo "scheduled build definition tests passed"
 
 grep -Fq "needs.schedule_config.outputs.microg == 'true'" .github/workflows/release-lineage.yml ||
