@@ -5,6 +5,13 @@
   "device": "pdx235",
   "base_build_id": "lineage-24.0-20261016-nightly-pdx235-signed",
   "approved_binary_sha256": "",
+  "artifact_distribution": {
+    "repository": "0cwa/ModOS",
+    "release_tag": "",
+    "binary_asset": "vold",
+    "provenance_asset": "provenance.json",
+    "provenance_sha256": ""
+  },
   "manifest": {
     "url": "https://mirrorbits.lineageos.org/full/pdx235/20261016/build-manifest.xml",
     "path": "locks/lineage-pdx235-20261016-build-manifest.xml",
