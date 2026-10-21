@@ -48,26 +48,75 @@ dynamic dependencies before injection.
 
 When registered by ModOS, the adapter is opt-in and requires the
 `lineage-vold-exfat-timeout` module selection. It supports only LineageOS
-`pdx235` and the pinned OTA build. The ModOS setup must set
+`pdx235` and the pinned OTA build. Source-built vold requires both the
+system and product partitions for validation: the device identity is read from
+`/system/build.prop`, and the `ro.lineage.*` release properties are read
+from `/product/build.prop` (the pinned LineageOS
+`vendor/lineage/config/version.mk` installs them via
+`PRODUCT_PRODUCT_PROPERTIES`). The ModOS setup must set
 `PIXENEOS_VOLD_ARTIFACT_DIR` to the artifact directory and
 `PIXENEOS_VOLD_BASE_BUILD_ID` to
 `lineage-24.0-20261016-nightly-pdx235-signed`.
 
-The module is opt-in and is not enabled in the scheduled build or release
-workflow. Build the artifact first, then set
+The module is default-off for both scheduled and manual release workflows.
+Their selectors are wired to a staged-artifact acquisition step, but this
+step intentionally fails before any download until the reviewed binary and
+provenance SHA-256 digests, plus the staging release tag, are pinned in the
+source lock. Local-unpublished builds can consume a locally built artifact
+without this final publication approval. Build the artifact first, then set
 `PIXENEOS_VOLD_ARTIFACT_DIR` to its output directory and
 `PIXENEOS_VOLD_BASE_BUILD_ID` to the exact id above in the build process
 environment. Selection fails before patching if either input is absent or if
 the artifact provenance does not match the lock.
 
-At injection, the adapter checks `ro.product.device`, `ro.lineage.build.version`,
-and the exact `ro.lineage.version` from the pinned source snapshot. It requires
-one regular executable `/system/bin/vold`, the `vold_exec` SELinux label, and
-the same AArch64 interpreter and dependencies as the original OTA binary. It
-writes bytes through the existing ExtFs file entry so its image mode, owner,
-and SELinux metadata stay attached to the existing path. A failed check stops
-the build before a patched OTA is emitted.
+At injection, the adapter checks the partition-specific properties and the
+exact `ro.lineage.version` from the pinned source snapshot. It requires
+one root-owned executable `/system/bin/vold`, the actual `vold_exec` SELinux
+xattr and expected context mapping, and the same AArch64 interpreter and
+dependencies as the original OTA binary. It overwrites the existing ExtFs
+entry, verifies all original filesystem metadata, and re-hashes the written
+binary. A failed check stops the build before a patched OTA is emitted.
 
 This module is kept separate from scheduled selections and the SELinux force
 release. The current workspace does not have Repo installed and has only about
 41 GB free, so the full source sync and Android build have not been run here.
+
+## Production promotion checklist (not yet complete)
+
+**This module is not qualified for public OTA use.** CI exercises synthetic
+ELF and filesystem fixtures; a full 1,243-project source sync, Android `m vold`
+build, authenticated OTA integration and real-device boot/exFAT checks remain
+necessary. Do not set the scheduled default to true or force-publish it yet.
+
+1. On a suitably provisioned, isolated Linux build host, run the pinned
+   `sync` and `build` commands above. Retain the generated `vold` and
+   `provenance.json` without editing either.
+2. Validate them against the authentic
+   `lineage-24.0-20261016-nightly-pdx235-signed` source and run a
+   **nonpublishing** rootless/Magisk OTA qualification. Confirm both images
+   boot, vold starts, encrypted storage mounts, and exFAT fsck behaves as
+   expected; preserve test results. This is not satisfied by unit-test
+   fixtures.
+3. Stage the exact `vold` and `provenance.json` as two independent assets
+   in a **separate non-OTA release** in `0cwa/ModOS`, using a tag beginning
+   with `vold-pdx235-20261016-`. Record both
+   `sha256sum vold provenance.json` values and verify the staging upload.
+4. Only after binary, OTA and device qualification, commit the independent
+   digest approval in `approved_binary_sha256` and the
+   `artifact_distribution.release_tag` and
+   `artifact_distribution.provenance_sha256` in the source lock.
+   `src/ci/fetch_lineage_vold_artifact.py` downloads only this pair and
+   independently checks its bytes; the scheduled preflight and actual build
+   both verify it again.
+5. Enable `ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]` only on the LineageOS
+   pdx235 schedule, run full CI, then intentionally force-publish and confirm
+   the resulting rootless/Magisk outputs and update delivery.
+
+**Nightly rotation:** This lock and artifact intentionally identify *only*
+the 2026-10-16 nightly. A newer official LineageOS OTA will fail closed
+rather than combining an outdated vold binary with a different source. To
+keep future scheduled builds enabled, obtain, qualify and review a fresh
+source-locked artifact for each new published nightly before rolling over
+the schedule. Never silently reuse the previous binary.
+
+GrapheneOS remains excluded by explicit workflow and schedule guards.
