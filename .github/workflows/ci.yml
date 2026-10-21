@@ -111,6 +111,7 @@ jobs:
           bash tests/executable_tool_bootstrap_test.sh
           bash tests/executable_tool_routing_test.sh
           bash tests/workflow_contract_test.sh
+          python3 tests/fsck_sysfs_sepolicy_registration_test.py
           bash tests/rom_contract_test.sh
           bash tests/module_selection_test.sh
           bash tests/source_care_map_policy_test.sh

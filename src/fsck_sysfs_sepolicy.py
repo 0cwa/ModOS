@@ -90,6 +90,16 @@ def _module_class() -> type[Any]:
     return FsckSysfsSePolicyMod
 
 
+if __name__ != "__main__":
+    try:
+        from lib.filesystem import ExtFs  # noqa: F401
+    except ModuleNotFoundError as exc:
+        if exc.name != "lib":
+            raise
+    else:
+        FsckSysfsSePolicyMod = _module_class()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args()
