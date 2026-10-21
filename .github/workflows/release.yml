@@ -358,18 +358,19 @@ jobs:
       rom-family: grapheneos
       # Scheduled builds use the checked-in shiba definition; manual inputs remain authoritative.
       device-id: ${{ github.event_name == 'schedule' && needs.preflight.outputs.device_id || inputs.device-id }}
-      root: ${{ github.event_name == 'schedule' && needs.preflight.outputs.root == 'true' || inputs.root }}
+      # A scheduled false must stay a boolean false, not fall through to an absent manual input.
+      root: ${{ github.event_name == 'schedule' && needs.preflight.outputs.root == 'true' || (github.event_name != 'schedule' && inputs.root) }}
       root-mode: ${{ github.event_name == 'schedule' && needs.preflight.outputs.root_mode || inputs.root-mode }}
       afsr: ${{ github.event_name == 'schedule' && needs.preflight.outputs.afsr == 'true' || github.event_name != 'schedule' && inputs.afsr }}
       magisk-preinit-device: ${{ github.event_name == 'schedule' && needs.preflight.outputs.magisk_preinit_device || inputs.magisk-preinit-device || 'sda10' }}
       update-channel: ${{ github.event_name == 'schedule' && needs.preflight.outputs.update_channel || inputs.update-channel || 'stable' }}
-      alterinstaller: ${{ github.event_name == 'schedule' && needs.preflight.outputs.alterinstaller == 'true' || inputs.alterinstaller }}
-      bcr: ${{ github.event_name == 'schedule' && needs.preflight.outputs.bcr == 'true' || inputs.bcr }}
-      custota: ${{ github.event_name == 'schedule' && needs.preflight.outputs.custota == 'true' || inputs.custota }}
-      msd: ${{ github.event_name == 'schedule' && needs.preflight.outputs.msd == 'true' || inputs.msd }}
-      oemunlockonboot: ${{ github.event_name == 'schedule' && needs.preflight.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}
-      disable-system-updater: ${{ github.event_name == 'schedule' && needs.preflight.outputs.disable_system_updater == 'true' || inputs.disable-system-updater }}
-      fdroid-privileged-extension: ${{ github.event_name == 'schedule' && needs.preflight.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
+      alterinstaller: ${{ github.event_name == 'schedule' && needs.preflight.outputs.alterinstaller == 'true' || (github.event_name != 'schedule' && inputs.alterinstaller) }}
+      bcr: ${{ github.event_name == 'schedule' && needs.preflight.outputs.bcr == 'true' || (github.event_name != 'schedule' && inputs.bcr) }}
+      custota: ${{ github.event_name == 'schedule' && needs.preflight.outputs.custota == 'true' || (github.event_name != 'schedule' && inputs.custota) }}
+      msd: ${{ github.event_name == 'schedule' && needs.preflight.outputs.msd == 'true' || (github.event_name != 'schedule' && inputs.msd) }}
+      oemunlockonboot: ${{ github.event_name == 'schedule' && needs.preflight.outputs.oemunlockonboot == 'true' || (github.event_name != 'schedule' && inputs.oemunlockonboot) }}
+      disable-system-updater: ${{ github.event_name == 'schedule' && needs.preflight.outputs.disable_system_updater == 'true' || (github.event_name != 'schedule' && inputs.disable-system-updater) }}
+      fdroid-privileged-extension: ${{ github.event_name == 'schedule' && needs.preflight.outputs.fdroid_privileged_extension == 'true' || (github.event_name != 'schedule' && inputs.fdroid-privileged-extension) }}
       shizuku: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
       compatible-sepolicy-patching: ${{ github.event_name == 'schedule' && needs.preflight.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
       allow-unauthorized-adb: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
