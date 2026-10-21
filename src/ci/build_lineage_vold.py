@@ -182,8 +182,84 @@ def ensure_regular_executable(path: Path) -> bytes:
     return path.read_bytes()
 
 
-def command_build(source_root: Path, output_dir: Path, jobs: int | None) -> None:
+def command_baseline(
+    source_root: Path, output_dir: Path, reference_vold: Path,
+    source_ota_sha256: str, jobs: int | None,
+) -> dict:
+    """Build UNMODIFIED vold and compare every byte against the official OTA.
+
+    The timeout patch is never applied by this command. Even a dependency- or
+    ABI-compatible binary is rejected when any byte differs.
+    """
+    from lineage_vold_baseline import (
+        BaselineMismatch, comparison_report, read_binary, require_exact_match, write_report,
+    )
+    lock, manifest_bytes, _patch_bytes = load_contract()
+    source_root = source_root.expanduser().resolve(strict=True)
+    if not (source_root / ".repo/manifest.xml").is_file():
+        raise BuildError("baseline source root is not a repo checkout")
+    expected = project_map(manifest_bytes)
+    for key in ("manifest", "vold", "device"):
+        project = lock["projects"][key]
+        if expected.get(project["path"]) != (project["name"], project["revision"]):
+            raise BuildError(f"baseline source contract disagrees for {key}")
+    checked_source_manifest(source_root, expected)
+    verify_source_checkouts_clean(source_root, expected)
+    reference = read_binary(reference_vold)
+
+    if output_dir.is_symlink() or (output_dir.exists() and (
+        not output_dir.is_dir() or any(output_dir.iterdir())
+    )):
+        raise BuildError("baseline output directory must be new or empty and not a symlink")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_artifact = source_root / lock["build"]["artifact"]
+    if output_artifact.is_symlink():
+        raise BuildError("baseline build artifact is an unsafe symlink")
+    # Eliminate stale installed results from a previous, unrelated build.
+    if output_artifact.is_file():
+        output_artifact.unlink()
+
+    jobs_arg = f"-j{jobs}" if jobs else ""
+    command = (
+        "source build/envsetup.sh && "
+        f"lunch {lock['build']['target']} && "
+        f"m {jobs_arg} vold"
+    ).replace("  ", " ")
+    completed = subprocess.run(["bash", "-euc", command], cwd=source_root, check=False)
+    if completed.returncode:
+        raise BuildError("unmodified LineageOS vold build failed")
+
+    built = ensure_regular_executable(output_artifact)
+    try:
+        report = comparison_report(reference, built, lock, source_ota_sha256)
+    except (ValueError, OSError) as exc:
+        raise BuildError(f"baseline binary validation failed: {exc}") from exc
+
+    # Preserve diagnostic hashes on a mismatch, but never grant a pass.
+    write_report(output_dir / "baseline-report.json", report)
+    try:
+        require_exact_match(report)
+    except BaselineMismatch as exc:
+        raise BuildError(str(exc)) from exc
+    (output_dir / "baseline-vold").write_bytes(built)
+    print(json.dumps(report, sort_keys=True))
+    return report
+
+
+def command_build(
+    source_root: Path, output_dir: Path, jobs: int | None,
+    baseline_report: Path, baseline_binary: Path, reference_vold: Path,
+) -> None:
     lock, manifest_bytes, patch_bytes = load_contract()
+    # A patched binary must NOT be built before a byte-exact unmodified vold
+    # has been reproduced and checked against the authenticated source OTA.
+    from lineage_vold_baseline import verify_baseline_inputs
+    try:
+        baseline = verify_baseline_inputs(
+            baseline_report, reference_vold, baseline_binary, lock
+        )
+    except (ValueError, OSError) as exc:
+        raise BuildError(f"patched vold is gated on exact baseline reproduction: {exc}") from exc
     source_root = source_root.resolve(strict=True)
     if not (source_root / ".repo/manifest.xml").exists():
         raise BuildError("source root is not a repo checkout")
@@ -251,6 +327,8 @@ def command_build(source_root: Path, output_dir: Path, jobs: int | None) -> None
             "build_command": lock["build"]["command"],
             "artifact_path": lock["build"]["artifact"],
             "binary_sha256": digest(binary),
+            "baseline_reference_sha256": baseline["reference_sha256"],
+            "baseline_source_ota_sha256": baseline["source_ota_sha256"],
             "elf": {
                 "elf_class": identity["elf_class"],
                 "machine": identity["machine"],
@@ -277,18 +355,39 @@ def main() -> int:
     sync = subparsers.add_parser("sync", help="explicitly download the large exact-revision source tree")
     sync.add_argument("--source-root", type=Path, required=True, help="new or empty source checkout directory")
     sync.add_argument("--jobs", type=int, help="optional repo sync parallelism")
-    build = subparsers.add_parser("build", help="build vold from an already synchronized exact-revision tree")
+    baseline = subparsers.add_parser(
+        "baseline", help="build unmodified vold and require exact OTA byte identity"
+    )
+    baseline.add_argument("--source-root", type=Path, required=True)
+    baseline.add_argument("--output-dir", type=Path, required=True)
+    baseline.add_argument("--reference-vold", type=Path, required=True)
+    baseline.add_argument("--source-ota-sha256", required=True)
+    baseline.add_argument("--jobs", type=int)
+    build = subparsers.add_parser(
+        "build", help="build patched vold ONLY after exact baseline proof"
+    )
     build.add_argument("--source-root", type=Path, required=True, help="complete, clean checkout synced to the locked official build manifest")
     build.add_argument("--output-dir", type=Path, required=True, help="new or empty artifact directory")
     build.add_argument("--jobs", type=int, help="optional parallel build job count")
+    build.add_argument("--baseline-report", type=Path, required=True)
+    build.add_argument("--baseline-binary", type=Path, required=True)
+    build.add_argument("--reference-vold", type=Path, required=True)
     args = parser.parse_args()
     if args.jobs is not None and args.jobs < 1:
         parser.error("--jobs must be positive")
     try:
         if args.command == "sync":
             command_sync(args.source_root, args.jobs)
+        elif args.command == "baseline":
+            command_baseline(
+                args.source_root, args.output_dir, args.reference_vold,
+                args.source_ota_sha256, args.jobs,
+            )
         else:
-            command_build(args.source_root, args.output_dir, args.jobs)
+            command_build(
+                args.source_root, args.output_dir, args.jobs, args.baseline_report,
+                args.baseline_binary, args.reference_vold,
+            )
     except (BuildError, OSError, subprocess.SubprocessError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
