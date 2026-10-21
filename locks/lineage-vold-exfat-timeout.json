@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "module": "lineage-vold-exfat-timeout",
+  "rom_family": "lineageos",
+  "device": "pdx235",
+  "base_build_id": "lineage-24.0-20261016-nightly-pdx235-signed",
+  "manifest": {
+    "url": "https://mirrorbits.lineageos.org/full/pdx235/20261016/build-manifest.xml",
+    "path": "locks/lineage-pdx235-20261016-build-manifest.xml",
+    "sha256": "d4ded1ca84de399497b68d7ac006808059b6be9cf76725029420a3495a2e5468",
+    "source_sha256": "1c9319c969c66b55543679fd5e0389d08cd14d5c2a91c1274ad698467845d326"
+  },
+  "projects": {
+    "manifest": {
+      "name": "LineageOS/android",
+      "path": "android",
+      "revision": "d4c6331bc603e5038a9e48f5e526e7f10c8b96d9"
+    },
+    "vold": {
+      "name": "LineageOS/android_system_vold",
+      "path": "system/vold",
+      "revision": "11d8982f824d52e8122c7aa732207ba66b8f23c8"
+    },
+    "device": {
+      "name": "LineageOS/android_device_sony_pdx235",
+      "path": "device/sony/pdx235",
+      "revision": "0559de69466e1e9af69b121985f592c4f4609283"
+    }
+  },
+  "build": {
+    "target": "lineage_pdx235-userdebug",
+    "command": "m vold",
+    "artifact": "out/target/product/pdx235/system/bin/vold",
+    "install_path": "/system/bin/vold",
+    "elf_class": 64,
+    "elf_machine": "AArch64",
+    "interpreter": "/system/bin/linker64"
+  },
+  "patch": {
+    "path": "patches/lineageos/android_system_vold/11d8982f824d52e8122c7aa732207ba66b8f23c8-exfat-fsck-timeout-120s.patch",
+    "sha256": "53129785ccea28d828b08766bddaaf594d5602ba819cb8e7abd281b9d5724a90"
+  }
+}

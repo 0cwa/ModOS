@@ -85,6 +85,9 @@ jobs:
       - name: Test exfatprogs image metadata diagnostics
         run: python3 tests/exfat_adapter_metadata_test.py
 
+      - name: Test source-built Vold module contract
+        run: python3 tests/lineage_vold_contract_test.py
+
       - name: Test pdx235 Custota metadata preparation
         run: bash tests/pdx235_custota_metadata_test.sh
 

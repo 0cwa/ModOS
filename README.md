@@ -292,6 +292,29 @@ any new OTA assets. Local-unpublished builds do not require source publication.
 The recorded signed APT metadata is audit provenance; builds verify the lock's
 package URL, size, and SHA-256, but do not repeat the APT signature check.
 
+### Source-built vold timeout for LineageOS pdx235
+
+The optional `lineage-vold-exfat-timeout` module replaces `/system/bin/vold`
+with a binary built from the complete, hash-pinned LineageOS pdx235 source
+manifest. It gives exFAT fsck a 120-second limit; the existing timeout for
+other filesystems remains 45 seconds. This option is disabled by default and
+is not selected in scheduled builds. Build the artifact explicitly with
+`src/ci/build_lineage_vold.py` as documented in
+[`docs/lineage-vold-exfat-timeout.md`](docs/lineage-vold-exfat-timeout.md),
+then set `PIXENEOS_VOLD_ARTIFACT_DIR` and
+`PIXENEOS_VOLD_BASE_BUILD_ID=lineage-24.0-20261016-nightly-pdx235-signed`
+before selecting the module. The OTA build validates source and binary
+provenance, AArch64 ABI and dynamic dependencies, exact base OTA identity, and
+the existing `vold_exec` SELinux label before replacing bytes in the existing
+filesystem entry.
+
+The pinned upstream `android_system_vold` project is Apache-2.0 licensed; the
+source patch is limited to the exFAT timeout constant and its call site. The
+full LineageOS source sync and Android binary build are intentionally explicit
+and were not run by CI. The binary must be built and checked on a suitable
+Linux host before use; this module remains absent from release workflows and
+scheduled builds until that build path is operationally provisioned.
+
 ### Custom boot animation (enabled by default)
 
 All builds use the checked-in `custom/boot-animation/bootanimation.zip` by

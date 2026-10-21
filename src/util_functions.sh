@@ -237,6 +237,7 @@ function append_enabled_module_arguments() {
     "shizuku:SHIZUKU"
     "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
     "exfatprogs-fsck:EXFATPROGS_FSCK"
+    "lineage-vold-exfat-timeout:LINEAGE_VOLD_EXFAT_TIMEOUT"
   )
 
   for entry in "${module_entries[@]}"; do
@@ -718,6 +719,86 @@ function prepare_exfatprogs_fsck_module() {
   export PIXENEOS_EXFATPROGS_PACKAGE_PATH="${expected_package}"
 }
 
+# Register the source-built LineageOS vold adapter. The source sync and `m vold`
+# build are explicit, separate operations; OTA patching only consumes a
+# provenance-checked artifact supplied by the caller.
+function prepare_lineage_vold_exfat_timeout_module() {
+  local helper_root="${1}"
+  local init_file="${helper_root}/lib/modules/__init__.py"
+  local registry_file="${helper_root}/lib/modules/registry.py"
+  local module_source="${helper_root}/lib/modules/lineage_vold.py"
+  local artifact_dir="${PIXENEOS_VOLD_ARTIFACT_DIR:-}"
+  local base_build_id="${PIXENEOS_VOLD_BASE_BUILD_ID:-}"
+
+  if [[ "${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}" != 'true' ]]; then
+    return 0
+  fi
+  if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
+    echo "Error: source-built vold is supported only for LineageOS pdx235." >&2
+    return 1
+  fi
+  if [[ -z "${artifact_dir}" || -z "${base_build_id}" ]]; then
+    echo "Error: set PIXENEOS_VOLD_ARTIFACT_DIR and PIXENEOS_VOLD_BASE_BUILD_ID after building pinned vold." >&2
+    return 1
+  fi
+  if [[ ! -f src/lineage_vold.py || -L src/lineage_vold.py ||
+    ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
+    -L "${module_source}" ]]; then
+    echo "Error: the Vold adapter or pinned helper registry path is missing or unsafe." >&2
+    return 1
+  fi
+  if ! PYTHONPATH=src python3 - "${artifact_dir}" "${base_build_id}" <<'PY'
+import sys
+from pathlib import Path
+import lineage_vold
+
+if sys.argv[2] != lineage_vold.BASE_BUILD_ID:
+    raise SystemExit("selected base build id differs from the pinned Vold source build")
+lineage_vold._artifact(Path(sys.argv[1]))
+PY
+  then
+    echo "Error: the source-built vold artifact failed provenance or ELF validation." >&2
+    return 1
+  fi
+
+  cp -- src/lineage_vold.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+  if ! grep -Fq 'from lib.modules.lineage_vold import LineageVoldMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.lineage_vold import LineageVoldMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(LineageVoldMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(LineageVoldMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
+  : >"${WORKDIR}/modules/lineage-vold-exfat-timeout.zip"
+  : >"${WORKDIR}/signatures/lineage-vold-exfat-timeout.zip.sig"
+  export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+  export PIXENEOS_DEVICE_NAME="${DEVICE_NAME}"
+  export PIXENEOS_VOLD_ARTIFACT_DIR="${artifact_dir}"
+  export PIXENEOS_VOLD_BASE_BUILD_ID="${base_build_id}"
+}
+
 # Resolve and acquire the locked F-Droid inputs before exposing them to the
 # patch command. Artifact URLs and versions belong exclusively to the lock.
 function prepare_fdroid_privileged_extension() {
@@ -1099,6 +1180,10 @@ function patch_ota() {
     fi
     if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ]] &&
       ! prepare_exfatprogs_fsck_module "${my_avbroot_setup}"; then
+      return 1
+    fi
+    if [[ "${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}" == 'true' ]] &&
+      ! prepare_lineage_vold_exfat_timeout_module "${my_avbroot_setup}"; then
       return 1
     fi
     append_enabled_module_arguments args
