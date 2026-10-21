@@ -5,4 +5,4 @@ edition = "2024"
 publish = false
 
 [dependencies]
-sepatch = { git = "https://github.com/chenxiaolong/sepatch", rev = "7634748c016165489c307a50f186aeb4faa5feb0" }
+sepatch = { path = "vendor/sepatch" }

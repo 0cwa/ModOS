@@ -192,6 +192,16 @@ function selection_variant_manifest() {
       "${policy_patcher_root}/src/fsck_sysfs_sepolicy.py"
       "${policy_patcher_root}/src/ci/libclang_identity.sh"
     )
+    while IFS= read -r -d '' value; do
+      policy_patcher_inputs+=("${value}")
+    done < <(find "${policy_patcher_root}/src/exfatprogs_sepolicy/vendor/sepatch" -type f -print0 | sort -z)
+    policy_patcher_inputs+=(
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_audit_rules.conf"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_audit_rules.policy"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_allow_roundtrip.conf"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_allow_roundtrip.policy"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/NOTICE"
+    )
     for value in "${policy_patcher_inputs[@]}"; do
       if [[ ! -f "${value}" || -L "${value}" ]]; then
         echo "Error: fsck sysfs policy patcher input is missing or unsafe: ${value}" >&2
