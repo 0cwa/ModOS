@@ -753,7 +753,7 @@ function prepare_lineage_vold_exfat_timeout_module() {
     --artifact-dir "${artifact_dir}" \
     --scope "${OUTPUT_SCOPE}" \
     --base-build-id "${base_build_id}" \
-    --source-target "${GRAPHENEOS[OTA_TARGET]:-}" >/dev/null;
+    --source-target "${GRAPHENEOS[OTA_TARGET]:-}" >/dev/null; then
     echo "Error: the source-built vold artifact failed provenance or ELF validation." >&2
     return 1
   fi
