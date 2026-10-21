@@ -136,6 +136,8 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     const POLICY_FIXTURE: &[u8] = include_bytes!("../tests/fixtures/fsck_sysfs_audit_rules.policy");
+    const ALLOW_ROUNDTRIP_FIXTURE: &[u8] =
+        include_bytes!("../tests/fixtures/fsck_sysfs_allow_roundtrip.policy");
     static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
 
     fn ids(
@@ -188,5 +190,25 @@ mod tests {
         let file_class = required_id(verified.get_class_id("file"), "file");
         let write_permission = required_id(verified.get_perm_id(file_class, "write"), "file.write");
         assert!(verified.has_allow_rule(other_source, other_source, file_class, write_permission));
+    }
+
+    #[test]
+    fn serialized_allow_bit_is_not_misread_as_missing_by_legacy_mutator() {
+        let mut warnings = Vec::new();
+        let policy = PolicyDb::from_raw(ALLOW_ROUNDTRIP_FIXTURE, &mut warnings).unwrap();
+        let mut serialized_warnings = Vec::new();
+        let serialized = policy.to_raw(&mut serialized_warnings).unwrap();
+
+        let mut round_trip_warnings = Vec::new();
+        let mut round_tripped = PolicyDb::from_raw(&serialized, &mut round_trip_warnings).unwrap();
+        let (source, target, class, permission) = ids(&round_tripped);
+
+        // The policy bytes contain the requested allow bit. Sibling audit
+        // rules keep both audit AVTAB nodes present without conflicting with
+        // the target read permission. The legacy mutating API returns false
+        // because reapplying that rule changes nothing, while the read-only
+        // query correctly reports it present.
+        assert!(!round_tripped.set_rule(source, target, class, permission, RuleAction::Allow));
+        assert!(round_tripped.has_allow_rule(source, target, class, permission));
     }
 }

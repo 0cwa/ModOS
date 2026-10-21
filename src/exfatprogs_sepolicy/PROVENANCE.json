@@ -40,5 +40,12 @@
     "purpose": "Round-trip regression with allow, auditallow, and dontaudit on the target tuple plus an unrelated allow rule.",
     "notice": "tests/fixtures/NOTICE",
     "compiled_sha256": "fd4f5527e7eafb95f9026a517f4d14684fcc4c6a3f9fad48c92dee5347636809"
+  },
+  "verifier_regression_fixture": {
+    "source": "tests/fixtures/fsck_sysfs_allow_roundtrip.conf",
+    "compiled": "tests/fixtures/fsck_sysfs_allow_roundtrip.policy",
+    "purpose": "Round-trip regression: an allow rule for dir.read coexists with sibling auditallow/dontaudit rules for dir.search. After serialization and reparsing, legacy set_rule(Allow) returns false because the target bit needs no change, while the exact read-only AVTAB_ALLOWED query returns true.",
+    "source_sha256": "7312ba92bb9d42a6bd06309a2a7edc8c6e42d3ab088492bbfc71261f51b4f748",
+    "compiled_sha256": "d62c8046f38c10d0ce78cc0ead8aa64372c3ba7f27680df58a365c78339c1998"
   }
 }

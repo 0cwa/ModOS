@@ -198,6 +198,8 @@ function selection_variant_manifest() {
     policy_patcher_inputs+=(
       "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_audit_rules.conf"
       "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_audit_rules.policy"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_allow_roundtrip.conf"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/fsck_sysfs_allow_roundtrip.policy"
       "${policy_patcher_root}/src/exfatprogs_sepolicy/tests/fixtures/NOTICE"
     )
     for value in "${policy_patcher_inputs[@]}"; do
