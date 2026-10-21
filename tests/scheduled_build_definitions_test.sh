@@ -39,6 +39,8 @@ check_definition() {
       fail "${file}: wrong fsck sysfs-SEPolicy selection"
     local expected_exfat=false
     [[ "${expected_family}" != lineageos ]] || expected_exfat=true
+    toml_config_has exfatprogs_fsck ||
+      fail "${file}: exfatprogs fsck selection must be explicitly declared"
     [[ "$(toml_resolve_value exfatprogs_fsck false)" == "${expected_exfat}" ]] ||
       fail "${file}: wrong exfatprogs fsck selection"
     [[ "$(toml_resolve_value lineage_vold_exfat_timeout '')" == false ]] ||
@@ -123,6 +125,47 @@ check_loader() {
 
 check_loader .github/schedules/grapheneos-shiba.toml shiba grapheneos
 check_loader .github/schedules/lineageos-pdx235.toml pdx235 lineageos
+
+# The loader must reject a tampered GrapheneOS schedule before exporting any
+# build inputs. Test each forbidden switch using an otherwise-valid definition.
+check_forbidden_grapheneos_module() {
+  local module="${1}" fixture output_file env_file error_file
+  local old="'ADDITIONALS[${module}]' = false"
+  local new="'ADDITIONALS[${module}]' = true"
+  fixture="$(mktemp --suffix=.toml)"
+  output_file="$(mktemp)"
+  env_file="$(mktemp)"
+  error_file="$(mktemp)"
+  cp .github/schedules/grapheneos-shiba.toml "${fixture}"
+  check_loader "${fixture}" shiba grapheneos
+  grep -Fxq "${old}" "${fixture}" || fail "missing GrapheneOS baseline: ${module}"
+  sed -i "s/^'ADDITIONALS\\[${module}\\]' = false$/'ADDITIONALS[${module}]' = true/" "${fixture}"
+  grep -Fxq "${new}" "${fixture}" || fail "could not activate ${module} in fixture"
+
+  if GITHUB_OUTPUT="${output_file}" GITHUB_ENV="${env_file}" \
+    SCHEDULE_DEFINITION="${fixture}" EXPECTED_ROM_FAMILY=grapheneos \
+    bash src/ci/load_schedule_definition.sh >/dev/null 2>"${error_file}"; then
+    fail "GrapheneOS schedule unexpectedly accepted ${module}"
+  fi
+  grep -Fq 'restricted to LineageOS pdx235' "${error_file}" ||
+    fail "GrapheneOS ${module} failure did not come from the device-scope guard"
+  [[ ! -s "${output_file}" && ! -s "${env_file}" ]] ||
+    fail "GrapheneOS ${module} leaked forbidden selection into scheduled build outputs"
+  rm -f "${fixture}" "${output_file}" "${env_file}" "${error_file}"
+}
+
+check_forbidden_grapheneos_module EXFATPROGS_FSCK
+check_forbidden_grapheneos_module FSCK_SYSFS_SEPOLICY
+
+# Both GrapheneOS entry points use this shared explicit-false callsite.
+for module in exfatprogs-fsck fsck-sysfs-sepolicy; do
+  grep -Eq "^[[:space:]]{6}${module}:[[:space:]]*false[[:space:]]*$" \
+    .github/workflows/release.yml ||
+    fail "GrapheneOS trigger must explicitly disable ${module}"
+done
+grep -Fq 'pdx235 fsck.exfat/SELinux modules require LineageOS pdx235' \
+  .github/workflows/build-rom.yml ||
+  fail "Shared workflow must reject non-pdx235 fsck/SELinux selections early"
 
 grep -Fq 'SCHEDULE_DEFINITION: .github/schedules/grapheneos-shiba.toml' .github/workflows/release.yml ||
   fail "GrapheneOS cron does not reference the shiba schedule definition"
