@@ -198,8 +198,10 @@ def _artifact(artifact_dir: Path) -> tuple[bytes, dict[str, Any]]:
     return binary, provenance
 
 
-def _build_properties(system_fs: Any) -> dict[str, str]:
-    path = system_fs.tree / "system" / "build.prop"
+def _build_properties(image_fs: Any, partition: str) -> dict[str, str]:
+    if partition not in ("system", "product"):
+        raise VoldModuleError("unsupported partition for build-property verification")
+    path = image_fs.tree / partition / "build.prop"
     data = _read_regular_file(path, 2 * 1024 * 1024)
     properties: dict[str, str] = {}
     try:
@@ -233,23 +235,24 @@ def _metadata_snapshot(entry: Any) -> tuple[Any, ...]:
     )
 
 
-def inject_vold(system_fs: Any, artifact_dir: Path, base_build_id: str) -> str:
+def inject_vold(system_fs: Any, product_fs: Any, artifact_dir: Path, base_build_id: str) -> str:
     if base_build_id != BASE_BUILD_ID:
         raise VoldModuleError("selected OTA build does not match the pinned vold source build")
     binary, _ = _artifact(artifact_dir)
-    properties = _build_properties(system_fs)
+    system_properties = _build_properties(system_fs, "system")
+    product_properties = _build_properties(product_fs, "product")
     # Modern Android partitions normally advertise ro.product.system.device,
     # whereas ro.product.device is resolved by init from several partitions.
     device_values = [
-        properties[key]
+        system_properties[key]
         for key in ("ro.product.system.device", "ro.product.device", "ro.build.product")
-        if key in properties
+        if key in system_properties
     ]
     if not device_values or any(value != "pdx235" for value in device_values):
         raise VoldModuleError("target system image does not identify as pdx235")
     if (
-        properties.get("ro.lineage.build.version") != "24.0"
-        or properties.get("ro.lineage.version") != "24.0-20261016-NIGHTLY-pdx235"
+        product_properties.get("ro.lineage.build.version") != "24.0"
+        or product_properties.get("ro.lineage.version") != "24.0-20261016-NIGHTLY-pdx235"
     ):
         raise VoldModuleError("target system image does not match the pinned 20261016 LineageOS build")
 
@@ -328,7 +331,9 @@ def _module_class() -> type[Any]:
                 os.environ.get("PIXENEOS_ROM_FAMILY", ""),
                 os.environ.get("PIXENEOS_DEVICE_NAME", ""),
             )
-            return ModuleRequirements(boot_images=set(), ext_images={"system"}, selinux_patching=False)
+            # vendor/lineage/config/version.mk supplies ro.lineage.* via
+            # PRODUCT_PRODUCT_PROPERTIES, not system/build.prop.
+            return ModuleRequirements(boot_images=set(), ext_images={"system", "product"}, selinux_patching=False)
 
         def inject(
             self,
@@ -345,10 +350,11 @@ def _module_class() -> type[Any]:
             artifact_value = os.environ.get(ARTIFACT_DIR_ENV, "")
             if not artifact_value:
                 raise VoldModuleError("source-built vold artifact directory is not configured")
-            if "system" not in ext_fs:
-                raise VoldModuleError("system image is unavailable for vold injection")
+            if "system" not in ext_fs or "product" not in ext_fs:
+                raise VoldModuleError("system and product images are required for vold validation")
             inject_vold(
                 ext_fs["system"],
+                ext_fs["product"],
                 Path(artifact_value),
                 os.environ.get(BASE_BUILD_ENV, ""),
             )
