@@ -65,6 +65,11 @@ on:
         required: false
         type: boolean
         default: false
+      fsck-sysfs-sepolicy:
+        description: Allow fsck_untrusted to read sysfs directories (LineageOS pdx235 only)
+        required: false
+        type: boolean
+        default: false
       disable-system-updater:
         description: Remove the stock ROM updater app (use with Custota)
         required: false
@@ -117,7 +122,7 @@ permissions:
 jobs:
   schedule_config:
     if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0')) }}"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -139,6 +144,7 @@ jobs:
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
       exfatprogs_fsck: ${{ steps.definition.outputs.exfatprogs_fsck }}
+      fsck_sysfs_sepolicy: ${{ steps.definition.outputs.fsck_sysfs_sepolicy }}
       should_build: ${{ steps.existing.outputs.should_build }}
     steps:
       - name: Checkout code
@@ -154,6 +160,22 @@ jobs:
           SCHEDULE_DEFINITION: .github/schedules/lineageos-pdx235.toml
           EXPECTED_ROM_FAMILY: lineageos
         run: bash src/ci/load_schedule_definition.sh
+
+      - name: Setup Rust for fsck sysfs selection identity
+        if: steps.definition.outputs.fsck_sysfs_sepolicy == 'true'
+        uses: dtolnay/rust-toolchain@1.97.1
+
+      - name: Install libclang for fsck sysfs selection identity
+        if: steps.definition.outputs.fsck_sysfs_sepolicy == 'true'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libclang-dev
+
+      - name: Build and verify exfatprogs corresponding-source bundle
+        if: steps.definition.outputs.exfatprogs_fsck == 'true'
+        shell: bash
+        run: python3 src/ci/build_exfatprogs_source_bundle.py --output-dir "${RUNNER_TEMP}/exfatprogs-source" --check-deterministic
 
       - name: Check for an already-published matching OTA pair
         id: existing
@@ -187,6 +209,7 @@ jobs:
       fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
       exfatprogs-fsck: ${{ needs.schedule_config.outputs.exfatprogs_fsck == 'true' }}
+      fsck-sysfs-sepolicy: ${{ needs.schedule_config.outputs.fsck_sysfs_sepolicy == 'true' }}
       allow-unauthorized-adb: false
       boot-animation: ${{ needs.schedule_config.outputs.boot_animation == 'true' }}
       release-type: default
@@ -210,6 +233,7 @@ jobs:
       microg: ${{ inputs.microg }}
       shizuku: ${{ inputs.shizuku }}
       exfatprogs-fsck: ${{ inputs.exfatprogs-fsck }}
+      fsck-sysfs-sepolicy: ${{ inputs.fsck-sysfs-sepolicy }}
       disable-system-updater: ${{ inputs.disable-system-updater }}
       boot-animation: ${{ inputs.boot-animation }}
       export-device-candidate: ${{ inputs.export-device-candidate }}

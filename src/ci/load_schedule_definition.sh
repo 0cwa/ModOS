@@ -28,6 +28,7 @@ required=(
   msd
   oemunlockonboot
   disable_system_updater
+  fsck_sysfs_sepolicy
   fdroid_privileged_extension
   boot_animation
   compatible_sepolicy_patching
@@ -54,6 +55,7 @@ custota="$(toml_resolve_value custota '')"
 msd="$(toml_resolve_value msd '')"
 oemunlockonboot="$(toml_resolve_value oemunlockonboot '')"
 disable_system_updater="$(toml_resolve_value disable_system_updater '')"
+fsck_sysfs_sepolicy="$(toml_resolve_value fsck_sysfs_sepolicy '')"
 microg="$(toml_resolve_value microg false)"
 fdroid_privileged_extension="$(toml_resolve_value fdroid_privileged_extension '')"
 boot_animation="$(toml_resolve_value boot_animation '')"
@@ -93,6 +95,7 @@ esac
   echo "msd=${msd}"
   echo "oemunlockonboot=${oemunlockonboot}"
   echo "disable_system_updater=${disable_system_updater}"
+  echo "fsck_sysfs_sepolicy=${fsck_sysfs_sepolicy}"
   echo "microg=${microg}"
   echo "fdroid_privileged_extension=${fdroid_privileged_extension}"
   echo "boot_animation=${boot_animation}"
@@ -115,6 +118,7 @@ esac
   echo "ADDITIONALS_MSD=${msd}"
   echo "ADDITIONALS_OEMUNLOCKONBOOT=${oemunlockonboot}"
   echo "ADDITIONALS_DISABLE_SYSTEM_UPDATER=${disable_system_updater}"
+  echo "ADDITIONALS_FSCK_SYSFS_SEPOLICY=${fsck_sysfs_sepolicy}"
   echo "ADDITIONALS_MICROG=${microg}"
   echo "ADDITIONALS_FDROID_PRIVILEGED_EXTENSION=${fdroid_privileged_extension}"
   echo "ADDITIONALS_BOOT_ANIMATION=${boot_animation}"

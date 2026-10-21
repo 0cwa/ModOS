@@ -232,6 +232,7 @@ function module_selection_fingerprint() {
   local exfatprogs_fsck_adapter_digest="disabled"
   local exfatprogs_fsck_payload_digest="disabled"
   local exfatprogs_fsck_provenance_digest="disabled"
+  local fsck_sysfs_sepolicy_adapter_digest="disabled"
   local entry
   local -a module_entries=(
     "afsr:AFSR"
@@ -244,6 +245,7 @@ function module_selection_fingerprint() {
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "shizuku:SHIZUKU"
+    "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
     "exfatprogs-fsck:EXFATPROGS_FSCK"
   )
 
@@ -298,6 +300,17 @@ function module_selection_fingerprint() {
       return 1
     }
     exfatprogs_fsck_payload_digest='06e018cc175e9702508b6a76e66486e28125fef434a0a5c0f7611f3cd3ad147e'
+  fi
+
+  if [[ "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" == 'true' ]]; then
+    if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
+      echo "Error: fsck sysfs SELinux patching is supported only for LineageOS pdx235." >&2
+      return 1
+    fi
+    fsck_sysfs_sepolicy_adapter_digest="$(_locked_input_digest src/fsck_sysfs_sepolicy.py)" || {
+      echo "Error: the fsck sysfs SELinux adapter is not clean and checked in." >&2
+      return 1
+    }
   fi
 
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]]; then
@@ -379,6 +392,8 @@ function module_selection_fingerprint() {
   SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256="${exfatprogs_fsck_adapter_digest}"
   SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256="${exfatprogs_fsck_payload_digest}"
   SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256="${exfatprogs_fsck_provenance_digest}"
+  SELECTION_MODULE_FSCK_SYSFS_SEPOLICY="${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}"
+  SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256="${fsck_sysfs_sepolicy_adapter_digest}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
 

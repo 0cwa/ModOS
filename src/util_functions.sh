@@ -235,6 +235,7 @@ function append_enabled_module_arguments() {
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "boot-animation:BOOT_ANIMATION"
     "shizuku:SHIZUKU"
+    "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
     "exfatprogs-fsck:EXFATPROGS_FSCK"
   )
 
@@ -484,6 +485,125 @@ function prepare_shizuku_module() {
   export PIXENEOS_SHIZUKU_APK_PATH="${expected_apk}"
   export PIXENEOS_SHIZUKU_ROOT_MODE="${RESOLVED_ROOT_MODE}"
   export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+}
+
+# Build the pinned compiled-policy helper used by the exFAT and SELinux modules.
+function build_exfatprogs_policy_patcher() {
+  local repository_root="${1}"
+  local project_root="${repository_root}/src/exfatprogs_sepolicy"
+  local target_dir="${WORKDIR}/build/exfatprogs-sepolicy"
+  local toolchain cargo_bin rustc_bin patcher_path libclang_path
+
+  if [[ ! -f "${project_root}/Cargo.toml" || -L "${project_root}/Cargo.toml" ||
+    ! -f "${project_root}/Cargo.lock" || -L "${project_root}/Cargo.lock" ||
+    ! -f "${project_root}/PROVENANCE.json" || -L "${project_root}/PROVENANCE.json" ||
+    ! -f "${project_root}/src/main.rs" || -L "${project_root}/src/main.rs" ]]; then
+    echo "Error: pinned exfatprogs SELinux patcher sources are missing or unsafe." >&2
+    return 1
+  fi
+
+  libclang_path="$(resolve_libclang_shared_object)" || return 1
+
+  if command -v rustup >/dev/null 2>&1; then
+    toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR == 1 {print $1}')" || return 1
+    if [[ -z "${toolchain}" ]]; then
+      echo "Error: rustup has no active Rust toolchain for the exfatprogs policy patcher." >&2
+      return 1
+    fi
+    cargo_bin="$(rustup which cargo --toolchain "${toolchain}")" || return 1
+    rustc_bin="$(rustup which rustc --toolchain "${toolchain}")" || return 1
+  else
+    cargo_bin="$(command -v cargo)" || {
+      echo "Error: cargo is required to build the exfatprogs SELinux patcher." >&2
+      return 1
+    }
+    rustc_bin="$(command -v rustc)" || {
+      echo "Error: rustc is required to build the exfatprogs SELinux patcher." >&2
+      return 1
+    }
+  fi
+
+  if ! env RUSTC="${rustc_bin}" CARGO_TARGET_DIR="${target_dir}" \
+    LIBCLANG_PATH="${libclang_path}" \
+    "${cargo_bin}" build --locked --release --manifest-path "${project_root}/Cargo.toml"; then
+    echo "Error: the pinned exfatprogs SELinux patcher could not be built." >&2
+    return 1
+  fi
+
+  patcher_path="${target_dir}/release/exfatprogs-sepolicy-patcher"
+  if [[ ! -f "${patcher_path}" || -L "${patcher_path}" || ! -x "${patcher_path}" ]]; then
+    echo "Error: the exfatprogs SELinux patcher build output is missing or unsafe." >&2
+    return 1
+  fi
+  EXFATPROGS_POLICY_PATCHER_PATH="${patcher_path}"
+}
+
+# Register the independent SELinux fix module for the pdx235 image. This keeps
+# the policy repair selectable without replacing the fsck.exfat executable.
+function prepare_fsck_sysfs_sepolicy_module() {
+  local helper_root="${1}"
+  local repository_root
+  local init_file="${helper_root}/lib/modules/__init__.py"
+  local registry_file="${helper_root}/lib/modules/registry.py"
+  local module_source="${helper_root}/lib/modules/fsck_sysfs_sepolicy.py"
+  local patcher_path
+
+  if [[ "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" != 'true' ]]; then
+    return 0
+  fi
+  if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
+    echo "Error: fsck sysfs SELinux patching is supported only for LineageOS pdx235." >&2
+    return 1
+  fi
+  repository_root="$(git rev-parse --show-toplevel)" || return 1
+  if [[ ! -f src/fsck_sysfs_sepolicy.py || -L src/fsck_sysfs_sepolicy.py ||
+    ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
+    -L "${module_source}" ]]; then
+    echo "Error: the fsck sysfs SELinux adapter or helper registry path is missing or unsafe." >&2
+    return 1
+  fi
+  if [[ -z "${EXFATPROGS_POLICY_PATCHER_PATH:-}" ]] &&
+    ! build_exfatprogs_policy_patcher "${repository_root}"; then
+    return 1
+  fi
+  patcher_path="${EXFATPROGS_POLICY_PATCHER_PATH}"
+
+  cp -- src/fsck_sysfs_sepolicy.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+  if ! grep -Fq 'from lib.modules.fsck_sysfs_sepolicy import FsckSysfsSePolicyMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.fsck_sysfs_sepolicy import FsckSysfsSePolicyMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(FsckSysfsSePolicyMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(FsckSysfsSePolicyMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
+  : >"${WORKDIR}/modules/fsck-sysfs-sepolicy.zip"
+  : >"${WORKDIR}/signatures/fsck-sysfs-sepolicy.zip.sig"
+  export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+  export PIXENEOS_DEVICE_NAME="${DEVICE_NAME}"
+  export PIXENEOS_FSCK_SYSFS_POLICY_PATCHER="${patcher_path}"
 }
 
 # Register the locked Termux exfatprogs binary adapter for the one supported
@@ -960,6 +1080,10 @@ function patch_ota() {
     fi
     if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]] &&
       ! prepare_shizuku_module "${my_avbroot_setup}"; then
+      return 1
+    fi
+    if [[ "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" == 'true' ]] &&
+      ! prepare_fsck_sysfs_sepolicy_module "${my_avbroot_setup}"; then
       return 1
     fi
     if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ]] &&

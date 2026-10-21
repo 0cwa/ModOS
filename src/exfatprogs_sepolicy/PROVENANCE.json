@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "patcher": "exfatprogs-sepolicy-patcher",
+  "upstream": {
+    "repository": "https://github.com/chenxiaolong/sepatch",
+    "revision": "7634748c016165489c307a50f186aeb4faa5feb0",
+    "license": "LGPL-2.1-or-later",
+    "selinux_submodule": {
+      "repository": "https://android.googlesource.com/platform/external/selinux",
+      "revision": "085c131ad1b984bfa8ffdafee7a976e9d89f403c"
+    }
+  },
+  "operation": {
+    "rule": "allow fsck_untrusted sysfs:dir read;",
+    "api": "PolicyDb::set_rule with RuleAction::Allow",
+    "policy_scope": "Only the fsck_untrusted/sysfs/dir/read rule tuple is changed."
+  }
+}

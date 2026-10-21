@@ -8,6 +8,9 @@
 # build and release preflight paths.
 
 BOOT_ANIMATION_SELECTION_CONTRACT="product-image-root-theme-context-deterministic-stored-v7"
+_selection_variant_source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${_selection_variant_source_dir}/libclang_identity.sh"
+unset _selection_variant_source_dir
 
 function selection_variant_manifest() {
   local field value
@@ -43,6 +46,8 @@ function selection_variant_manifest() {
     SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256
     SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256
     SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256
+    SELECTION_MODULE_FSCK_SYSFS_SEPOLICY
+    SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256
     SELECTION_BOOT_ANIMATION
   )
 
@@ -70,6 +75,7 @@ function selection_variant_manifest() {
     SELECTION_DISABLE_SYSTEM_UPDATER \
     SELECTION_MODULE_SHIZUKU \
     SELECTION_MODULE_EXFATPROGS_FSCK \
+    SELECTION_MODULE_FSCK_SYSFS_SEPOLICY \
     SELECTION_BOOT_ANIMATION; do
     value="${!field}"
     if [[ "${value}" != 'true' && "${value}" != 'false' ]]; then
@@ -82,7 +88,8 @@ function selection_variant_manifest() {
     SELECTION_SHIZUKU_LOCK_SHA256 SELECTION_EXFATPROGS_FSCK_LOCK_SHA256 \
     SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256 \
     SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256 \
-    SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256; do
+    SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256 \
+    SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256; do
     value="${!field}"
     if [[ "${value}" != 'disabled' && ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
       echo "Error: selection identity field ${field} is not a SHA-256 digest." >&2
@@ -126,6 +133,16 @@ function selection_variant_manifest() {
     done
   fi
 
+  if [[ "${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" == 'true' ]]; then
+    if [[ ! "${SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Error: enabled fsck sysfs SELinux module lacks a checked adapter digest." >&2
+      return 1
+    fi
+  elif [[ "${SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256}" != 'disabled' ]]; then
+    echo "Error: disabled fsck sysfs SELinux module has an unexpected adapter digest." >&2
+    return 1
+  fi
+
   printf '%s\n' \
     'pixene-module-selection-v1' \
     "rom_family=${SELECTION_ROM_FAMILY}" \
@@ -157,6 +174,46 @@ function selection_variant_manifest() {
     "exfatprogs_fsck_adapter_sha256=${SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256}" \
     "exfatprogs_fsck_payload_sha256=${SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256}" \
     "exfatprogs_fsck_provenance_sha256=${SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256}"
+
+  printf '%s\n' \
+    "module.fsck-sysfs-sepolicy=${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" \
+    "fsck_sysfs_sepolicy_adapter_sha256=${SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256}"
+
+  if [[ "${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" == 'true' ]]; then
+    local policy_patcher_root libclang_identity policy_patcher_digest value
+    local -a policy_patcher_inputs
+    policy_patcher_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)" || return 1
+    libclang_identity="$(resolve_libclang_identity)" || return 1
+    policy_patcher_inputs=(
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/Cargo.toml"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/Cargo.lock"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/PROVENANCE.json"
+      "${policy_patcher_root}/src/exfatprogs_sepolicy/src/main.rs"
+      "${policy_patcher_root}/src/fsck_sysfs_sepolicy.py"
+      "${policy_patcher_root}/src/ci/libclang_identity.sh"
+    )
+    for value in "${policy_patcher_inputs[@]}"; do
+      if [[ ! -f "${value}" || -L "${value}" ]]; then
+        echo "Error: fsck sysfs policy patcher input is missing or unsafe: ${value}" >&2
+        return 1
+      fi
+    done
+    policy_patcher_digest="$(
+      {
+        printf '%s\n' 'build-host=ubuntu-24.04' 'rust-toolchain=1.97.1'
+        printf '%s\n' "${libclang_identity}"
+        for value in "${policy_patcher_inputs[@]}"; do
+          printf '%s ' "${value#"${policy_patcher_root}"/}"
+          sha256sum <"${value}" | awk '{print $1}'
+        done
+      } | sha256sum | awk '{print $1}'
+    )" || return 1
+    if [[ ! "${policy_patcher_digest}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Error: failed to compute fsck sysfs policy patcher input digest." >&2
+      return 1
+    fi
+    printf '%s\n' "fsck_sysfs_policy_patcher_sha256=${policy_patcher_digest}"
+  fi
 
   if [[ "${SELECTION_ROOT}" == 'true' ]]; then
     if [[ ! "${SELECTION_MAGISK_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
