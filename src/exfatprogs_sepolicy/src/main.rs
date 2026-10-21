@@ -177,7 +177,10 @@ mod tests {
         let path = std::env::temp_dir().join(filename);
         fs::write(&path, POLICY_FIXTURE).unwrap();
         let result = patch(&path);
-        assert!(result.is_ok(), "patch failed: {result:?}");
+        assert!(
+            matches!(&result, Ok(true)),
+            "patch did not rewrite fixture: {result:?}"
+        );
 
         let output = fs::read(&path).unwrap();
         let _ = fs::remove_file(&path);

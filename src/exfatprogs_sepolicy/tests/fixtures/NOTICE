@@ -10,5 +10,6 @@ relevant upstream libsepol license is at
 sibling `dir.search` audit rules to exercise the legacy verifier's aggregate
 change result for the target `dir.read` allow.
 
-Regenerate the binary with:
+Regenerate the compiled policies from this directory with:
 `checkpolicy -N -c 31 -o fsck_sysfs_audit_rules.policy fsck_sysfs_audit_rules.conf`
+`checkpolicy -N -c 31 -o fsck_sysfs_allow_roundtrip.policy fsck_sysfs_allow_roundtrip.conf`
