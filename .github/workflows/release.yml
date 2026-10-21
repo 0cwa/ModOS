@@ -372,6 +372,9 @@ jobs:
       disable-system-updater: ${{ github.event_name == 'schedule' && needs.preflight.outputs.disable_system_updater == 'true' || (github.event_name != 'schedule' && inputs.disable-system-updater) }}
       fdroid-privileged-extension: ${{ github.event_name == 'schedule' && needs.preflight.outputs.fdroid_privileged_extension == 'true' || (github.event_name != 'schedule' && inputs.fdroid-privileged-extension) }}
       shizuku: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
+      # LineageOS pdx235-only modules; never forward them from a GrapheneOS trigger.
+      exfatprogs-fsck: false
+      fsck-sysfs-sepolicy: false
       compatible-sepolicy-patching: ${{ github.event_name == 'schedule' && needs.preflight.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
       allow-unauthorized-adb: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
       boot-animation: ${{ github.event_name == 'schedule' && needs.preflight.outputs.boot_animation == 'true' || github.event_name != 'schedule' && inputs.boot-animation }}
