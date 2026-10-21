@@ -74,8 +74,12 @@ a successful real baseline reproduction.
 ## Second gate: compile the modified vold only after success
 
 After inspecting an actual **`byte_identical: true`** receipt from the
-full baseline CI run, the same isolated source checkout can produce the
-patched artifact with the mandatory proof inputs:
+full baseline CI run, a separately reviewed patched-build job may be developed.
+The baseline CI job intentionally deletes its source checkout, reference and
+binary after uploading the receipt. Therefore, the later patched-build job
+must re-authenticate the exact source OTA and reproduce its unmodified vold
+again, without trusting just the uploaded JSON. Only then can it build the
+patched artifact with these mandatory proof inputs:
 
 ```sh
 python3 src/ci/build_lineage_vold.py build \
