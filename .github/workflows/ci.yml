@@ -102,6 +102,9 @@ jobs:
       - name: Test source-built Vold module contract
         run: python3 tests/lineage_vold_contract_test.py
 
+      - name: Test byte-exact unmodified Vold reproduction contract
+        run: python3 tests/lineage_vold_baseline_test.py
+
       - name: Test source-built Vold workflow routing
         run: python3 tests/lineage_vold_workflow_contract_test.py
 
@@ -177,3 +180,95 @@ jobs:
       signing-mode: disposable
       release-type: build-only
       publish: false
+
+  # Manual opt-in on the owned review branch only. No publishing keys, release
+  # credentials, rootless/Magisk patching, or binary-injection paths are used.
+  # The runner must have a large isolated scratch volume and Android build deps.
+  lineage_vold_exact_baseline:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'codex/lineage-vold-exfat-timeout-pr' && vars.MODOS_VOLD_BASELINE_RUNNER_READY == 'true' && vars.MODOS_LINEAGE_LARGE_SCRATCH != '' }}
+    runs-on: [self-hosted, linux, x64, modos-lineage-large]
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    concurrency:
+      group: lineage-vold-unmodified-baseline
+      cancel-in-progress: false
+    env:
+      MODOS_LINEAGE_LARGE_SCRATCH: ${{ vars.MODOS_LINEAGE_LARGE_SCRATCH }}
+    steps:
+      - name: Checkout exact PR source without retained credentials
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check isolated build host and initialize scratch workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in repo avbroot unzip debugfs curl openssl python3 git; do
+            command -v "${tool}" >/dev/null || { echo "::error::Missing host tool: ${tool}"; exit 1; }
+          done
+          scratch="${MODOS_LINEAGE_LARGE_SCRATCH}"
+          [[ "${scratch}" == /* && -d "${scratch}" && ! -L "${scratch}" ]] ||
+            { echo "::error::A real absolute large scratch directory is required"; exit 1; }
+          scratch="$(realpath -e -- "${scratch}")"
+          free="$(df -PB1 -- "${scratch}" | awk 'END {print $4}')"
+          (( free >= 220000000000 )) ||
+            { echo "::error::Baseline source build needs at least 220GB available"; exit 1; }
+          work="$(mktemp -d -- "${scratch}/modos-vold-baseline.XXXXXXXX")"
+          echo "VOLD_BASELINE_WORK=${work}" >> "${GITHUB_ENV}"
+
+      - name: Resolve exact 2026-10-16 OTA through official Lineage API
+        id: official
+        shell: bash
+        run: python3 src/ci/resolve_lineage_vold_ota.py --output "${GITHUB_OUTPUT}"
+
+      - name: Download, authenticate and extract original OTA vold
+        shell: bash
+        env:
+          OTA_URL: ${{ steps.official.outputs.ota_url }}
+          OTA_SHA256: ${{ steps.official.outputs.ota_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "${OTA_SHA256}" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' \
+            --output "${VOLD_BASELINE_WORK}/source.zip" "${OTA_URL}"
+          bash src/ci/prepare_lineage_vold_reference.sh \
+            "${VOLD_BASELINE_WORK}/source.zip" "${VOLD_BASELINE_WORK}/reference" "${OTA_SHA256}"
+
+      - name: Sync full immutable LineageOS source manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 src/ci/build_lineage_vold.py sync \
+            --source-root "${VOLD_BASELINE_WORK}/source" --jobs 4
+
+      - name: Reproduce unmodified vold and check byte-exact OTA identity
+        shell: bash
+        env:
+          OTA_SHA256: ${{ steps.official.outputs.ota_sha256 }}
+        run: |
+          set -euo pipefail
+          python3 src/ci/build_lineage_vold.py baseline \
+            --source-root "${VOLD_BASELINE_WORK}/source" \
+            --reference-vold "${VOLD_BASELINE_WORK}/reference/reference-vold" \
+            --source-ota-sha256 "${OTA_SHA256}" \
+            --output-dir "${VOLD_BASELINE_WORK}/baseline" --jobs 4
+
+      - name: Preserve comparison receipt only (no signed or patched OTA)
+        if: always() && env.VOLD_BASELINE_WORK != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lineage-pdx235-original-vold-baseline-report
+          path: ${{ env.VOLD_BASELINE_WORK }}/baseline/baseline-report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Erase isolated source and extracted images
+        if: always() && env.VOLD_BASELINE_WORK != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${VOLD_BASELINE_WORK}" == "${MODOS_LINEAGE_LARGE_SCRATCH}"/modos-vold-baseline.* ]] || exit 1
+          rm -rf -- "${VOLD_BASELINE_WORK}"
