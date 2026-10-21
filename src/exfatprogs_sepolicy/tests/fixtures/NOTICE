@@ -5,5 +5,10 @@ The fixture source and compiled policy are retained for testing only. The
 relevant upstream libsepol license is at
 `vendor/sepatch/external/selinux/libsepol/LICENSE` (LGPL-2.1-or-later).
 
+`fsck_sysfs_allow_roundtrip.conf` is derived from
+`fsck_sysfs_audit_rules.conf`; it preserves the policy boilerplate and uses
+sibling `dir.search` audit rules to exercise the legacy verifier's aggregate
+change result for the target `dir.read` allow.
+
 Regenerate the binary with:
 `checkpolicy -N -c 31 -o fsck_sysfs_audit_rules.policy fsck_sysfs_audit_rules.conf`

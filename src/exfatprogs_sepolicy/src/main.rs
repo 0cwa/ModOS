@@ -182,8 +182,14 @@ mod tests {
         let output = fs::read(&path).unwrap();
         let _ = fs::remove_file(&path);
         let mut verify_warnings = Vec::new();
-        let verified = PolicyDb::from_raw(&output, &mut verify_warnings).unwrap();
+        let mut verified = PolicyDb::from_raw(&output, &mut verify_warnings).unwrap();
         let (source, target, class, permission) = ids(&verified);
+        assert!(verified.has_allow_rule(source, target, class, permission));
+
+        // Reproduce the old production verifier: its true result was treated
+        // as a missing allow, although this same-tuple audit state is what
+        // caused the aggregate mutator to report a change.
+        assert!(verified.set_rule(source, target, class, permission, RuleAction::Allow));
         assert!(verified.has_allow_rule(source, target, class, permission));
 
         let other_source = required_id(verified.get_type_id("keep_t"), "keep_t");
