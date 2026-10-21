@@ -17,6 +17,9 @@ import shutil
 import subprocess
 import sys
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
 from build_lineage_vold import load_contract
 from check_lineage_vold_artifact import verify
 from lineage_vold import BASE_BUILD_ID, _read_regular_file
