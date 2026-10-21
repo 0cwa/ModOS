@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "src" / "ci"))
 import lineage_vold  # noqa: E402
 import build_lineage_vold  # noqa: E402
+import check_lineage_vold_artifact  # noqa: E402
 
 
 class LineageVoldContractTest(unittest.TestCase):
@@ -193,6 +194,57 @@ class LineageVoldContractTest(unittest.TestCase):
                 fs.change_metadata_on_write = True
                 with self.assertRaisesRegex(lineage_vold.VoldModuleError, "changed filesystem entry metadata"):
                     lineage_vold.inject_vold(fs, product_fs, tree, lineage_vold.BASE_BUILD_ID)
+
+    def test_published_module_requires_independent_binary_approval(self):
+        from unittest.mock import patch
+
+        lock = json.loads((ROOT / "locks/lineage-vold-exfat-timeout.json").read_text())
+        binary = self.fixture_elf()
+        digest = hashlib.sha256(binary).hexdigest()
+        self.assertEqual(lock["approved_binary_sha256"], "")
+        check_lineage_vold_artifact.require_release_approval(
+            lock, digest, "local-unpublished"
+        )
+        with self.assertRaisesRegex(lineage_vold.VoldModuleError, "blocked"):
+            check_lineage_vold_artifact.require_release_approval(lock, digest, "published")
+        with self.assertRaises(lineage_vold.VoldModuleError):
+            check_lineage_vold_artifact.require_release_approval(lock, digest, "shared")
+        approved_lock = {**lock, "approved_binary_sha256": digest}
+        check_lineage_vold_artifact.require_release_approval(
+            approved_lock, digest, "published"
+        )
+        with self.assertRaisesRegex(lineage_vold.VoldModuleError, "approved publication digest"):
+            check_lineage_vold_artifact.require_release_approval(
+                approved_lock, "0" * 64, "published"
+            )
+
+        with (
+            patch.object(
+                check_lineage_vold_artifact, "load_contract",
+                return_value=(lock, b"", b""),
+            ),
+            patch.object(
+                check_lineage_vold_artifact, "_artifact",
+                return_value=(binary, {}),
+            ),
+        ):
+            self.assertEqual(
+                check_lineage_vold_artifact.verify(
+                    Path("/unused"), "local-unpublished",
+                    lineage_vold.BASE_BUILD_ID, lineage_vold.BASE_BUILD_ID,
+                ),
+                digest,
+            )
+            with self.assertRaisesRegex(lineage_vold.VoldModuleError, "does not match"):
+                check_lineage_vold_artifact.verify(
+                    Path("/unused"), "local-unpublished",
+                    lineage_vold.BASE_BUILD_ID, "lineage-24.0-20261017-nightly-pdx235-signed",
+                )
+            with self.assertRaisesRegex(lineage_vold.VoldModuleError, "blocked"):
+                check_lineage_vold_artifact.verify(
+                    Path("/unused"), "published",
+                    lineage_vold.BASE_BUILD_ID, lineage_vold.BASE_BUILD_ID,
+                )
 
     def test_helper_module_imports_without_helper_runtime(self):
         import tempfile
