@@ -749,16 +749,11 @@ function prepare_lineage_vold_exfat_timeout_module() {
     echo "Error: the Vold adapter or pinned helper registry path is missing or unsafe." >&2
     return 1
   fi
-  if ! PYTHONPATH=src python3 - "${artifact_dir}" "${base_build_id}" <<'PY'
-import sys
-from pathlib import Path
-import lineage_vold
-
-if sys.argv[2] != lineage_vold.BASE_BUILD_ID:
-    raise SystemExit("selected base build id differs from the pinned Vold source build")
-lineage_vold._artifact(Path(sys.argv[1]))
-PY
-  then
+  if ! python3 src/ci/check_lineage_vold_artifact.py \
+    --artifact-dir "${artifact_dir}" \
+    --scope "${OUTPUT_SCOPE}" \
+    --base-build-id "${base_build_id}" \
+    --source-target "${GRAPHENEOS[OTA_TARGET]:-}" >/dev/null;
     echo "Error: the source-built vold artifact failed provenance or ELF validation." >&2
     return 1
   fi
