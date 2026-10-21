@@ -236,6 +236,7 @@ function module_selection_fingerprint() {
   local lineage_vold_lock_digest="disabled"
   local lineage_vold_adapter_digest="disabled"
   local lineage_vold_builder_digest="disabled"
+  local lineage_vold_verifier_digest="disabled"
   local lineage_vold_patch_digest="disabled"
   local lineage_vold_manifest_digest="disabled"
   local lineage_vold_binary_digest="disabled"
@@ -333,6 +334,7 @@ function module_selection_fingerprint() {
     lineage_vold_lock_digest="$(_locked_input_digest locks/lineage-vold-exfat-timeout.json)" || return 1
     lineage_vold_adapter_digest="$(_locked_input_digest src/lineage_vold.py)" || return 1
     lineage_vold_builder_digest="$(_locked_input_digest src/ci/build_lineage_vold.py)" || return 1
+    lineage_vold_verifier_digest="$(_locked_input_digest src/ci/check_lineage_vold_artifact.py)" || return 1
     lineage_vold_patch_digest="$(_locked_input_digest patches/lineageos/android_system_vold/11d8982f824d52e8122c7aa732207ba66b8f23c8-exfat-fsck-timeout-120s.patch)" || return 1
     lineage_vold_manifest_digest="$(_locked_input_digest locks/lineage-pdx235-20261016-build-manifest.xml)" || return 1
     lineage_vold_binary_digest="$(python3 src/ci/check_lineage_vold_artifact.py \
@@ -431,6 +433,7 @@ function module_selection_fingerprint() {
   SELECTION_LINEAGE_VOLD_LOCK_SHA256="${lineage_vold_lock_digest}"
   SELECTION_LINEAGE_VOLD_ADAPTER_SHA256="${lineage_vold_adapter_digest}"
   SELECTION_LINEAGE_VOLD_BUILDER_SHA256="${lineage_vold_builder_digest}"
+  SELECTION_LINEAGE_VOLD_VERIFIER_SHA256="${lineage_vold_verifier_digest}"
   SELECTION_LINEAGE_VOLD_PATCH_SHA256="${lineage_vold_patch_digest}"
   SELECTION_LINEAGE_VOLD_MANIFEST_SHA256="${lineage_vold_manifest_digest}"
   SELECTION_LINEAGE_VOLD_BINARY_SHA256="${lineage_vold_binary_digest}"
