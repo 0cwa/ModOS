@@ -307,11 +307,17 @@ def _metadata_diagnostics(entry: Any) -> dict[str, Any]:
     selinux_empty = selinux_present and (
         not isinstance(label, str) or not label.rstrip("\0")
     )
+
+    def owner_id_valid(value: Any) -> bool:
+        return value is None or (type(value) is int and 0 <= value <= 0xFFFFFFFF)
+
     return {
         "file_type": entry.file_type,
         "executable_bit": isinstance(file_mode, int) and bool(file_mode & 0o111),
-        "uid_present": entry.uid is not None,
-        "gid_present": entry.gid is not None,
+        "uid_valid": owner_id_valid(entry.uid),
+        "gid_valid": owner_id_valid(entry.gid),
+        "uid_defaulted_to_root": entry.uid is None,
+        "gid_defaulted_to_root": entry.gid is None,
         "selinux_label_present": selinux_present,
         "selinux_label_empty": selinux_empty,
     }
@@ -326,8 +332,8 @@ def _inject_system_binary(system_fs: Any, binary: bytes) -> None:
     if (
         diagnostics["file_type"] != "RegularFile"
         or not diagnostics["executable_bit"]
-        or not diagnostics["uid_present"]
-        or not diagnostics["gid_present"]
+        or not diagnostics["uid_valid"]
+        or not diagnostics["gid_valid"]
         or not diagnostics["selinux_label_present"]
         or diagnostics["selinux_label_empty"]
     ):
@@ -339,6 +345,14 @@ def _inject_system_binary(system_fs: Any, binary: bytes) -> None:
             "system image fsck.exfat metadata is incomplete or unexpected: "
             f"{summary}"
         )
+
+    # AFSR v2.0.0 omits zero-valued UID/GID fields when unpacking and defaults
+    # omitted values to zero when packing. Make that pinned root-owner
+    # convention explicit in the helper metadata before writing the image.
+    if target_entry.uid is None:
+        target_entry.uid = 0
+    if target_entry.gid is None:
+        target_entry.gid = 0
 
     tree_path = system_fs.tree / "system" / "bin" / "fsck.exfat"
     for path in (system_fs.tree, system_fs.tree / "system", system_fs.tree / "system" / "bin"):
