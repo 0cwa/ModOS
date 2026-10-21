@@ -217,14 +217,20 @@ function selection_variant_manifest() {
 
   printf '%s\n' \
     "module.fsck-sysfs-sepolicy=${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" \
-    "fsck_sysfs_sepolicy_adapter_sha256=${SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256}" \
-    "module.lineage-vold-exfat-timeout=${SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT}" \
-    "lineage_vold_lock_sha256=${SELECTION_LINEAGE_VOLD_LOCK_SHA256}" \
-    "lineage_vold_adapter_sha256=${SELECTION_LINEAGE_VOLD_ADAPTER_SHA256}" \
-    "lineage_vold_builder_sha256=${SELECTION_LINEAGE_VOLD_BUILDER_SHA256}" \
-    "lineage_vold_patch_sha256=${SELECTION_LINEAGE_VOLD_PATCH_SHA256}" \
-    "lineage_vold_manifest_sha256=${SELECTION_LINEAGE_VOLD_MANIFEST_SHA256}" \
-    "lineage_vold_binary_sha256=${SELECTION_LINEAGE_VOLD_BINARY_SHA256}"
+    "fsck_sysfs_sepolicy_adapter_sha256=${SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256}"
+
+  # Preserve the existing release fingerprint whenever this optional module
+  # is disabled; include its artifact digests only for enabled builds.
+  if [[ "${SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT}" == "true" ]]; then
+    printf '%s\n' \
+      "module.lineage-vold-exfat-timeout=true" \
+      "lineage_vold_lock_sha256=${SELECTION_LINEAGE_VOLD_LOCK_SHA256}" \
+      "lineage_vold_adapter_sha256=${SELECTION_LINEAGE_VOLD_ADAPTER_SHA256}" \
+      "lineage_vold_builder_sha256=${SELECTION_LINEAGE_VOLD_BUILDER_SHA256}" \
+      "lineage_vold_patch_sha256=${SELECTION_LINEAGE_VOLD_PATCH_SHA256}" \
+      "lineage_vold_manifest_sha256=${SELECTION_LINEAGE_VOLD_MANIFEST_SHA256}" \
+      "lineage_vold_binary_sha256=${SELECTION_LINEAGE_VOLD_BINARY_SHA256}"
+  fi
 
   if [[ "${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" == 'true' ]]; then
     local policy_patcher_root libclang_identity policy_patcher_digest value
