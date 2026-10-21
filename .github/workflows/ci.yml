@@ -88,6 +88,9 @@ jobs:
       - name: Test source-built Vold module contract
         run: python3 tests/lineage_vold_contract_test.py
 
+      - name: Test source-built Vold workflow routing
+        run: python3 tests/lineage_vold_workflow_contract_test.py
+
       - name: Test pdx235 Custota metadata preparation
         run: bash tests/pdx235_custota_metadata_test.sh
 
