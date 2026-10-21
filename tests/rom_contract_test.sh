@@ -307,6 +307,14 @@ test_shizuku_selection_follows_supported_rom_profiles() (
 test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted() (
   local disabled enabled
 
+  resolve_libclang_identity() {
+    printf '%s\n' \
+      'libclang_selected_path=/fixture/libclang.so' \
+      'libclang_path=/fixture/libclang.so' \
+      'libclang_sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' \
+      'libclang_owner=fixture:1.0'
+  }
+
   load_contract
   set_selection_fixture
   ROM_FAMILY="lineageos"

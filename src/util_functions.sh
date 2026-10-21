@@ -492,7 +492,7 @@ function build_exfatprogs_policy_patcher() {
   local repository_root="${1}"
   local project_root="${repository_root}/src/exfatprogs_sepolicy"
   local target_dir="${WORKDIR}/build/exfatprogs-sepolicy"
-  local toolchain cargo_bin rustc_bin patcher_path libclang_path
+  local toolchain cargo_bin rustc_bin rustc_version rustc_version_number patcher_path libclang_path
 
   if [[ ! -f "${project_root}/Cargo.toml" || -L "${project_root}/Cargo.toml" ||
     ! -f "${project_root}/Cargo.lock" || -L "${project_root}/Cargo.lock" ||
@@ -521,6 +521,17 @@ function build_exfatprogs_policy_patcher() {
       echo "Error: rustc is required to build the exfatprogs SELinux patcher." >&2
       return 1
     }
+  fi
+
+  rustc_version="$("${rustc_bin}" --version 2>/dev/null)" || {
+    echo "Error: the selected Rust compiler could not report its version." >&2
+    return 1
+  }
+  rustc_version_number="${rustc_version#rustc }"
+  rustc_version_number="${rustc_version_number%% *}"
+  if [[ "${rustc_version_number}" != '1.97.1' ]]; then
+    echo "Error: the exfatprogs policy patcher requires rustc 1.97.1; selected ${rustc_version_number:-unknown}." >&2
+    return 1
   fi
 
   if ! env RUSTC="${rustc_bin}" CARGO_TARGET_DIR="${target_dir}" \
