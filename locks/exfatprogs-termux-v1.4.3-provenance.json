@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "package": {
+    "name": "exfatprogs",
+    "version": "1.4.3",
+    "architecture": "aarch64",
+    "filename": "pool/main/e/exfatprogs/exfatprogs_1.4.3_aarch64.deb",
+    "size": 89540,
+    "sha256": "b177a2254245170dac3dab200e972e8dc7ac06777713d033da8e1516e32685e9"
+  },
+  "repository": {
+    "origin": "termux-main stable",
+    "base_url": "https://packages.termux.dev/apt/termux-main",
+    "inrelease_sha256": "fc02e360f8b446720de47d67e95f0bed51aa07a3c3e63d7c8b6f0595dcef5e05",
+    "packages_index": "main/binary-aarch64/Packages.gz",
+    "packages_index_sha256": "8375792232267cb852ccfae0ff60617f159e37d7f8be847a6f90f757bcf54cdb",
+    "signing_key_fingerprint": "CC72CF8BA7DBFA0182877D045A897D96E57CF20C",
+    "signing_key_file": "termux-autobuilds.gpg",
+    "signature_verification_at_build": false,
+    "build_verification": "The module-tool verifies locked artifact URL, size, and SHA-256. It does not re-fetch or verify the signed InRelease/Packages metadata; those hashes and the signing fingerprint record the prior audit only."
+  },
+  "extracted_executable": {
+    "package_path": "./data/data/com.termux/files/usr/bin/fsck.exfat",
+    "size": 72112,
+    "sha256": "6d88dd967484e80a7d8c5b4930109b8f3d9f46118a45d2071f5aa446859a0b93",
+    "elf_class": 64,
+    "machine": "AArch64",
+    "interpreter": "/system/bin/linker64",
+    "android_api": 24,
+    "needed": [
+      "libc.so"
+    ],
+    "original_runpath": "/data/data/com.termux/files/usr/lib"
+  },
+  "system_image_executable": {
+    "runpath": "/system/lib64",
+    "sha256": "06e018cc175e9702508b6a76e66486e28125fef434a0a5c0f7611f3cd3ad147e"
+  },
+  "source_offer": {
+    "license": "GPL-2.0",
+    "source_url": "https://github.com/exfatprogs/exfatprogs/archive/refs/tags/1.4.3.tar.gz",
+    "source_revision": "1.4.3",
+    "source_size": 236950,
+    "source_sha256": "d745a0e7f97e1c36fad97148062ba4c496724e212d6075ff3129355d9054e218",
+    "termux_recipe_repository": "https://github.com/termux/termux-packages",
+    "termux_recipe_path": "packages/exfatprogs/build.sh",
+    "termux_recipe_commit": "76ffc81c5802ca140d27080c8d4c431243e3e10e",
+    "termux_recipe_sha256": "22fe42c9a2c001461b2ee874e0e7c02dd37d49968140365909c3deb14de28260",
+    "termux_recipe_has_patch_references": false,
+    "source_fetch_url": "https://raw.githubusercontent.com/termux/termux-packages/76ffc81c5802ca140d27080c8d4c431243e3e10e/packages/exfatprogs/build.sh",
+    "source_offer_policy": "Published exfatprogs output is allowed only when the exact locked upstream archive, exact pinned Termux recipe and bounded Termux build-control source closure, ModOS adapter, provenance, applicable license texts, and a hash manifest are attached. The closure is not the complete Termux repository or compiler/toolchain/dependency environment and does not claim full binary reproducibility.",
+    "termux_build_framework_commit": "76ffc81c5802ca140d27080c8d4c431243e3e10e",
+    "termux_build_framework_archive_size": 10095760,
+    "termux_build_framework_archive_sha256": "ba8a91ccd2697e7b07f5a6a561d94c6f6a75fbb89f7df151ea850a1d7afcc2b0",
+    "termux_build_framework_closure_file_count": 98
+  }
+}

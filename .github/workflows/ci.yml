@@ -58,8 +58,19 @@ jobs:
       - name: Check microG release against immutable helper lock
         run: python3 src/ci/check_microg_helper_lock.py
 
+      - name: Verify pinned exfatprogs package with image adapter
+        run: python3 src/ci/check_exfatprogs_artifact.py
+
+      - name: Verify deterministic exfatprogs corresponding-source bundle
+        run: python3 src/ci/build_exfatprogs_source_bundle.py --output-dir "${RUNNER_TEMP}/exfatprogs-source-ci" --check-deterministic
+
+      - name: Test exfatprogs published-scope source gate
+        run: python3 tests/exfat_source_scope_test.py
+
       - name: Run deterministic tests
         shell: bash
+        env:
+          REQUIRE_EXFAT_SOURCE_BUNDLE: "true"
         run: |
           set -euo pipefail
           bash tests/declarations_config_test.sh
@@ -85,6 +96,7 @@ jobs:
           bash tests/pdx235_source_publisher_test.sh
           bash tests/pdx235_repaired_helper_test.sh
           bash tests/pdx235_release_quarantine_test.sh
+          bash tests/exfat_source_asset_test.sh
           bash tests/custota_device_alias_test.sh
           python3 tests/pdx235_modular_health_test.py
           bash tests/boot_animation_config_test.sh

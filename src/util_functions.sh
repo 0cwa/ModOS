@@ -235,6 +235,7 @@ function append_enabled_module_arguments() {
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "boot-animation:BOOT_ANIMATION"
     "shizuku:SHIZUKU"
+    "exfatprogs-fsck:EXFATPROGS_FSCK"
   )
 
   for entry in "${module_entries[@]}"; do
@@ -483,6 +484,107 @@ function prepare_shizuku_module() {
   export PIXENEOS_SHIZUKU_APK_PATH="${expected_apk}"
   export PIXENEOS_SHIZUKU_ROOT_MODE="${RESOLVED_ROOT_MODE}"
   export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+}
+
+# Register the locked Termux exfatprogs binary adapter for the one supported
+# LineageOS device. The package lock pins the exact aarch64 .deb; the adapter
+# extracts only fsck.exfat and runs no package scripts.
+function prepare_exfatprogs_fsck_module() {
+  local helper_root="${1}"
+  local repository_root
+  local lock_path
+  local cache_path="${WORKDIR}/locked-artifacts"
+  local package_sha256='b177a2254245170dac3dab200e972e8dc7ac06777713d033da8e1516e32685e9'
+  local expected_package="${cache_path}/sha256/${package_sha256:0:2}/${package_sha256}"
+  local module_tool="${helper_root}/module-tool.py"
+  local init_file="${helper_root}/lib/modules/__init__.py"
+  local registry_file="${helper_root}/lib/modules/registry.py"
+  local module_source="${helper_root}/lib/modules/exfatprogs_fsck.py"
+
+  if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" != 'true' ]]; then
+    return 0
+  fi
+
+  if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
+    echo "Error: exfatprogs fsck replacement is supported only for LineageOS pdx235." >&2
+    return 1
+  fi
+  if [[ "${OUTPUT_SCOPE:-}" != 'local-unpublished' && "${OUTPUT_SCOPE:-}" != 'published' ]]; then
+    echo "Error: exfatprogs fsck supports local-unpublished or source-verified published output only." >&2
+    return 1
+  fi
+  if [[ "${OUTPUT_SCOPE:-}" == published ]]; then
+    require_verified_exfat_source_bundle || return 1
+  fi
+  repository_root="$(git rev-parse --show-toplevel)" || return 1
+  lock_path="${repository_root}/locks/exfatprogs-termux-v1.4.3.json"
+  if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
+    echo "Error: the pinned helper lacks the locked module tool." >&2
+    return 1
+  fi
+  if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
+    ! -f src/exfatprogs_fsck.py || -L src/exfatprogs_fsck.py ]]; then
+    echo "Error: the exfatprogs lock or adapter path is missing or unsafe." >&2
+    return 1
+  fi
+  if [[ ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
+    -L "${module_source}" ]]; then
+    echo "Error: the pinned helper lacks a safe module registry path." >&2
+    return 1
+  fi
+  if ! python "${module_tool}" lock verify --lock "${lock_path}" >/dev/null; then
+    echo "Error: the exfatprogs package lock failed validation." >&2
+    return 1
+  fi
+  if ! python "${module_tool}" artifacts fetch \
+    --lock "${lock_path}" \
+    --cache "${cache_path}" \
+    --module exfatprogs-fsck >/dev/null; then
+    echo "Error: locked exfatprogs package acquisition failed." >&2
+    return 1
+  fi
+  if ! python3 src/exfatprogs_fsck.py verify-package "${expected_package}" >/dev/null; then
+    echo "Error: locked exfatprogs package failed extraction or ELF validation." >&2
+    return 1
+  fi
+
+  cp -- src/exfatprogs_fsck.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+  if ! grep -Fq 'from lib.modules.exfatprogs_fsck import ExfatprogsFsckMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.exfatprogs_fsck import ExfatprogsFsckMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(ExfatprogsFsckMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(ExfatprogsFsckMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
+  : >"${WORKDIR}/modules/exfatprogs-fsck.zip"
+  : >"${WORKDIR}/signatures/exfatprogs-fsck.zip.sig"
+  export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+  export PIXENEOS_DEVICE_NAME="${DEVICE_NAME}"
+  export PIXENEOS_OUTPUT_SCOPE="${OUTPUT_SCOPE}"
+  export PIXENEOS_EXFATPROGS_PACKAGE_PATH="${expected_package}"
 }
 
 # Resolve and acquire the locked F-Droid inputs before exposing them to the
@@ -858,6 +960,10 @@ function patch_ota() {
     fi
     if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]] &&
       ! prepare_shizuku_module "${my_avbroot_setup}"; then
+      return 1
+    fi
+    if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ]] &&
+      ! prepare_exfatprogs_fsck_module "${my_avbroot_setup}"; then
       return 1
     fi
     append_enabled_module_arguments args

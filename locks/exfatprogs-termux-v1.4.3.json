@@ -1,0 +1,599 @@
+{
+  "modules": [
+    {
+      "artifacts": [
+        {
+          "allowed_origins": [
+            "https://packages.termux.dev"
+          ],
+          "apk": null,
+          "archive": null,
+          "id": "exfatprogs-aarch64-deb",
+          "immutable_url": "https://packages.termux.dev/apt/termux-main/pool/main/e/exfatprogs/exfatprogs_1.4.3_aarch64.deb",
+          "kind": "other",
+          "legal": {
+            "allowed_output_scopes": [
+              "local-unpublished",
+              "published"
+            ],
+            "license": "GPL-2.0",
+            "source_offer_required": true
+          },
+          "role": "injection-input",
+          "sha256": "b177a2254245170dac3dab200e972e8dc7ac06777713d033da8e1516e32685e9",
+          "size": 89540,
+          "source": {
+            "corresponding_source_artifact": "exfatprogs-source",
+            "revision": "1.4.3",
+            "url": "https://github.com/exfatprogs/exfatprogs"
+          },
+          "source_verification": {
+            "metadata_name": "InRelease",
+            "metadata_sha256": "fc02e360f8b446720de47d67e95f0bed51aa07a3c3e63d7c8b6f0595dcef5e05",
+            "repository_url": "https://packages.termux.dev/apt/termux-main",
+            "signature_types": [
+              "openpgp-primary"
+            ]
+          },
+          "version": "1.4.3"
+        },
+        {
+          "allowed_origins": [
+            "https://codeload.github.com",
+            "https://github.com"
+          ],
+          "apk": null,
+          "archive": null,
+          "id": "exfatprogs-source",
+          "immutable_url": "https://github.com/exfatprogs/exfatprogs/archive/refs/tags/1.4.3.tar.gz",
+          "kind": "other",
+          "legal": {
+            "allowed_output_scopes": [
+              "local-unpublished",
+              "private",
+              "shared",
+              "published"
+            ],
+            "license": "GPL-2.0",
+            "source_offer_required": false
+          },
+          "role": "corresponding-source",
+          "sha256": "d745a0e7f97e1c36fad97148062ba4c496724e212d6075ff3129355d9054e218",
+          "size": 236950,
+          "source": null,
+          "source_verification": null,
+          "version": "1.4.3"
+        },
+        {
+          "allowed_origins": [
+            "https://raw.githubusercontent.com"
+          ],
+          "apk": null,
+          "archive": null,
+          "id": "termux-exfatprogs-recipe",
+          "immutable_url": "https://raw.githubusercontent.com/termux/termux-packages/76ffc81c5802ca140d27080c8d4c431243e3e10e/packages/exfatprogs/build.sh",
+          "kind": "other",
+          "legal": null,
+          "role": "verification-evidence",
+          "sha256": "22fe42c9a2c001461b2ee874e0e7c02dd37d49968140365909c3deb14de28260",
+          "size": 585,
+          "source": null,
+          "source_verification": null,
+          "version": "76ffc81c5802ca140d27080c8d4c431243e3e10e"
+        },
+        {
+          "allowed_origins": [
+            "https://codeload.github.com"
+          ],
+          "apk": null,
+          "archive": null,
+          "id": "termux-exfatprogs-build-control-closure",
+          "immutable_url": "https://codeload.github.com/termux/termux-packages/tar.gz/76ffc81c5802ca140d27080c8d4c431243e3e10e",
+          "kind": "other",
+          "legal": null,
+          "role": "corresponding-source",
+          "sha256": "ba8a91ccd2697e7b07f5a6a561d94c6f6a75fbb89f7df151ea850a1d7afcc2b0",
+          "size": 10095760,
+          "source": null,
+          "source_verification": null,
+          "version": "76ffc81c5802ca140d27080c8d4c431243e3e10e",
+          "members": [
+            {
+              "path": "LICENSE.md",
+              "size": 565,
+              "sha256": "e86f899e394c692ce10dff53614f93ce473f02cddb4d88c5d49cb0c728ba5f68"
+            },
+            {
+              "path": "build-package.sh",
+              "size": 36965,
+              "sha256": "8081a708bdcb2a8741017f51b1e8f6228955164ed87219d3c9ddf0847f3622cb"
+            },
+            {
+              "path": "packages/exfatprogs/build.sh",
+              "size": 585,
+              "sha256": "22fe42c9a2c001461b2ee874e0e7c02dd37d49968140365909c3deb14de28260"
+            },
+            {
+              "path": "packages/termux-licenses/LICENSES/Apache-2.0.txt",
+              "size": 11358,
+              "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+            },
+            {
+              "path": "repo.json",
+              "size": 522,
+              "sha256": "ca98924f4cd78e63dfb5c8dca10bfa34d407861cd864d97f1bf3f2ef63554271"
+            },
+            {
+              "path": "scripts/build/configure/termux_step_configure.sh",
+              "size": 1338,
+              "sha256": "d349cce603538da330d1473d14e91c17803b406679d0225fb08151c8d1769833"
+            },
+            {
+              "path": "scripts/build/configure/termux_step_configure_autotools.sh",
+              "size": 5043,
+              "sha256": "53b53296545c8b8ab40a850d9995d634708f2b83a9b9d9f0702a867ce19915a3"
+            },
+            {
+              "path": "scripts/build/configure/termux_step_configure_cabal.sh",
+              "size": 3162,
+              "sha256": "e81808fb64cfe85f6bb89c4faf0b19d2f051307112930fd6805c0b40de2db001"
+            },
+            {
+              "path": "scripts/build/configure/termux_step_configure_cmake.sh",
+              "size": 2552,
+              "sha256": "260a2a9d4bcbcf1ab26d20c34e9acdd7fe1a34cbbced19be4dc3c42943b56be3"
+            },
+            {
+              "path": "scripts/build/configure/termux_step_configure_meson.sh",
+              "size": 793,
+              "sha256": "18292c816e385cb89113b9eff7383a58a8aab11ca67a2511405006a36b03e5b6"
+            },
+            {
+              "path": "scripts/build/get_source/termux_download_src_archive.sh",
+              "size": 602,
+              "sha256": "af200990c40a873af15b08800e2af21bf585c6d759f8ca39925028130df06f6d"
+            },
+            {
+              "path": "scripts/build/get_source/termux_git_clone_src.sh",
+              "size": 2973,
+              "sha256": "bf4609fa2e3d6ddf0ca7dbce4069b940fa36fe596565fcfd7b6f69e973a273b3"
+            },
+            {
+              "path": "scripts/build/get_source/termux_step_get_source.sh",
+              "size": 707,
+              "sha256": "89fa1fa9339f095295fc9c2235e49f41c9d761c265ef623f1c5dc19b13e14ab6"
+            },
+            {
+              "path": "scripts/build/get_source/termux_unpack_src_archive.sh",
+              "size": 809,
+              "sha256": "e440e1be84914c06e061b95da38e7b8c4717548518d2622f8a5a8afbeec7bc49"
+            },
+            {
+              "path": "scripts/build/setup/meson-libintl.patch",
+              "size": 915,
+              "sha256": "da998f4f5f847ded57282dc2b2ad4a2fbb27e457689624f62242caddaf479f95"
+            },
+            {
+              "path": "scripts/build/setup/meson-python.patch",
+              "size": 542,
+              "sha256": "87279c17de8a4cf837554dd3e90a5bf51ef70f9716ee56963eacc821ddb97e87"
+            },
+            {
+              "path": "scripts/build/setup/meson-soversion.patch",
+              "size": 1217,
+              "sha256": "873eda42ba1855c8454896d77c31450c9d1dfa7158ea472ca67ee52dfebb86b7"
+            },
+            {
+              "path": "scripts/build/setup/python-crossenv-PYTHONPATH.patch",
+              "size": 1256,
+              "sha256": "81c1d9f8c01ffeb57fc845d3fb75301f36d65655232ae31f530f8826eea8249c"
+            },
+            {
+              "path": "scripts/build/setup/python-crossenv-fix-shebang.patch",
+              "size": 1086,
+              "sha256": "e7ab64c2c30cad29e374a956e76381c8f81d4713366b792c34425bcc53f634ff"
+            },
+            {
+              "path": "scripts/build/setup/python-crossenv-pip-android-api-level.patch",
+              "size": 2119,
+              "sha256": "6641903659d5bf703e779392a1a5c9d68531ca936e19968f245eae4e183a5be3"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_bpc.sh",
+              "size": 2645,
+              "sha256": "d7fb6b676ae32c2fe0f712315e5e9068efdcbe42f7a723964d256bf47742e54f"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_build_python.sh",
+              "size": 4375,
+              "sha256": "3ca8b971d86259d71537ad814581a5c0f130fc8ddef8fc347901061cd8c9bd36"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_cabal.sh",
+              "size": 2093,
+              "sha256": "7974a2c2c2b15b42ca2acb3cf2e5debac31df1856565f860c3b2f2f1322bf417"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_capnp.sh",
+              "size": 2171,
+              "sha256": "29e96d0c0ad40b9ff46edca0b562d08c23cf44dcb89787a5d23f56fb993832e4"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_cargo_c.sh",
+              "size": 1449,
+              "sha256": "17d59da0ccd1081201fc42225b25404f6b87b55917b0858184c845029c66a9a2"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_cmake.sh",
+              "size": 1912,
+              "sha256": "b2c8133693a155e50d131324a3d1844e298296b39a42efebeaa07d541eca451b"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_crystal.sh",
+              "size": 1511,
+              "sha256": "9f893497a520744f84bf086b7abb65f9ca96728ffe2bc053dddfe20dcaeb92da"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_dotnet.sh",
+              "size": 4056,
+              "sha256": "01a994709f00feb57c7cf1723b70fd6af3368c991869760f41899c10e1b86acc"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_flang.sh",
+              "size": 4012,
+              "sha256": "00bad3888f27b62c2226ddf7daa029fcdbc8d199dbcc6d567b876f62b1296c11"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_ghc.sh",
+              "size": 2654,
+              "sha256": "2c83d28a0bdd9e92969edc27dd305654b074bb562c41791c6fd5897129b7b143"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_ghc_iserv.sh",
+              "size": 882,
+              "sha256": "a7964c9a292a35523e1377fa279597c0bca1df2efbb163945fd4b14a8de31634"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_gir.sh",
+              "size": 4323,
+              "sha256": "e5b2fdf94b9161d0bd48ba9b4d2d6dde2b5353e4bb8d466facd31005fd2a1a24"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_gn.sh",
+              "size": 2142,
+              "sha256": "1ca9c8b91ff6ddaa86c1ccf3397aaff97a9756e9e30732c42d20a82d981e4a9a"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_golang.sh",
+              "size": 2127,
+              "sha256": "516a07d3d0018934a08f6468baeb0ce09669a662b3364d366b9a5ec4432efd72"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_jailbreak_cabal.sh",
+              "size": 1638,
+              "sha256": "12bf8e8bc9a737b1d9882ed04f90d884925c69d92d917884e7c8b37c55c06e27"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_ldc.sh",
+              "size": 4080,
+              "sha256": "a146b51bc473c7eceea492a438dd6b4e81124a60ddd0d001023608c76956790d"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_meson.sh",
+              "size": 4045,
+              "sha256": "afc9dce9bdbe5345af01ba1264665621d4470ef98bf1f1bc29b42ed644d1d93c"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_ninja.sh",
+              "size": 1549,
+              "sha256": "4f273571cbb6d29e0f8e21f947713068553531fcb111e56ab49f63b93e634b9a"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_no_integrated_as.sh",
+              "size": 1545,
+              "sha256": "c1b0cca1cb1546acc1c3c122e3d0f2e55ec0b76f7c7bf59d79eec5aa8440ada3"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_nodejs.sh",
+              "size": 1900,
+              "sha256": "7a1097db14f1b704ca4673627174a4ebb0a126ee68fcb5c29eaedfa13e906861"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_pkg_config_wrapper.sh",
+              "size": 1041,
+              "sha256": "1b2bc3d5c95649fbfadc6c53eacd79b542019365e4328bb2cf062aba5dd16f77"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_proot.sh",
+              "size": 2009,
+              "sha256": "ea0c89834c57fc42e1579e98e4c3f3f7f7581781ff2aba4378a11e36eb500090"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_protobuf.sh",
+              "size": 1143,
+              "sha256": "08810698986696306ab4e28678818ae15530464cd639396135b493022c3bc003"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_python_pip.sh",
+              "size": 3685,
+              "sha256": "502c5cde08bf15e4ff427c37e733cb14fa335c18410cf1fcc4877ebb956f9411"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_rust.sh",
+              "size": 1373,
+              "sha256": "7bd4f4748b83a9c7b2c199f4c697b538e61d86d56732c0da0bde7cc40c8fc603"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_swift.sh",
+              "size": 2523,
+              "sha256": "d745d66b8ef793d99d68ce997d6334e13edbebe4565389f4b2ed6189d0a248c6"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_treesitter.sh",
+              "size": 2669,
+              "sha256": "129e202a2dc36507b11a806dbaa11b28481d86a2d480142aadfd3adcdf085584"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_xmake.sh",
+              "size": 2288,
+              "sha256": "044810a268f5b761f903f9db92b21176a58808846873f87d4a921027b387889b"
+            },
+            {
+              "path": "scripts/build/setup/termux_setup_zig.sh",
+              "size": 3852,
+              "sha256": "d2185d4ba938c143d78e75b6b72fc20178939c0ee897a7de3adb6b657860df36"
+            },
+            {
+              "path": "scripts/build/termux_create_debian_subpackages.sh",
+              "size": 7916,
+              "sha256": "2690857b0a467b635c1050ba50181a315293de9f162806be77b3a6db4007e2bf"
+            },
+            {
+              "path": "scripts/build/termux_create_pacman_subpackages.sh",
+              "size": 9882,
+              "sha256": "8910534b38deb3a9fbd9464891b7982646a959d882457841888ef8b019385b0b"
+            },
+            {
+              "path": "scripts/build/termux_download.sh",
+              "size": 2990,
+              "sha256": "1c8c6f1fb657c17c3837504cbf0d92f2ec2b5830693af7a635633f23132be9cf"
+            },
+            {
+              "path": "scripts/build/termux_download_deb_pac.sh",
+              "size": 6138,
+              "sha256": "c03a411ab01324685876fc3c4e56712b7e918650635d770c5f595698731212b3"
+            },
+            {
+              "path": "scripts/build/termux_download_ubuntu_packages.sh",
+              "size": 2654,
+              "sha256": "5782004e84d1d8fb13ff30c4a89fe6d21cb649ca3b9e5f72147266a8822c14c9"
+            },
+            {
+              "path": "scripts/build/termux_error_exit.sh",
+              "size": 163,
+              "sha256": "c3318ebdc7cc0c6f4340da0390c0234d9325d54cdd945ffb5c1584d3cbd14a8f"
+            },
+            {
+              "path": "scripts/build/termux_extract_dep_info.sh",
+              "size": 1749,
+              "sha256": "5a0f9dc216c9bdcc9d09ea10c92b01606894af865c4bf781b84cdb246ea6ef75"
+            },
+            {
+              "path": "scripts/build/termux_get_repo_files.sh",
+              "size": 3648,
+              "sha256": "4d79db7efd5d888480152496ab5c618cb05ebc9387fa4989bcde12661e4967c8"
+            },
+            {
+              "path": "scripts/build/termux_step_cleanup_packages.sh",
+              "size": 1264,
+              "sha256": "7221bc45ec92da4cd650900aa2776b27d584869b813890359d0c13dcc60cd348"
+            },
+            {
+              "path": "scripts/build/termux_step_copy_into_massagedir.sh",
+              "size": 336,
+              "sha256": "c7f9cea1597a2e9f22315145e02eace9629cabf7ceb6d16124fb8af75399363e"
+            },
+            {
+              "path": "scripts/build/termux_step_create_alternatives.sh",
+              "size": 5813,
+              "sha256": "97bab1cb8b6dff1e09eb4cf8e218f62bf416396710335f152b93904b748ac072"
+            },
+            {
+              "path": "scripts/build/termux_step_create_debian_package.sh",
+              "size": 4150,
+              "sha256": "6ba3328c38c7e9269956b00bcffebfaab9caf15cd5ecd8b80486f98c184c22ef"
+            },
+            {
+              "path": "scripts/build/termux_step_create_debscripts.sh",
+              "size": 796,
+              "sha256": "45619d6f0e8e520a9d13910dfa3a2af3989335ea1006f06ff43caf226bc95a33"
+            },
+            {
+              "path": "scripts/build/termux_step_create_pacman_install_hook.sh",
+              "size": 1201,
+              "sha256": "501eea8f35010dbcb23b1e0417fac1fde75fdf335a84e7cc3b59f09dfee85670"
+            },
+            {
+              "path": "scripts/build/termux_step_create_pacman_package.sh",
+              "size": 5964,
+              "sha256": "dfadcb6b9ddbacf01550ac7fa1834128ae8c7ea7f9b770645b8525b4d25b428d"
+            },
+            {
+              "path": "scripts/build/termux_step_create_python_debscripts.sh",
+              "size": 6832,
+              "sha256": "ab255ddeed3db4123e3d55696b3b2bacff85a787ee982c57e725e1e1d8d19c54"
+            },
+            {
+              "path": "scripts/build/termux_step_create_subpkg_debscripts.sh",
+              "size": 53,
+              "sha256": "78b91945b1ce2d15f8fa60ecd8122fff565dedefb4e95fc3d0e6c6e2c72b3a13"
+            },
+            {
+              "path": "scripts/build/termux_step_create_timestamp_file.sh",
+              "size": 431,
+              "sha256": "41c6d244e973367040ecd48d7393d8cf1ad2e612c4336a7c84cd0e4294e66883"
+            },
+            {
+              "path": "scripts/build/termux_step_elf_cleaner.sh",
+              "size": 370,
+              "sha256": "c6ea207a1f5b2a8f44fbf673b709fa9ed7205f01cbd719b6651626f8649b4d6e"
+            },
+            {
+              "path": "scripts/build/termux_step_finish_build.sh",
+              "size": 517,
+              "sha256": "0b4c23d80574b16d308058366d3e940e701b75d7aecae9b921f96be3dd8be4c0"
+            },
+            {
+              "path": "scripts/build/termux_step_get_dependencies.sh",
+              "size": 6443,
+              "sha256": "c7ebdc129fa06e1bbc3ad1127938c8f798ed799945d50c2c4123531a1a128203"
+            },
+            {
+              "path": "scripts/build/termux_step_get_dependencies_python.sh",
+              "size": 1757,
+              "sha256": "c234535fc337903dab504e1b0377af40fb4ee97fca175dbb20f3ffddacaff45b"
+            },
+            {
+              "path": "scripts/build/termux_step_handle_buildarch.sh",
+              "size": 1378,
+              "sha256": "b060d61deff9fced5ef6b1f9ec5e84d53ff0e3e3954d6595fcdf1e89e0522206"
+            },
+            {
+              "path": "scripts/build/termux_step_handle_host_build.sh",
+              "size": 686,
+              "sha256": "7dcc9a778e3cb7f856b08c711e30b6f610975f1d66856215e06087764f93e20f"
+            },
+            {
+              "path": "scripts/build/termux_step_host_build.sh",
+              "size": 144,
+              "sha256": "7a51f1aa3505d41aa44229f824bafa88221d352b0133390b2466c7cbb49da3aa"
+            },
+            {
+              "path": "scripts/build/termux_step_install_license.sh",
+              "size": 4406,
+              "sha256": "d1c5768191012d9e0099c80d5fb2f8c7c26499eaba61087534d93e08948ba337"
+            },
+            {
+              "path": "scripts/build/termux_step_install_pacman_hooks.sh",
+              "size": 1040,
+              "sha256": "d78891ed9046d8a1274ef6adea50af36b544e90b029d3023818992f0b2a30713"
+            },
+            {
+              "path": "scripts/build/termux_step_install_service_scripts.sh",
+              "size": 1901,
+              "sha256": "6be57101c5f89da567f964cdcb8cc88c2fa690464a7f5d7f4b7589014a866e74"
+            },
+            {
+              "path": "scripts/build/termux_step_make.sh",
+              "size": 877,
+              "sha256": "8a88d309af217ac4f27fd267a4e671165d56f8552ff9b9bd537224569e240d92"
+            },
+            {
+              "path": "scripts/build/termux_step_make_install.sh",
+              "size": 1802,
+              "sha256": "23355798c16d9bb3fede457918bf23cfcec3e7c77334a5620f74c8be8dd2c18f"
+            },
+            {
+              "path": "scripts/build/termux_step_massage.sh",
+              "size": 18819,
+              "sha256": "803aeff2786d59affe61006b43221b2192d538255517fb0502759e36245ed8f5"
+            },
+            {
+              "path": "scripts/build/termux_step_override_config_scripts.sh",
+              "size": 2989,
+              "sha256": "bf47743b792d1862b7e70b7f186835ef602f10181b07df008649bd2ed94020e4"
+            },
+            {
+              "path": "scripts/build/termux_step_patch_package.sh",
+              "size": 1678,
+              "sha256": "9aac97b26c181cedb3767619ae1750357874b67f9fd59785738eff754302e40f"
+            },
+            {
+              "path": "scripts/build/termux_step_replace_guess_scripts.sh",
+              "size": 666,
+              "sha256": "68bf46327b0759017f7223bc9833441a49b03c3e721d890a8f8a589d71d70933"
+            },
+            {
+              "path": "scripts/build/termux_step_setup_build_folders.sh",
+              "size": 2790,
+              "sha256": "454ad1ee224412d203ea3860a1071c1592b662ba6bcf4e980437861f7064382c"
+            },
+            {
+              "path": "scripts/build/termux_step_setup_cgct_environment.sh",
+              "size": 4258,
+              "sha256": "46304cf81b73d5d445b981b9b5975e0adbaf44c03cd2612cb1c4d21998738368"
+            },
+            {
+              "path": "scripts/build/termux_step_setup_toolchain.sh",
+              "size": 1297,
+              "sha256": "f00f27f9b6af82fe6f46769a38135807f2745bdd37867ddfea4a0b7d3bf8e2bd"
+            },
+            {
+              "path": "scripts/build/termux_step_setup_variables.sh",
+              "size": 11205,
+              "sha256": "d991368371c6f88c69049eefed25e3db0f1afdda6df7e2a1de7af2579dbba45d"
+            },
+            {
+              "path": "scripts/build/termux_step_start_build.sh",
+              "size": 6902,
+              "sha256": "c0493dfca494564c023f6d304ac206be0aba967a29c40bb6a434c8dbfc60397b"
+            },
+            {
+              "path": "scripts/build/termux_step_strip_elf_symbols.sh",
+              "size": 502,
+              "sha256": "a22be6da27ce9f9323626d77124fb18fcc64117264b7570d0b81df6e6db1ebb7"
+            },
+            {
+              "path": "scripts/build/toolchain/termux_setup_toolchain_23c.sh",
+              "size": 9303,
+              "sha256": "f12e8a1a8f9ffd03c47bb165b95bbf81dd08d5944229b1b17f22ba6aee498b10"
+            },
+            {
+              "path": "scripts/build/toolchain/termux_setup_toolchain_29.sh",
+              "size": 9757,
+              "sha256": "8463f0fde5453e8f2672308fe5ab3db24683d8d13ffb164df4101da8b88aaf61"
+            },
+            {
+              "path": "scripts/build/toolchain/termux_setup_toolchain_gnu.sh",
+              "size": 3956,
+              "sha256": "cd968bf585dccfa91ed3487c9f3217272a4c81529578610d44253b03680a68e8"
+            },
+            {
+              "path": "scripts/buildorder.py",
+              "size": 17488,
+              "sha256": "6dc802a7167ad8d6f6eec0d74cf92f3ab3d4673b1531f0356f0712d689c3f498"
+            },
+            {
+              "path": "scripts/config.guess",
+              "size": 50850,
+              "sha256": "50205cf3ec5c7615b17f937a0a57babf4ec5cd0aade3d7b3cccbe5f1bf91a7ef"
+            },
+            {
+              "path": "scripts/config.sub",
+              "size": 39943,
+              "sha256": "26b852f75a637448360a956931439f7e818bf63150eaadb9b85484347628d1fd"
+            },
+            {
+              "path": "scripts/properties.sh",
+              "size": 92447,
+              "sha256": "af3fc8006fa45814cbfb5c8f59e80fdf1c4a551fb1bd047b641a228fff892932"
+            },
+            {
+              "path": "scripts/utils/docker/docker.sh",
+              "size": 3974,
+              "sha256": "aa38b1284b000659b2ff284f84af1653bb45f9d7c5384b524862e56dabd78e7d"
+            },
+            {
+              "path": "scripts/utils/termux/package/termux_package.sh",
+              "size": 3292,
+              "sha256": "eb2a93559f542b8edd536bd07d3376b5aa17f25c03ba139496f79a127af37cd0"
+            }
+          ]
+        }
+      ],
+      "id": "exfatprogs-fsck",
+      "version": "1.4.3"
+    }
+  ],
+  "schema_version": 1
+}

@@ -62,6 +62,11 @@ on:
         required: false
         type: boolean
         default: false
+      exfatprogs-fsck:
+        description: Replace fsck.exfat with the locked Termux exfatprogs 1.4.3 binary (LineageOS pdx235 only)
+        required: false
+        type: boolean
+        default: false
       update-channel:
         required: true
         type: string
@@ -140,6 +145,7 @@ env:
   ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ inputs.disable-system-updater }}
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
   ADDITIONALS_SHIZUKU: ${{ inputs.shizuku }}
+  ADDITIONALS_EXFATPROGS_FSCK: ${{ inputs.exfatprogs-fsck }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 
 # Publishing inherits the caller job's permission ceiling. A reusable
@@ -207,6 +213,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: ${{ inputs.publish && inputs.release-type != 'build-only' }}
+
+      - name: Build and verify exfatprogs corresponding-source bundle
+        if: inputs.exfatprogs-fsck && inputs.publish && inputs.release-type != 'build-only' && inputs.rom-family == 'lineageos' && inputs.device-id == 'pdx235'
+        shell: bash
+        run: python3 src/ci/build_exfatprogs_source_bundle.py --output-dir "${RUNNER_TEMP}/exfatprogs-source" --check-deterministic
 
       - name: Enforce profile output policy
         shell: bash
@@ -479,7 +490,7 @@ jobs:
           } > "${GITHUB_WORKSPACE}-CHANGELOG.txt"
 
       - name: Publish GitHub release
-        if: inputs.publish && inputs.release-type != 'build-only' && env.ROOT_MODE_RESOLVED != 'both'
+        if: inputs.publish && inputs.release-type != 'build-only' && env.ROOT_MODE_RESOLVED != 'both' && !inputs.exfatprogs-fsck
         uses: softprops/action-gh-release@v3
         with:
           body_path: ${{ github.workspace }}-CHANGELOG.txt
@@ -491,7 +502,7 @@ jobs:
           tag_name: ${{ env.GRAPHENEOS_VERSION }}
 
       - name: Publish paired GitHub release assets
-        if: inputs.publish && inputs.release-type != 'build-only' && env.ROOT_MODE_RESOLVED == 'both'
+        if: inputs.publish && inputs.release-type != 'build-only' && env.ROOT_MODE_RESOLVED == 'both' && !inputs.exfatprogs-fsck
         uses: softprops/action-gh-release@v3
         with:
           body_path: ${{ github.workspace }}-CHANGELOG.txt
@@ -504,6 +515,26 @@ jobs:
             ${{ env.SELECTION_METADATA_MAGISK }}
           name: ${{ env.PROJECT_NAME }} ${{ env.GRAPHENEOS_VERSION }}
           tag_name: ${{ env.GRAPHENEOS_VERSION }}
+
+      - name: Publish source-first exfatprogs release assets
+        if: inputs.publish && inputs.release-type != 'build-only' && inputs.exfatprogs-fsck
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ env.GRAPHENEOS_VERSION }}
+          RELEASE_TITLE: ${{ env.PROJECT_NAME }} ${{ env.GRAPHENEOS_VERSION }}
+          RELEASE_NOTES: ${{ github.workspace }}-CHANGELOG.txt
+          ROOT_MODE_RESOLVED: ${{ env.ROOT_MODE_RESOLVED }}
+          EXFAT_SOURCE_BUNDLE_PATH: ${{ env.EXFAT_SOURCE_BUNDLE_PATH }}
+          EXFAT_SOURCE_BUNDLE_NAME: ${{ env.EXFAT_SOURCE_BUNDLE_NAME }}
+          EXFAT_SOURCE_BUNDLE_SHA256: ${{ env.EXFAT_SOURCE_BUNDLE_SHA256 }}
+          OUTPUTS_PATCHED_OTA: ${{ env.OUTPUTS_PATCHED_OTA }}
+          OUTPUTS_PATCHED_OTA_ROOTLESS: ${{ env.OUTPUTS_PATCHED_OTA_ROOTLESS }}
+          OUTPUTS_PATCHED_OTA_MAGISK: ${{ env.OUTPUTS_PATCHED_OTA_MAGISK }}
+          SELECTION_METADATA: ${{ env.SELECTION_METADATA }}
+          SELECTION_METADATA_ROOTLESS: ${{ env.SELECTION_METADATA_ROOTLESS }}
+          SELECTION_METADATA_MAGISK: ${{ env.SELECTION_METADATA_MAGISK }}
+        run: bash src/ci/publish_exfatprogs_release_assets.sh
 
       - name: Remove superseded release assets
         if: inputs.publish && inputs.release-type != 'build-only' && env.ROOT_MODE_RESOLVED != 'both'
@@ -540,6 +571,9 @@ jobs:
           ROM_FLAVOR: ${{ env.ROM_FLAVOR }}
           ROM_PROFILE_PROVIDER: ${{ env.ROM_PROFILE_PROVIDER }}
           SELECTION_METADATA_PATH: ${{ env.SELECTION_METADATA }}
+          ADDITIONALS_EXFATPROGS_FSCK: ${{ inputs.exfatprogs-fsck }}
+          EXFAT_SOURCE_BUNDLE_NAME: ${{ env.EXFAT_SOURCE_BUNDLE_NAME }}
+          EXFAT_SOURCE_BUNDLE_SHA256: ${{ env.EXFAT_SOURCE_BUNDLE_SHA256 }}
         run: |
           bash src/ci/publish_ota.sh
 
@@ -558,6 +592,9 @@ jobs:
           MAGISK_SELECTION_METADATA_PATH: ${{ env.SELECTION_METADATA_MAGISK }}
           MAGISK_OTA_METADATA_PATH: ${{ env.OTA_METADATA_MAGISK }}
           MAGISK_MODULE_SELECTION_FINGERPRINT: ${{ env.MODULE_SELECTION_FINGERPRINT_MAGISK }}
+          ADDITIONALS_EXFATPROGS_FSCK: ${{ inputs.exfatprogs-fsck }}
+          EXFAT_SOURCE_BUNDLE_NAME: ${{ env.EXFAT_SOURCE_BUNDLE_NAME }}
+          EXFAT_SOURCE_BUNDLE_SHA256: ${{ env.EXFAT_SOURCE_BUNDLE_SHA256 }}
         run: |
           bash src/ci/publish_ota_pair.sh
 

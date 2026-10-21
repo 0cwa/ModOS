@@ -12,7 +12,6 @@ set -o nounset -o pipefail -o errexit
 _publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
 source "${_publish_ci_dir}/publish_custota_device_alias.sh"
-unset _publish_ci_dir
 
 die() {
   echo "::error::$*" >&2
@@ -147,6 +146,12 @@ for expected_asset in \
   grep -Fxq -- "${expected_asset}" <<<"${asset_names}" ||
     die "Release is missing expected asset: ${expected_asset}"
 done
+if [[ "${ADDITIONALS_EXFATPROGS_FSCK:-false}" == true ]]; then
+  require_value EXFAT_SOURCE_BUNDLE_NAME "${EXFAT_SOURCE_BUNDLE_NAME-}"
+  require_value EXFAT_SOURCE_BUNDLE_SHA256 "${EXFAT_SOURCE_BUNDLE_SHA256-}"
+  bash "${_publish_ci_dir}/verify_release_asset.sh" \
+    "${GRAPHENEOS_VERSION}" "${EXFAT_SOURCE_BUNDLE_NAME}" "${EXFAT_SOURCE_BUNDLE_SHA256}"
+fi
 
 git config user.email "${GIT_COMMIT_EMAIL-}"
 git config user.name "${GIT_COMMIT_NAME-}"

@@ -262,6 +262,36 @@ PixeneOS can be run locally on Linux.
 
 Local runs generate the patched OTA but do not publish release assets or update `gh-pages`. Configuration precedence is: declaration defaults, then `env.toml`, then explicit caller/workflow inputs. Invalid or unknown TOML keys fail closed.
 
+### exFAT checker on LineageOS pdx235
+
+The optional `exfatprogs-fsck` build input defaults to false. When selected for
+LineageOS `pdx235`, ModOS fetches the locked official Termux `exfatprogs`
+1.4.3 aarch64 package, extracts only `fsck.exfat` without running package
+scripts, checks its Android ELF ABI and hashes, and replaces the existing
+`/system/bin/fsck.exfat` file in the system image. The package's Termux-only
+RUNPATH is rewritten to `/system/lib64`. The selection identity includes the
+adapter source, lock, provenance document, and transformed payload hashes. The
+adapter fails if the target file is missing, is not a regular executable,
+lacks its SELinux label, or has an unsafe parent path; its existing image
+metadata is preserved.
+
+The binary was built for Android API 24 and has only `libc.so` as a dynamic
+dependency. The SELinux label is preserved, while execution-domain compatibility
+and device runtime behavior remain unverified. We have not established whether
+the replacement completes SD card verification within vold's timeout. The option
+is rejected for other ROM families and devices and remains disabled in scheduled
+builds. Published builds with this option attach a deterministic,
+content-addressed corresponding-source bundle for the GPL-2.0 binary before
+uploading OTA assets. The bundle includes the exact locked upstream archive, pinned Termux
+recipe, the pinned build-control script closure, ModOS adapter, provenance and
+lock records, applicable license texts, and a SHA-256 manifest. It does not
+include the full Termux repository, build toolchain, or dependency archives,
+so it does not claim full binary reproducibility. New releases remain drafts until the uploaded source bundle is
+downloaded and hash-verified; existing releases receive the source asset before
+any new OTA assets. Local-unpublished builds do not require source publication.
+The recorded signed APT metadata is audit provenance; builds verify the lock's
+package URL, size, and SHA-256, but do not repeat the APT signature check.
+
 ### Custom boot animation (enabled by default)
 
 All builds use the checked-in `custom/boot-animation/bootanimation.zip` by

@@ -130,6 +130,26 @@ function enforce_output_policy() {
     echo "Error: F-Droid output is restricted to local-unpublished." >&2
     return 1
   fi
+  if [[ "${ADDITIONALS[EXFATPROGS_FSCK]:-false}" == true &&
+    "${output_scope}" == published ]]; then
+    require_verified_exfat_source_bundle || return 1
+  fi
+}
+
+function require_verified_exfat_source_bundle() {
+  local path="${EXFAT_SOURCE_BUNDLE_PATH:-}"
+  local expected="${EXFAT_SOURCE_BUNDLE_SHA256:-}"
+  [[ "${EXFAT_SOURCE_BUNDLE_VERIFIED:-}" == true &&
+    "${expected}" =~ ^[0-9a-f]{64}$ && -n "${path}" && -f "${path}" && ! -L "${path}" ]] || {
+    echo "Error: published exfatprogs output requires a verified corresponding-source bundle." >&2
+    return 1
+  }
+  local profiles_dir
+  profiles_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  python3 "${profiles_dir}/ci/verify_exfatprogs_source_bundle.py" "${path}" "${expected}" || {
+    echo "Error: published exfatprogs corresponding-source bundle failed strict content validation." >&2
+    return 1
+  }
 }
 
 function enforce_publication_evidence() {
@@ -208,6 +228,10 @@ function module_selection_fingerprint() {
   local boot_animation_digest="disabled"
   local shizuku_lock_digest="disabled"
   local shizuku_root_mode="disabled"
+  local exfatprogs_fsck_lock_digest="disabled"
+  local exfatprogs_fsck_adapter_digest="disabled"
+  local exfatprogs_fsck_payload_digest="disabled"
+  local exfatprogs_fsck_provenance_digest="disabled"
   local entry
   local -a module_entries=(
     "afsr:AFSR"
@@ -220,6 +244,7 @@ function module_selection_fingerprint() {
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
     "shizuku:SHIZUKU"
+    "exfatprogs-fsck:EXFATPROGS_FSCK"
   )
 
   resolve_rom_profile || return 1
@@ -246,6 +271,33 @@ function module_selection_fingerprint() {
       echo "Error: the Shizuku lock is not clean and checked in." >&2
       return 1
     }
+  fi
+
+  if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ]]; then
+    if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
+      echo "Error: exfatprogs fsck replacement is supported only for LineageOS pdx235." >&2
+      return 1
+    fi
+    if [[ "${OUTPUT_SCOPE}" != 'local-unpublished' && "${OUTPUT_SCOPE}" != 'published' ]]; then
+      echo "Error: exfatprogs fsck supports local-unpublished or source-verified published output only." >&2
+      return 1
+    fi
+    if [[ "${OUTPUT_SCOPE}" == published ]]; then
+      require_verified_exfat_source_bundle || return 1
+    fi
+    exfatprogs_fsck_lock_digest="$(_locked_input_digest locks/exfatprogs-termux-v1.4.3.json)" || {
+      echo "Error: the exfatprogs package lock is not clean and checked in." >&2
+      return 1
+    }
+    exfatprogs_fsck_adapter_digest="$(_locked_input_digest src/exfatprogs_fsck.py)" || {
+      echo "Error: the exfatprogs adapter is not clean and checked in." >&2
+      return 1
+    }
+    exfatprogs_fsck_provenance_digest="$(_locked_input_digest locks/exfatprogs-termux-v1.4.3-provenance.json)" || {
+      echo "Error: the exfatprogs source provenance is not clean and checked in." >&2
+      return 1
+    }
+    exfatprogs_fsck_payload_digest='06e018cc175e9702508b6a76e66486e28125fef434a0a5c0f7611f3cd3ad147e'
   fi
 
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]]; then
@@ -322,6 +374,11 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
   SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"
   SELECTION_SHIZUKU_ROOT_MODE="${shizuku_root_mode}"
+  SELECTION_MODULE_EXFATPROGS_FSCK="${ADDITIONALS[EXFATPROGS_FSCK]}"
+  SELECTION_EXFATPROGS_FSCK_LOCK_SHA256="${exfatprogs_fsck_lock_digest}"
+  SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256="${exfatprogs_fsck_adapter_digest}"
+  SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256="${exfatprogs_fsck_payload_digest}"
+  SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256="${exfatprogs_fsck_provenance_digest}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
 

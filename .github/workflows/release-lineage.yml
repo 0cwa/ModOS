@@ -60,6 +60,11 @@ on:
         required: false
         type: boolean
         default: false
+      exfatprogs-fsck:
+        description: Replace fsck.exfat with the locked Termux exfatprogs 1.4.3 build and publish its corresponding-source bundle
+        required: false
+        type: boolean
+        default: false
       disable-system-updater:
         description: Remove the stock ROM updater app (use with Custota)
         required: false
@@ -178,6 +183,7 @@ jobs:
       disable-system-updater: ${{ needs.schedule_config.outputs.disable_system_updater == 'true' }}
       microg: ${{ needs.schedule_config.outputs.microg == 'true' }}
       shizuku: false
+      exfatprogs-fsck: false
       fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
       allow-unauthorized-adb: false
@@ -202,6 +208,7 @@ jobs:
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
       microg: ${{ inputs.microg }}
       shizuku: ${{ inputs.shizuku }}
+      exfatprogs-fsck: ${{ inputs.exfatprogs-fsck }}
       disable-system-updater: ${{ inputs.disable-system-updater }}
       boot-animation: ${{ inputs.boot-animation }}
       export-device-candidate: ${{ inputs.export-device-candidate }}
