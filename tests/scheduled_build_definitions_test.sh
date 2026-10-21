@@ -41,6 +41,8 @@ check_definition() {
     [[ "${expected_family}" != lineageos ]] || expected_exfat=true
     [[ "$(toml_resolve_value exfatprogs_fsck false)" == "${expected_exfat}" ]] ||
       fail "${file}: wrong exfatprogs fsck selection"
+    [[ "$(toml_resolve_value lineage_vold_exfat_timeout '')" == false ]] ||
+      fail "${file}: source-built vold must remain disabled until approved"
     [[ "$(toml_resolve_value force_update '')" == false ]] ||
       fail "${file}: scheduled force update must default to false"
     [[ "$(toml_resolve_value shizuku false)" == false ]] ||
@@ -100,6 +102,10 @@ check_loader() {
     fail "${file}: loader exported wrong exfatprogs fsck selection"
   grep -Fxq "ADDITIONALS_FSCK_SYSFS_SEPOLICY=${expected_fsck_sysfs_sepolicy}" "${env_file}" ||
     fail "${file}: loader exported wrong fsck sysfs-SEPolicy selection"
+  grep -Fxq "lineage_vold_exfat_timeout=false" "${output_file}" ||
+    fail "${file}: schedule loader unexpectedly enabled unqualified vold"
+  grep -Fxq "ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT=false" "${env_file}" ||
+    fail "${file}: schedule loader exported unexpected vold selection"
   grep -Fxq 'ADDITIONALS_DISABLE_SYSTEM_UPDATER=true' "${env_file}" ||
     fail "${file}: loader did not export stock updater removal"
   grep -Fxq 'ADDITIONALS_BOOT_ANIMATION=true' "${env_file}" ||
@@ -139,6 +145,8 @@ grep -Fq 'needs.schedule_config.outputs.disable_system_updater' .github/workflow
   fail "LineageOS scheduled updater removal is not forwarded from the definition"
 grep -Fq "needs.schedule_config.outputs.exfatprogs_fsck == 'true'" .github/workflows/release-lineage.yml ||
   fail "LineageOS scheduled exfatprogs selection is not forwarded to the build"
+grep -Fq "needs.schedule_config.outputs.lineage_vold_exfat_timeout == 'true'" .github/workflows/release-lineage.yml ||
+  fail "LineageOS schedule does not route its opt-in vold module to the builder"
 grep -Fq 'check_existing_pair.sh' .github/workflows/release.yml ||
   fail "GrapheneOS paired schedule is not protected by paired existing-build preflight"
 
