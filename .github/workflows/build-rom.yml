@@ -340,6 +340,11 @@ jobs:
             both) echo 'ROM_FLAVOR=both' >> "${GITHUB_ENV}" ;;
           esac
 
+      - name: Prepare canonical pdx235 Custota metadata
+        if: inputs.publish && inputs.release-type != 'build-only' && inputs.rom-family == 'lineageos' && inputs.device-id == 'pdx235' && (env.ROOT_MODE_RESOLVED == 'rootless' || env.ROOT_MODE_RESOLVED == 'magisk')
+        shell: bash
+        run: bash src/ci/prepare_pdx235_custota_metadata.sh
+
       - name: Record build metadata
         shell: bash
         run: |
