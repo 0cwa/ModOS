@@ -61,6 +61,21 @@ jobs:
       - name: Verify pinned exfatprogs package with image adapter
         run: python3 src/ci/check_exfatprogs_artifact.py
 
+      - name: Verify exfatprogs lock with pinned module-tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          source src/declarations.sh
+          helper="${RUNNER_TEMP}/pinned-module-tool"
+          python3 -m venv "${RUNNER_TEMP}/module-tool-venv"
+          "${RUNNER_TEMP}/module-tool-venv/bin/python" -m pip install --disable-pip-version-check 'pydantic>=2.12.0' 'tomlkit>=0.13.2'
+          git init -q "${helper}"
+          git -C "${helper}" remote add origin "${PIXENEOS_AVBROOT_SETUP_SOURCE:-https://github.com/0cwa/my-avbroot-setup}"
+          git -C "${helper}" fetch --quiet --depth=1 origin "${VERSION[AVBROOT_SETUP]}"
+          git -C "${helper}" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "${helper}" rev-parse HEAD)" = "${VERSION[AVBROOT_SETUP]}"
+          "${RUNNER_TEMP}/module-tool-venv/bin/python" "${helper}/module-tool.py" lock verify --lock locks/exfatprogs-termux-v1.4.3.json
+
       - name: Verify deterministic exfatprogs corresponding-source bundle
         run: python3 src/ci/build_exfatprogs_source_bundle.py --output-dir "${RUNNER_TEMP}/exfatprogs-source-ci" --check-deterministic
 

@@ -64,9 +64,17 @@ def _locked_artifact(artifact_id: str) -> dict:
 
 def _framework_members() -> list[dict]:
     artifact = _locked_artifact("termux-exfatprogs-build-control-closure")
-    members = artifact.get("members")
+    provenance = json.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
+    offer = provenance.get("source_offer")
+    if not isinstance(offer, dict):
+        raise SourceBundleError("Termux framework provenance is missing")
+    if (offer.get("termux_build_framework_commit") != artifact.get("version") or
+            offer.get("termux_build_framework_archive_size") != artifact.get("size") or
+            offer.get("termux_build_framework_archive_sha256") != artifact.get("sha256")):
+        raise SourceBundleError("Termux framework provenance does not match its artifact lock")
+    members = offer.get("termux_build_framework_closure_members")
     if not isinstance(members, list) or not members:
-        raise SourceBundleError("Termux framework closure is missing from the lock")
+        raise SourceBundleError("Termux framework closure is missing from provenance")
     paths = [item.get("path") for item in members if isinstance(item, dict)]
     if (len(paths) != len(members) or len(paths) != len(set(paths)) or
             any(not isinstance(path, str) or path.startswith("/") or ".." in PurePosixPath(path).parts
@@ -74,7 +82,9 @@ def _framework_members() -> list[dict]:
         raise SourceBundleError("Termux framework closure lock is malformed")
     framework_paths = {path for path in paths if path.startswith("scripts/build/")}
     other_paths = set(paths) - framework_paths
-    if (len(paths) != EXPECTED_FRAMEWORK_MEMBER_COUNT or len(framework_paths) != 87 or
+    if (len(paths) != EXPECTED_FRAMEWORK_MEMBER_COUNT or
+            offer.get("termux_build_framework_closure_file_count") != len(paths) or
+            len(framework_paths) != 87 or
             other_paths != FRAMEWORK_REQUIRED_PATHS):
         raise SourceBundleError("Termux framework closure differs from the reviewed pinned file set")
     return members
