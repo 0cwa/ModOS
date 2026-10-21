@@ -156,3 +156,40 @@ echo "scheduled build definition tests passed"
 
 grep -Fq "needs.schedule_config.outputs.microg == 'true'" .github/workflows/release-lineage.yml ||
   fail 'LineageOS schedule does not forward microG'
+
+# Cron events have no workflow_dispatch inputs. When a scheduled boolean is
+# false, its reusable-workflow binding must not fall through to the missing
+# manual input (an empty string rather than a typed boolean).
+python3 - <<'PYTEST'
+from pathlib import Path
+
+workflow = Path(".github/workflows/release.yml").read_text()
+bindings = {}
+for line in workflow.splitlines():
+    if line.startswith("      ") and ": ${{ " in line:
+        name, value = line.strip().split(": ", 1)
+        bindings[name] = value
+
+scheduled_boolean_outputs = {
+    "root": "root",
+    "alterinstaller": "alterinstaller",
+    "bcr": "bcr",
+    "custota": "custota",
+    "msd": "msd",
+    "oemunlockonboot": "oemunlockonboot",
+    "disable-system-updater": "disable_system_updater",
+    "fdroid-privileged-extension": "fdroid_privileged_extension",
+}
+for name, output in scheduled_boolean_outputs.items():
+    expected = (
+        "${{ github.event_name == 'schedule' && "
+        f"needs.preflight.outputs.{output} == 'true' || "
+        f"(github.event_name != 'schedule' && inputs.{name}) }}}}"
+    )
+    actual = bindings.get(name)
+    assert actual == expected, (
+        f"{name}: scheduled false must remain boolean false, not use an absent "
+        f"manual input: {actual!r}"
+    )
+print("GrapheneOS scheduled boolean routing checks passed")
+PYTEST
