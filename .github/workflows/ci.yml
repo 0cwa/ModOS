@@ -82,6 +82,9 @@ jobs:
       - name: Test exfatprogs published-scope source gate
         run: python3 tests/exfat_source_scope_test.py
 
+      - name: Test exfatprogs image metadata diagnostics
+        run: python3 tests/exfat_adapter_metadata_test.py
+
       - name: Run deterministic tests
         shell: bash
         env:
