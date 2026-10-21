@@ -355,6 +355,29 @@ test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted() (
   fi
 )
 
+# GrapheneOS builds must fail closed even if a caller explicitly requests
+# a pdx235-only patch through the reusable workflow or local configuration.
+test_grapheneos_rejects_pdx235_fsck_modules() (
+  local device module
+
+  load_contract
+  set_selection_fixture
+  ROM_FAMILY="grapheneos"
+  ADDITIONALS[EXFATPROGS_FSCK]="false"
+  ADDITIONALS[FSCK_SYSFS_SEPOLICY]="false"
+
+  for device in shiba pdx235; do
+    DEVICE_NAME="${device}"
+    for module in EXFATPROGS_FSCK FSCK_SYSFS_SEPOLICY; do
+      ADDITIONALS["${module}"]="true"
+      if module_selection_fingerprint >/dev/null 2>&1; then
+        fail "GrapheneOS/${device} unexpectedly accepted pdx235-only ${module}"
+      fi
+      ADDITIONALS["${module}"]="false"
+    done
+  done
+)
+
 test_output_filename_contains_fingerprint() (
   local full
 
@@ -480,6 +503,7 @@ test_unknown_rom_fails_closed
 test_invalid_compatible_sepolicy_fails_closed
 test_selection_fingerprint
 test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted
+test_grapheneos_rejects_pdx235_fsck_modules
 test_output_filename_contains_fingerprint
 test_output_policy
 
