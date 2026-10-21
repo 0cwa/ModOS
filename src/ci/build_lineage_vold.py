@@ -146,6 +146,30 @@ def git(source: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def verify_source_checkouts_clean(source_root: Path, expected: dict) -> None:
+    """Ensure pinned revisions are not overridden by local edits or extra files.
+
+    A repo manifest pins Git HEADs; it does not certify the working-tree bytes.
+    An Android binary built with dirty dependencies must never be presented as
+    built from the exact official manifest.
+    """
+    source_root = source_root.resolve(strict=True)
+    for relative_path, (_name, revision) in sorted(expected.items()):
+        project_path = source_root / relative_path
+        if (
+            project_path.is_symlink()
+            or not project_path.is_dir()
+            or not project_path.resolve().is_relative_to(source_root)
+        ):
+            raise BuildError(f"pinned source project is missing or unsafe: {relative_path}")
+        if git(project_path, "rev-parse", "HEAD") != revision:
+            raise BuildError(f"pinned source revision differs at: {relative_path}")
+        # --ignored includes files hidden by .gitignore that could still be
+        # read by the Android compiler; require a virgin source workspace.
+        if git(project_path, "status", "--porcelain", "--ignored", "--untracked-files=all"):
+            raise BuildError(f"pinned source project is dirty: {relative_path}")
+
+
 def ensure_regular_executable(path: Path) -> bytes:
     try:
         metadata = path.lstat()
@@ -169,6 +193,7 @@ def command_build(source_root: Path, output_dir: Path, jobs: int | None) -> None
         if expected.get(project["path"]) != (project["name"], project["revision"]):
             raise BuildError(f"lock and official manifest disagree for project {key}")
     checked_source_manifest(source_root, expected)
+    verify_source_checkouts_clean(source_root, expected)
 
     vold_project = lock["projects"]["vold"]
     vold_root = source_root / vold_project["path"]
@@ -177,8 +202,13 @@ def command_build(source_root: Path, output_dir: Path, jobs: int | None) -> None
     if git(vold_root, "status", "--porcelain"):
         raise BuildError("android_system_vold checkout is dirty; use an isolated source workspace")
 
+    # Resolve only after checking the caller-provided path: resolve() erases
+    # whether its final component was an unsafe symbolic link.
+    output_dir = output_dir.expanduser()
+    if output_dir.is_symlink():
+        raise BuildError("artifact output directory must not be a symlink")
     output_dir = output_dir.resolve()
-    if output_dir.exists() and (not output_dir.is_dir() or output_dir.is_symlink() or any(output_dir.iterdir())):
+    if output_dir.exists() and (not output_dir.is_dir() or any(output_dir.iterdir())):
         raise BuildError("artifact output directory must be absent or empty")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_artifact = source_root / lock["build"]["artifact"]
