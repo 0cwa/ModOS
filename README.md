@@ -296,24 +296,28 @@ package URL, size, and SHA-256, but do not repeat the APT signature check.
 
 The optional `lineage-vold-exfat-timeout` module replaces `/system/bin/vold`
 with a binary built from the complete, hash-pinned LineageOS pdx235 source
-manifest. It gives exFAT fsck a 120-second limit; the existing timeout for
-other filesystems remains 45 seconds. This option is disabled by default and
-is not selected in scheduled builds. Build the artifact explicitly with
-`src/ci/build_lineage_vold.py` as documented in
-[`docs/lineage-vold-exfat-timeout.md`](docs/lineage-vold-exfat-timeout.md),
-then set `PIXENEOS_VOLD_ARTIFACT_DIR` and
-`PIXENEOS_VOLD_BASE_BUILD_ID=lineage-24.0-20261016-nightly-pdx235-signed`
-before selecting the module. The OTA build validates source and binary
-provenance, AArch64 ABI and dynamic dependencies, exact base OTA identity, and
-the existing `vold_exec` SELinux label before replacing bytes in the existing
-filesystem entry.
+manifest. It gives exFAT fsck a 120-second limit; other filesystem timeouts
+remain 45 seconds. The manual and scheduled selectors are wired up but are
+**disabled by default**; no binary has yet been independently qualified or
+approved for release.
 
-The pinned upstream `android_system_vold` project is Apache-2.0 licensed; the
-source patch is limited to the exFAT timeout constant and its call site. The
-full LineageOS source sync and Android binary build are intentionally explicit
-and were not run by CI. The binary must be built and checked on a suitable
-Linux host before use; this module remains absent from release workflows and
-scheduled builds until that build path is operationally provisioned.
+For local qualification, run `src/ci/build_lineage_vold.py` as documented in
+[`docs/lineage-vold-exfat-timeout.md`](docs/lineage-vold-exfat-timeout.md),
+then provide `PIXENEOS_VOLD_ARTIFACT_DIR` and the exact
+`PIXENEOS_VOLD_BASE_BUILD_ID=lineage-24.0-20261016-nightly-pdx235-signed`.
+The adapter validates exact product/system properties, the AArch64 ELF ABI and
+dependency list, root ownership, actual `vold_exec` SELinux xattr, and unchanged
+filesystem entry metadata. A public OTA additionally requires separately
+reviewed SHA-256 pins for both the vold binary and staging provenance. The
+`src/ci/fetch_lineage_vold_artifact.py` transport fails closed until those
+pins and a dedicated staging-release tag are committed to the source lock.
+
+The upstream `android_system_vold` patch changes only the exFAT timeout.
+The full LineageOS source sync, Android `m vold` binary build and device
+qualification have **not** been completed; no production selection or
+force-publish is authorized merely by passing CI fixtures. The binary is
+pinned to the 2026-10-16 nightly and must be independently rebuilt and
+requalified for subsequent LineageOS nightlies.
 
 ### Custom boot animation (enabled by default)
 
