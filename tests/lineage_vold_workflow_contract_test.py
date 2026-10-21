@@ -62,6 +62,49 @@ class VoldWorkflowContractTest(unittest.TestCase):
         self.assertIn("PIXENEOS_VOLD_BASE_BUILD_ID=lineage-24.0-20261016-nightly-pdx235-signed", lineage)
         self.assertIn("PIXENEOS_VOLD_BASE_BUILD_ID=lineage-24.0-20261016-nightly-pdx235-signed", build)
 
+    def test_large_runner_baseline_proves_original_bytes_before_any_patch(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        job = workflow.split("  lineage_vold_exact_baseline:\n", 1)[1]
+        self.assertIn("self-hosted, linux, x64, modos-lineage-large", job)
+        self.assertIn("vars.MODOS_VOLD_BASELINE_RUNNER_READY == 'true'", job)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", job)
+        self.assertIn("contents: read", job)
+        self.assertNotIn("secrets.", job)
+        self.assertNotIn("signing", job.split("    steps:\n", 1)[1])
+        self.assertNotIn("force-publish", job)
+        self.assertNotIn("src/ci/build_lineage_vold.py build ", job)
+        self.assertNotIn("git apply", job)
+        self.assertIn("src/ci/resolve_lineage_vold_ota.py", job)
+        self.assertIn("src/ci/prepare_lineage_vold_reference.sh", job)
+        self.assertIn("src/ci/build_lineage_vold.py sync", job)
+        self.assertIn("src/ci/build_lineage_vold.py baseline", job)
+        self.assertLess(
+            job.index("src/ci/prepare_lineage_vold_reference.sh"),
+            job.index("src/ci/build_lineage_vold.py baseline"),
+        )
+        self.assertIn("--reference-vold", job)
+        self.assertIn("--source-ota-sha256", job)
+        self.assertIn("baseline/baseline-report.json", job)
+        self.assertIn("MODOS_LINEAGE_LARGE_SCRATCH", job)
+        self.assertIn("220000000000", job)
+
+        reference = (ROOT / "src/ci/prepare_lineage_vold_reference.sh").read_text()
+        self.assertLess(reference.index("source_care_map_require_lineageos_pdx235_publisher"),
+                        reference.index("avbroot ota verify"))
+        self.assertLess(reference.index("avbroot ota verify"),
+                        reference.index("avbroot ota extract"))
+        self.assertLess(reference.index("avbroot ota extract"),
+                        reference.index('debugfs -R "dump -p /system/bin/vold'))
+        self.assertIn("META-INF/com/android/otacert", reference)
+
+        builder = (ROOT / "src/ci/build_lineage_vold.py").read_text()
+        self.assertIn("def command_baseline(", builder)
+        self.assertIn("verify_baseline_inputs(", builder)
+        self.assertLess(
+            builder.index("verify_baseline_inputs("),
+            builder.index('subprocess.run(["git", "-C", str(vold_root), "apply"'),
+        )
+
     def test_publication_cannot_inherit_self_reported_provenance_only(self):
         lock = json.loads(LOCK.read_text())
         profile = PROFILE.read_text()
