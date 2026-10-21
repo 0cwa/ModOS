@@ -1,7 +1,7 @@
 {
   "version": 2,
   "full": {
-    "location_ota": "https://github.com/0cwa/ModOS/releases/download/2026091900/shiba-2026091900-rootless-9d9b9138e93565abb9f32fcbfff2bfad7e0af9bc1a66abfdb0d0f5712d244700-37dc0a5.zip",
-    "location_csig": "https://github.com/0cwa/ModOS/releases/download/2026091900/shiba-2026091900-rootless-9d9b9138e93565abb9f32fcbfff2bfad7e0af9bc1a66abfdb0d0f5712d244700-37dc0a5.zip.csig"
+    "location_ota": "https://github.com/0cwa/ModOS/releases/download/2026101600/shiba-2026101600-rootless-b3c5ba6808007cb84a9ce7d70f07513e29f31f75a7e3954982fb4f518b102f83-86db61f.zip",
+    "location_csig": "https://github.com/0cwa/ModOS/releases/download/2026101600/shiba-2026101600-rootless-b3c5ba6808007cb84a9ce7d70f07513e29f31f75a7e3954982fb4f518b102f83-86db61f.zip.csig"
   }
 }
