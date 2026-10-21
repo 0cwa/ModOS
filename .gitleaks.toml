@@ -28,10 +28,3 @@ id = "pixeneos-private-key-block"
 description = "Private key material must not be committed"
 regex = '''-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'''
 tags = ["pixeneos", "signing", "private-key"]
-
-[[allowlists]]
-description = "Public Termux package signing fingerprint in its provenance record only"
-condition = "AND"
-paths = ['^locks/exfatprogs-termux-v1\.4\.3-provenance\.json$']
-regexTarget = "secret"
-regexes = ['^CC72CF8BA7DBFA0182877D045A897D96E57CF20C$']
