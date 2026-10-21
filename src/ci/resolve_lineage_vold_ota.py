@@ -69,14 +69,12 @@ def choose_official_file(builds: object, expected_sha256: str = "") -> tuple[str
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True, help="newline-free GitHub Actions output file")
-    parser.add_argument("--metadata-file", type=Path, help="offline test fixture, never pass from production CI")
     args = parser.parse_args()
     try:
-        if args.metadata_file:
-            payload = args.metadata_file.read_bytes()
-        else:
-            with urlopen(ENDPOINT, timeout=60) as response:
-                payload = response.read(MAX_METADATA_BYTES + 1)
+        # CLI never accepts caller-supplied API metadata. Tests exercise the
+        # pure chooser with synthetic fixtures, not the production resolver.
+        with urlopen(ENDPOINT, timeout=60) as response:
+            payload = response.read(MAX_METADATA_BYTES + 1)
         if len(payload) > MAX_METADATA_BYTES:
             raise SourceSelectionError("official build metadata exceeds size limit")
         builds = json.loads(payload)
