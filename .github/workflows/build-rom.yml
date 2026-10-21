@@ -193,9 +193,9 @@ jobs:
           esac
           # pdx235 filesystem and compiled-policy modifications must never reach GrapheneOS.
           # Reject even explicit workflow_call selections before checkout or signing.
-          if [[ "${ADDITIONALS_EXFATPROGS_FSCK}" == true ||
-                "${ADDITIONALS_FSCK_SYSFS_SEPOLICY}" == true ]]; then
-            if [[ "${ROM_FAMILY}" != lineageos || "${DEVICE_NAME}" != pdx235 ]]; then
+          if [[ "${ADDITIONALS_EXFATPROGS_FSCK:-false}" == true ||
+                "${ADDITIONALS_FSCK_SYSFS_SEPOLICY:-false}" == true ]]; then
+            if [[ "${ROM_FAMILY:-}" != lineageos || "${DEVICE_NAME:-}" != pdx235 ]]; then
               echo "::error::pdx235 fsck.exfat/SELinux modules require LineageOS pdx235"
               exit 1
             fi
