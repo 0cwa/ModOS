@@ -34,6 +34,10 @@ check_definition() {
       fail "${file}: scheduled custom boot animation must be enabled"
     [[ "$(toml_resolve_value compatible_sepolicy_patching '')" == "${expected_sepolicy}" ]] ||
       fail "${file}: wrong compatible-SEPolicy selection"
+    local expected_exfat=false
+    [[ "${expected_family}" != lineageos ]] || expected_exfat=true
+    [[ "$(toml_resolve_value exfatprogs_fsck false)" == "${expected_exfat}" ]] ||
+      fail "${file}: wrong exfatprogs fsck selection"
     [[ "$(toml_resolve_value force_update '')" == false ]] ||
       fail "${file}: scheduled force update must default to false"
     [[ "$(toml_resolve_value shizuku false)" == false ]] ||
@@ -81,6 +85,12 @@ check_loader() {
     fail "${file}: loader did not export paired root mode"
   grep -Fxq 'boot_animation=true' "${output_file}" ||
     fail "${file}: loader did not enable scheduled boot animation"
+  local expected_exfat=false
+  [[ "${expected_family}" != lineageos ]] || expected_exfat=true
+  grep -Fxq "exfatprogs_fsck=${expected_exfat}" "${output_file}" ||
+    fail "${file}: loader emitted wrong exfatprogs fsck selection"
+  grep -Fxq "ADDITIONALS_EXFATPROGS_FSCK=${expected_exfat}" "${env_file}" ||
+    fail "${file}: loader exported wrong exfatprogs fsck selection"
   grep -Fxq 'ADDITIONALS_DISABLE_SYSTEM_UPDATER=true' "${env_file}" ||
     fail "${file}: loader did not export stock updater removal"
   grep -Fxq 'ADDITIONALS_BOOT_ANIMATION=true' "${env_file}" ||
@@ -118,6 +128,8 @@ grep -Fq 'needs.preflight.outputs.disable_system_updater' .github/workflows/rele
   fail "GrapheneOS scheduled updater removal is not forwarded from the definition"
 grep -Fq 'needs.schedule_config.outputs.disable_system_updater' .github/workflows/release-lineage.yml ||
   fail "LineageOS scheduled updater removal is not forwarded from the definition"
+grep -Fq "needs.schedule_config.outputs.exfatprogs_fsck == 'true'" .github/workflows/release-lineage.yml ||
+  fail "LineageOS scheduled exfatprogs selection is not forwarded to the build"
 grep -Fq 'check_existing_pair.sh' .github/workflows/release.yml ||
   fail "GrapheneOS paired schedule is not protected by paired existing-build preflight"
 

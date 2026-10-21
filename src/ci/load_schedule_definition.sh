@@ -58,6 +58,7 @@ microg="$(toml_resolve_value microg false)"
 fdroid_privileged_extension="$(toml_resolve_value fdroid_privileged_extension '')"
 boot_animation="$(toml_resolve_value boot_animation '')"
 compatible_sepolicy_patching="$(toml_resolve_value compatible_sepolicy_patching '')"
+exfatprogs_fsck="$(toml_resolve_value exfatprogs_fsck false)"
 force_update="$(toml_resolve_value force_update '')"
 
 [[ -n "${device_id}" && -n "${rom_family}" && -n "${update_channel}" && -n "${root_mode}" && -n "${magisk_preinit}" ]] || {
@@ -96,6 +97,7 @@ esac
   echo "fdroid_privileged_extension=${fdroid_privileged_extension}"
   echo "boot_animation=${boot_animation}"
   echo "compatible_sepolicy_patching=${compatible_sepolicy_patching}"
+  echo "exfatprogs_fsck=${exfatprogs_fsck}"
   echo "force_update=${force_update}"
 } >>"${GITHUB_OUTPUT}"
 
@@ -117,5 +119,6 @@ esac
   echo "ADDITIONALS_FDROID_PRIVILEGED_EXTENSION=${fdroid_privileged_extension}"
   echo "ADDITIONALS_BOOT_ANIMATION=${boot_animation}"
   echo "ADDITIONALS_MAS_COMPATIBLE_SEPOLICY=${compatible_sepolicy_patching}"
+  echo "ADDITIONALS_EXFATPROGS_FSCK=${exfatprogs_fsck}"
   echo "FORCE_UPDATE=${force_update}"
 } >>"${GITHUB_ENV}"
