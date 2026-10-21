@@ -88,6 +88,11 @@ jobs:
       - name: Test pdx235 Custota metadata preparation
         run: bash tests/pdx235_custota_metadata_test.sh
 
+      - name: Install libclang for sysfs selection identity tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libclang-dev
+
       - name: Run deterministic tests
         shell: bash
         env:
