@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "src" / "ci"))
 import lineage_vold  # noqa: E402
 import build_lineage_vold  # noqa: E402
 import check_lineage_vold_artifact  # noqa: E402
+import fetch_lineage_vold_artifact  # noqa: E402
 
 
 class LineageVoldContractTest(unittest.TestCase):
@@ -245,6 +246,53 @@ class LineageVoldContractTest(unittest.TestCase):
                     Path("/unused"), "published",
                     lineage_vold.BASE_BUILD_ID, lineage_vold.BASE_BUILD_ID,
                 )
+
+    def test_staged_release_is_unusable_until_both_assets_are_pinned(self):
+        from unittest.mock import patch
+
+        lock = json.loads((ROOT / "locks/lineage-vold-exfat-timeout.json").read_text())
+        with self.assertRaisesRegex(ValueError, "release tag is not approved"):
+            fetch_lineage_vold_artifact.distribution_contract(lock)
+
+        binary = self.fixture_elf()
+        metadata = b'{"module":"lineage-vold-exfat-timeout"}\n'
+        lock["approved_binary_sha256"] = hashlib.sha256(binary).hexdigest()
+        lock["artifact_distribution"]["release_tag"] = "vold-pdx235-20261016-reviewed"
+        lock["artifact_distribution"]["provenance_sha256"] = hashlib.sha256(metadata).hexdigest()
+        self.assertEqual(
+            fetch_lineage_vold_artifact.distribution_contract(lock)["binary_asset"], "vold"
+        )
+
+        def fake_download(argv, check):
+            self.assertTrue(check)
+            self.assertEqual(argv[:4], ["gh", "release", "download", "vold-pdx235-20261016-reviewed"])
+            destination = Path(argv[argv.index("--dir") + 1])
+            (destination / "vold").write_bytes(binary)
+            (destination / "provenance.json").write_bytes(metadata)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact = Path(tmp) / "artifact"
+            with (
+                patch.object(fetch_lineage_vold_artifact, "load_contract",
+                             return_value=(lock, b"", b"")),
+                patch.object(fetch_lineage_vold_artifact.subprocess, "run",
+                             side_effect=fake_download),
+                patch.object(fetch_lineage_vold_artifact, "verify",
+                             return_value=lock["approved_binary_sha256"]),
+            ):
+                self.assertEqual(
+                    fetch_lineage_vold_artifact.fetch(artifact), lock["approved_binary_sha256"]
+                )
+                self.assertTrue((artifact / "vold").is_file())
+                # A destination containing a previous artifact cannot be silently reused.
+                with self.assertRaisesRegex(ValueError, "destination must be absent"):
+                    fetch_lineage_vold_artifact.fetch(artifact)
+
+                different = Path(tmp) / "tampered"
+                lock["artifact_distribution"]["provenance_sha256"] = "0" * 64
+                with self.assertRaisesRegex(ValueError, "provenance digest"):
+                    fetch_lineage_vold_artifact.fetch(different)
+                self.assertFalse(different.exists())
 
     def test_helper_module_imports_without_helper_runtime(self):
         import tempfile
