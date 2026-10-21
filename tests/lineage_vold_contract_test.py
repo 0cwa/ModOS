@@ -122,9 +122,13 @@ class LineageVoldContractTest(unittest.TestCase):
             (tree / "system" / "bin").mkdir(parents=True)
             (tree / "system" / "build.prop").write_text(
                 "ro.product.system.device=pdx235\n"
+            )
+            (tree / "product").mkdir()
+            (tree / "product" / "build.prop").write_text(
                 "ro.lineage.build.version=24.0\n"
                 "ro.lineage.version=24.0-20261016-NIGHTLY-pdx235\n"
             )
+            product_fs = SimpleNamespace(tree=tree)
             original = tree / "system" / "bin" / "vold"
             original.write_bytes(binary)
             original.chmod(0o755)
@@ -163,21 +167,32 @@ class LineageVoldContractTest(unittest.TestCase):
 
             fs = FakeExtFs()
             with patch.object(lineage_vold, "_artifact", return_value=(binary, {})):
-                sha = lineage_vold.inject_vold(fs, tree, lineage_vold.BASE_BUILD_ID)
+                sha = lineage_vold.inject_vold(fs, product_fs, tree, lineage_vold.BASE_BUILD_ID)
                 self.assertEqual(sha, hashlib.sha256(binary).hexdigest())
                 self.assertEqual(entry.uid, 0)
                 self.assertEqual(entry.gid, 0)
                 self.assertEqual(entry.file_mode, 0o755)
                 self.assertEqual(entry.xattrs["security.selinux"], "u:object_r:vold_exec:s0\0")
 
+                (tree / "product" / "build.prop").write_text(
+                    "ro.lineage.build.version=24.0\n"
+                    "ro.lineage.version=24.0-20261017-NIGHTLY-pdx235\n"
+                )
+                with self.assertRaisesRegex(lineage_vold.VoldModuleError, "does not match"):
+                    lineage_vold.inject_vold(fs, product_fs, tree, lineage_vold.BASE_BUILD_ID)
+                (tree / "product" / "build.prop").write_text(
+                    "ro.lineage.build.version=24.0\n"
+                    "ro.lineage.version=24.0-20261016-NIGHTLY-pdx235\n"
+                )
+
                 entry.xattrs["security.selinux"] = "u:object_r:unlabeled:s0"
                 with self.assertRaisesRegex(lineage_vold.VoldModuleError, "SELinux xattr"):
-                    lineage_vold.inject_vold(fs, tree, lineage_vold.BASE_BUILD_ID)
+                    lineage_vold.inject_vold(fs, product_fs, tree, lineage_vold.BASE_BUILD_ID)
 
                 entry.xattrs["security.selinux"] = "u:object_r:vold_exec:s0\0"
                 fs.change_metadata_on_write = True
                 with self.assertRaisesRegex(lineage_vold.VoldModuleError, "changed filesystem entry metadata"):
-                    lineage_vold.inject_vold(fs, tree, lineage_vold.BASE_BUILD_ID)
+                    lineage_vold.inject_vold(fs, product_fs, tree, lineage_vold.BASE_BUILD_ID)
 
     def test_helper_module_imports_without_helper_runtime(self):
         import tempfile
@@ -206,7 +221,7 @@ class LineageVoldContractTest(unittest.TestCase):
                 self.assertEqual(loaded.LineageVoldMod.NAME, lineage_vold.MODULE_NAME)
                 self.assertEqual(
                     loaded.LineageVoldMod.requirements(loaded.LineageVoldMod()).ext_images,
-                    {"system"},
+                    {"system", "product"},
                 )
             finally:
                 sys.path.remove(tmp)
