@@ -509,9 +509,12 @@ function prepare_exfatprogs_fsck_module() {
     echo "Error: exfatprogs fsck replacement is supported only for LineageOS pdx235." >&2
     return 1
   fi
-  if [[ "${OUTPUT_SCOPE:-}" != 'local-unpublished' ]]; then
-    echo "Error: exfatprogs fsck is limited to local-unpublished output until its corresponding source is included in published releases." >&2
+  if [[ "${OUTPUT_SCOPE:-}" != 'local-unpublished' && "${OUTPUT_SCOPE:-}" != 'published' ]]; then
+    echo "Error: exfatprogs fsck supports local-unpublished or source-verified published output only." >&2
     return 1
+  fi
+  if [[ "${OUTPUT_SCOPE:-}" == published ]]; then
+    require_verified_exfat_source_bundle || return 1
   fi
   repository_root="$(git rev-parse --show-toplevel)" || return 1
   lock_path="${repository_root}/locks/exfatprogs-termux-v1.4.3.json"

@@ -280,9 +280,15 @@ dependency. The SELinux label is preserved, while execution-domain compatibility
 and device runtime behavior remain unverified. We have not established whether
 the replacement completes SD card verification within vold's timeout. The option
 is rejected for other ROM families and devices and remains disabled in scheduled
-builds. The GPL-2.0 source archive and exact Termux recipe commit are pinned and
-fetched with the package. Published ModOS releases do not yet attach that source,
-so the option fails closed unless the output scope is `local-unpublished`.
+builds. Published builds with this option attach a deterministic,
+content-addressed corresponding-source bundle for the GPL-2.0 binary before
+uploading OTA assets. The bundle includes the exact locked upstream archive, pinned Termux
+recipe, the pinned build-control script closure, ModOS adapter, provenance and
+lock records, applicable license texts, and a SHA-256 manifest. It does not
+include the full Termux repository, build toolchain, or dependency archives,
+so it does not claim full binary reproducibility. New releases remain drafts until the uploaded source bundle is
+downloaded and hash-verified; existing releases receive the source asset before
+any new OTA assets. Local-unpublished builds do not require source publication.
 The recorded signed APT metadata is audit provenance; builds verify the lock's
 package URL, size, and SHA-256, but do not repeat the APT signature check.
 

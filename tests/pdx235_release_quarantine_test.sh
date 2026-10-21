@@ -81,6 +81,31 @@ for scenario in normal forced-pair; do
   expect_allow "${scenario} publication evidence" enforce_publication_evidence published
 done
 
+# The exfat module adds one additional fail-closed condition: a verified
+# corresponding-source bundle must exist before a published selection passes.
+ADDITIONALS[EXFATPROGS_FSCK]=true
+provided_source_bundle_path="${EXFAT_SOURCE_BUNDLE_PATH:-}"
+provided_source_bundle_sha256="${EXFAT_SOURCE_BUNDLE_SHA256:-}"
+unset EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
+expect_allow 'exfat remains available for local-unpublished output' enforce_output_policy local-unpublished
+expect_reject 'exfat publication requires a verified source bundle' enforce_output_policy published
+if [[ -z "${provided_source_bundle_path}" ||
+  ! -f "${provided_source_bundle_path}" ||
+  ! "${provided_source_bundle_sha256}" =~ ^[0-9a-f]{64} ]]; then
+  fail 'test requires the deterministic source bundle produced by the CI build step'
+fi
+source_bundle="${tmp}/$(basename -- "${provided_source_bundle_path}")"
+cp -- "${provided_source_bundle_path}" "${source_bundle}"
+EXFAT_SOURCE_BUNDLE_PATH="${source_bundle}"
+EXFAT_SOURCE_BUNDLE_SHA256="${provided_source_bundle_sha256}"
+EXFAT_SOURCE_BUNDLE_VERIFIED=true
+export EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
+expect_allow 'verified source bundle permits exfat publication' enforce_output_policy published
+printf 'tampered' >>"${source_bundle}"
+expect_reject 'changed source bundle blocks exfat publication' enforce_output_policy published
+unset EXFAT_SOURCE_BUNDLE_PATH EXFAT_SOURCE_BUNDLE_SHA256 EXFAT_SOURCE_BUNDLE_VERIFIED
+ADDITIONALS[EXFATPROGS_FSCK]=false
+
 # Both release helpers still fail closed on malformed direct invocation before
 # contacting GH; valid workflow calls receive published scope only after the
 # main pipeline has checked source identity and rebuilt/postverified outputs.

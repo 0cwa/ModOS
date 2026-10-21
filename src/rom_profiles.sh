@@ -130,6 +130,26 @@ function enforce_output_policy() {
     echo "Error: F-Droid output is restricted to local-unpublished." >&2
     return 1
   fi
+  if [[ "${ADDITIONALS[EXFATPROGS_FSCK]:-false}" == true &&
+    "${output_scope}" == published ]]; then
+    require_verified_exfat_source_bundle || return 1
+  fi
+}
+
+function require_verified_exfat_source_bundle() {
+  local path="${EXFAT_SOURCE_BUNDLE_PATH:-}"
+  local expected="${EXFAT_SOURCE_BUNDLE_SHA256:-}"
+  [[ "${EXFAT_SOURCE_BUNDLE_VERIFIED:-}" == true &&
+    "${expected}" =~ ^[0-9a-f]{64}$ && -n "${path}" && -f "${path}" && ! -L "${path}" ]] || {
+    echo "Error: published exfatprogs output requires a verified corresponding-source bundle." >&2
+    return 1
+  }
+  local profiles_dir
+  profiles_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  python3 "${profiles_dir}/ci/verify_exfatprogs_source_bundle.py" "${path}" "${expected}" || {
+    echo "Error: published exfatprogs corresponding-source bundle failed strict content validation." >&2
+    return 1
+  }
 }
 
 function enforce_publication_evidence() {
@@ -258,9 +278,12 @@ function module_selection_fingerprint() {
       echo "Error: exfatprogs fsck replacement is supported only for LineageOS pdx235." >&2
       return 1
     fi
-    if [[ "${OUTPUT_SCOPE}" != 'local-unpublished' ]]; then
-      echo "Error: exfatprogs fsck is limited to local-unpublished output until its corresponding source is included in published releases." >&2
+    if [[ "${OUTPUT_SCOPE}" != 'local-unpublished' && "${OUTPUT_SCOPE}" != 'published' ]]; then
+      echo "Error: exfatprogs fsck supports local-unpublished or source-verified published output only." >&2
       return 1
+    fi
+    if [[ "${OUTPUT_SCOPE}" == published ]]; then
+      require_verified_exfat_source_bundle || return 1
     fi
     exfatprogs_fsck_lock_digest="$(_locked_input_digest locks/exfatprogs-termux-v1.4.3.json)" || {
       echo "Error: the exfatprogs package lock is not clean and checked in." >&2

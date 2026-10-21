@@ -48,6 +48,10 @@
     "termux_recipe_sha256": "22fe42c9a2c001461b2ee874e0e7c02dd37d49968140365909c3deb14de28260",
     "termux_recipe_has_patch_references": false,
     "source_fetch_url": "https://raw.githubusercontent.com/termux/termux-packages/76ffc81c5802ca140d27080c8d4c431243e3e10e/packages/exfatprogs/build.sh",
-    "source_offer_policy": "The adapter is limited to local-unpublished outputs because source artifacts are not currently attached to published ModOS releases."
+    "source_offer_policy": "Published exfatprogs output is allowed only when the exact locked upstream archive, exact pinned Termux recipe and bounded Termux build-control source closure, ModOS adapter, provenance, applicable license texts, and a hash manifest are attached. The closure is not the complete Termux repository or compiler/toolchain/dependency environment and does not claim full binary reproducibility.",
+    "termux_build_framework_commit": "76ffc81c5802ca140d27080c8d4c431243e3e10e",
+    "termux_build_framework_archive_size": 10095760,
+    "termux_build_framework_archive_sha256": "ba8a91ccd2697e7b07f5a6a561d94c6f6a75fbb89f7df151ea850a1d7afcc2b0",
+    "termux_build_framework_closure_file_count": 98
   }
 }

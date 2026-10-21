@@ -10,16 +10,16 @@ import json
 import lzma
 import os
 from pathlib import Path, PurePosixPath
+import re
 import stat
 import struct
 import tarfile
 from typing import Any, Iterable
 
-
 MODULE_NAME = "exfatprogs-fsck"
 TARGET_ROM_FAMILY = "lineageos"
 TARGET_DEVICE = "pdx235"
-ALLOWED_OUTPUT_SCOPE = "local-unpublished"
+ALLOWED_OUTPUT_SCOPES = {"local-unpublished", "published"}
 TARGET_PATH = PurePosixPath("/system/bin/fsck.exfat")
 PACKAGE_NAME = "exfatprogs"
 PACKAGE_VERSION = "1.4.3"
@@ -350,11 +350,29 @@ def _inject_system_binary(system_fs: Any, binary: bytes) -> None:
 def _require_target_profile(rom_family: str, device: str) -> None:
     if rom_family != TARGET_ROM_FAMILY or device != TARGET_DEVICE:
         raise ExfatFsckError("exfatprogs fsck is supported only for LineageOS pdx235")
-    if os.environ.get("PIXENEOS_OUTPUT_SCOPE", "") != ALLOWED_OUTPUT_SCOPE:
+    scope = os.environ.get("PIXENEOS_OUTPUT_SCOPE", "")
+    if scope not in ALLOWED_OUTPUT_SCOPES:
         raise ExfatFsckError(
-            "exfatprogs fsck is limited to local-unpublished output until the "
-            "corresponding source is included in published releases"
+            "exfatprogs fsck requires local-unpublished or source-verified published output"
         )
+    if scope == "published":
+        path = Path(os.environ.get("EXFAT_SOURCE_BUNDLE_PATH", ""))
+        expected = os.environ.get("EXFAT_SOURCE_BUNDLE_SHA256", "")
+        if (os.environ.get("EXFAT_SOURCE_BUNDLE_VERIFIED") != "true" or
+                not re.fullmatch(r"[0-9a-f]{64}", expected)):
+            raise ExfatFsckError("published exfatprogs output requires its verified source bundle")
+        try:
+            metadata = path.lstat()
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size <= 0:
+                raise ExfatFsckError("published exfatprogs source bundle is not a regular file")
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        except OSError as exc:
+            raise ExfatFsckError("published exfatprogs source bundle cannot be read") from exc
+        if digest.hexdigest() != expected:
+            raise ExfatFsckError("published exfatprogs source bundle digest does not match verification")
 
 
 def _module_class() -> type[Any]:
