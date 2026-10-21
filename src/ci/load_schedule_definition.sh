@@ -29,6 +29,7 @@ required=(
   oemunlockonboot
   disable_system_updater
   fsck_sysfs_sepolicy
+  lineage_vold_exfat_timeout
   fdroid_privileged_extension
   boot_animation
   compatible_sepolicy_patching
@@ -56,6 +57,7 @@ msd="$(toml_resolve_value msd '')"
 oemunlockonboot="$(toml_resolve_value oemunlockonboot '')"
 disable_system_updater="$(toml_resolve_value disable_system_updater '')"
 fsck_sysfs_sepolicy="$(toml_resolve_value fsck_sysfs_sepolicy '')"
+lineage_vold_exfat_timeout="$(toml_resolve_value lineage_vold_exfat_timeout '')"
 microg="$(toml_resolve_value microg false)"
 fdroid_privileged_extension="$(toml_resolve_value fdroid_privileged_extension '')"
 boot_animation="$(toml_resolve_value boot_animation '')"
@@ -70,6 +72,16 @@ force_update="$(toml_resolve_value force_update '')"
 
 if [[ -n "${EXPECTED_ROM_FAMILY:-}" && "${rom_family}" != "${EXPECTED_ROM_FAMILY}" ]]; then
   echo "::error::Schedule definition ROM family ${rom_family} does not match expected ${EXPECTED_ROM_FAMILY}."
+  exit 1
+fi
+
+if [[ "${lineage_vold_exfat_timeout}" != true && "${lineage_vold_exfat_timeout}" != false ]]; then
+  echo "::error::Scheduled vold module selection must be a boolean."
+  exit 1
+fi
+if [[ "${lineage_vold_exfat_timeout}" == true &&
+  ("${rom_family}" != lineageos || "${device_id}" != pdx235) ]]; then
+  echo "::error::Source-built vold is supported only for LineageOS pdx235."
   exit 1
 fi
 
@@ -96,6 +108,7 @@ esac
   echo "oemunlockonboot=${oemunlockonboot}"
   echo "disable_system_updater=${disable_system_updater}"
   echo "fsck_sysfs_sepolicy=${fsck_sysfs_sepolicy}"
+  echo "lineage_vold_exfat_timeout=${lineage_vold_exfat_timeout}"
   echo "microg=${microg}"
   echo "fdroid_privileged_extension=${fdroid_privileged_extension}"
   echo "boot_animation=${boot_animation}"
@@ -119,6 +132,7 @@ esac
   echo "ADDITIONALS_OEMUNLOCKONBOOT=${oemunlockonboot}"
   echo "ADDITIONALS_DISABLE_SYSTEM_UPDATER=${disable_system_updater}"
   echo "ADDITIONALS_FSCK_SYSFS_SEPOLICY=${fsck_sysfs_sepolicy}"
+  echo "ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT=${lineage_vold_exfat_timeout}"
   echo "ADDITIONALS_MICROG=${microg}"
   echo "ADDITIONALS_FDROID_PRIVILEGED_EXTENSION=${fdroid_privileged_extension}"
   echo "ADDITIONALS_BOOT_ANIMATION=${boot_animation}"
