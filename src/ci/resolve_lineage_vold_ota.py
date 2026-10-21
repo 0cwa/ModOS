@@ -12,9 +12,9 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 from urllib.parse import urlsplit
-from urllib.request import urlopen
 
 
 ENDPOINT = "https://download.lineageos.org/api/v2/devices/pdx235/builds"
@@ -73,8 +73,14 @@ def main() -> int:
     try:
         # CLI never accepts caller-supplied API metadata. Tests exercise the
         # pure chooser with synthetic fixtures, not the production resolver.
-        with urlopen(ENDPOINT, timeout=60) as response:
-            payload = response.read(MAX_METADATA_BYTES + 1)
+        completed = subprocess.run(
+            ["curl", "--fail", "--location", "--silent", "--show-error",
+             "--max-time", "60", "--proto", "=https", "--proto-redir", "=https", ENDPOINT],
+            capture_output=True, check=False,
+        )
+        if completed.returncode:
+            raise SourceSelectionError("official LineageOS builds API could not be fetched")
+        payload = completed.stdout
         if len(payload) > MAX_METADATA_BYTES:
             raise SourceSelectionError("official build metadata exceeds size limit")
         builds = json.loads(payload)
@@ -84,7 +90,7 @@ def main() -> int:
             raise SourceSelectionError("output file is an unsafe symlink")
         with args.output.open("a", encoding="utf-8") as output:
             output.write(f"ota_url={url}\nota_sha256={sha}\n")
-    except (OSError, ValueError, KeyError, TypeError) as exc:
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     return 0
