@@ -38,7 +38,7 @@ actual_sha="$(sha256sum -- "${ota}")"
 }
 mkdir -p -- "${dest}"
 cert_path="${dest}/lineage-official-otacert.pem"
-unzip -p -- "${ota}" META-INF/com/android/otacert >"${cert_path}"
+unzip -p "${ota}" META-INF/com/android/otacert >"${cert_path}"
 [[ -s "${cert_path}" ]] || {
   echo "Error: source ZIP lacks its official OTA certificate." >&2
   exit 1
