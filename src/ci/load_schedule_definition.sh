@@ -85,6 +85,15 @@ if [[ "${lineage_vold_exfat_timeout}" == true &&
   exit 1
 fi
 
+# Fail before exporting a scheduled selection: pdx235-only modules must not
+# leak into GrapheneOS or other devices, even if a TOML entry is changed.
+if [[ "${exfatprogs_fsck}" != false || "${fsck_sysfs_sepolicy}" != false ]]; then
+  if [[ "${rom_family}" != lineageos || "${device_id}" != pdx235 ]]; then
+    echo "::error::exfatprogs fsck and fsck sysfs SELinux are restricted to LineageOS pdx235." >&2
+    exit 1
+  fi
+fi
+
 case "${root_mode}" in
   rootless|magisk|both) ;;
   *)
