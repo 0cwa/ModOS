@@ -44,6 +44,10 @@ def comparison_report(reference: bytes, built: bytes, lock: dict, source_sha256:
     # mismatch is an ABI problem as well as an exact byte mismatch.
     reference_elf = _elf_identity(reference)
     built_elf = _elf_identity(built)
+    # Canonical JSON-safe shape, so a report round-trips without tuple/list
+    # confusion when reviewed later by the patch gate.
+    reference_elf["needed"] = list(reference_elf["needed"])
+    built_elf["needed"] = list(built_elf["needed"])
     exact = reference == built
     offset = next((i for i, (a, b) in enumerate(zip(reference, built)) if a != b), None)
     if offset is None and not exact:
