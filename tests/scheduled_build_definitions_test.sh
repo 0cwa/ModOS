@@ -222,8 +222,10 @@ if SCHEDULE_DEFINITION="${vold_tampered}" GITHUB_OUTPUT="${vold_output}" \
    bash src/ci/load_schedule_definition.sh >/dev/null 2>"${vold_error}"; then
   fail "GrapheneOS schedule accepted the Lineage-only vold module"
 fi
-grep -Fq 'Source-built vold is supported only for LineageOS pdx235' "${vold_error}" ||
+grep -Fq 'Source-built vold is supported only for LineageOS pdx235' "${vold_error}" || {
+  cat "${vold_error}" >&2
   fail "GrapheneOS vold rejection did not come from the device-scope guard"
+}
 [[ ! -s "${vold_output}" && ! -s "${vold_env}" ]] ||
   fail "GrapheneOS vold schedule leaked forbidden outputs"
 rm -f -- "${vold_tampered}" "${vold_output}" "${vold_env}" "${vold_error}"
