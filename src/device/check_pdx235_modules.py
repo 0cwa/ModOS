@@ -18,8 +18,8 @@ import tomllib
 from modos_health.common import Context, item
 from modos_health.checks import (afsr, alterinstaller, android, bcr,
                                  boot_animation, custota, fdroid_privileged_extension,
-                                 exfatprogs_fsck, magisk, microg, msd, oemunlockonboot,
-                                 stock_updater)
+                                 exfatprogs_fsck, fsck_sysfs_sepolicy, magisk, microg,
+                                 msd, oemunlockonboot, stock_updater)
 
 # Static registry: every enabled module has exactly one owning check file.
 # Keys refer to the checked-in scheduled TOML settings, not arbitrary caller
@@ -35,6 +35,7 @@ MODULES = (
     ("boot_animation", "ADDITIONALS[BOOT_ANIMATION]", boot_animation),
     ("stock_updater", "ADDITIONALS[DISABLE_SYSTEM_UPDATER]", stock_updater),
     ("exfatprogs_fsck", "ADDITIONALS[EXFATPROGS_FSCK]", exfatprogs_fsck),
+    ("fsck_sysfs_sepolicy", "ADDITIONALS[FSCK_SYSFS_SEPOLICY]", fsck_sysfs_sepolicy),
     ("fdroid_privileged_extension", "ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]",
      fdroid_privileged_extension),
 )

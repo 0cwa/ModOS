@@ -99,6 +99,12 @@ class HealthAuditTests(unittest.TestCase):
         self.assertEqual(next(c["status"] for c in checks
                               if c["module"] == "fdroid_privileged_extension"),
                          "NOT_TESTED")
+        self.assertEqual(next(c["status"] for c in checks
+                              if c["module"] == "fsck_sysfs_sepolicy"),
+                         "NOT_TESTED")
+        self.assertEqual(next(c["check"] for c in checks
+                              if c["module"] == "fsck_sysfs_sepolicy"),
+                         "compiled-policy-allow-rule")
         self.assertFalse(any(c["status"] == "FAIL" for c in checks))
         self.assertEqual(next(c["status"] for c in checks
                               if c["check"] == "same-boot"), "PASS")
