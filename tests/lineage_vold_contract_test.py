@@ -111,6 +111,74 @@ class LineageVoldContractTest(unittest.TestCase):
             with self.assertRaises(lineage_vold.VoldModuleError):
                 lineage_vold._artifact(artifact)
 
+    def test_injection_checks_actual_selinux_and_preserves_image_metadata(self):
+        import re
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        binary = self.fixture_elf()
+        with tempfile.TemporaryDirectory() as tmp:
+            tree = Path(tmp)
+            (tree / "system" / "bin").mkdir(parents=True)
+            (tree / "system" / "build.prop").write_text(
+                "ro.product.system.device=pdx235\n"
+                "ro.lineage.build.version=24.0\n"
+                "ro.lineage.version=24.0-20261016-NIGHTLY-pdx235\n"
+            )
+            original = tree / "system" / "bin" / "vold"
+            original.write_bytes(binary)
+            original.chmod(0o755)
+            entry = SimpleNamespace(
+                path=lineage_vold.TARGET,
+                source=None,
+                file_type="RegularFile",
+                file_mode=0o755,
+                uid=None,
+                gid=None,
+                atime=0,
+                ctime=0,
+                mtime=0,
+                crtime=0,
+                device_major=None,
+                device_minor=None,
+                symlink_target=None,
+                xattrs={"security.selinux": "u:object_r:vold_exec:s0\0"},
+            )
+
+            class FakeExtFs:
+                def __init__(self):
+                    self.tree = tree
+                    self.info = SimpleNamespace(entries=[entry])
+                    self.contexts = [
+                        (re.compile(r"/system/bin/vold"), "u:object_r:vold_exec:s0")
+                    ]
+                    self.change_metadata_on_write = False
+
+                def open(self, path, flags, mode=None):
+                    if path != "/system/bin/vold" or flags != "wb" or mode != 0o755:
+                        raise AssertionError("vold must overwrite with the original mode")
+                    if self.change_metadata_on_write:
+                        entry.file_mode = 0o644
+                    return original.open("wb")
+
+            fs = FakeExtFs()
+            with patch.object(lineage_vold, "_artifact", return_value=(binary, {})):
+                sha = lineage_vold.inject_vold(fs, tree, lineage_vold.BASE_BUILD_ID)
+                self.assertEqual(sha, hashlib.sha256(binary).hexdigest())
+                self.assertEqual(entry.uid, 0)
+                self.assertEqual(entry.gid, 0)
+                self.assertEqual(entry.file_mode, 0o755)
+                self.assertEqual(entry.xattrs["security.selinux"], "u:object_r:vold_exec:s0\0")
+
+                entry.xattrs["security.selinux"] = "u:object_r:unlabeled:s0"
+                with self.assertRaisesRegex(lineage_vold.VoldModuleError, "SELinux xattr"):
+                    lineage_vold.inject_vold(fs, tree, lineage_vold.BASE_BUILD_ID)
+
+                entry.xattrs["security.selinux"] = "u:object_r:vold_exec:s0\0"
+                fs.change_metadata_on_write = True
+                with self.assertRaisesRegex(lineage_vold.VoldModuleError, "changed filesystem entry metadata"):
+                    lineage_vold.inject_vold(fs, tree, lineage_vold.BASE_BUILD_ID)
+
     def test_helper_module_imports_without_helper_runtime(self):
         import tempfile
 
