@@ -335,15 +335,11 @@ function module_selection_fingerprint() {
     lineage_vold_builder_digest="$(_locked_input_digest src/ci/build_lineage_vold.py)" || return 1
     lineage_vold_patch_digest="$(_locked_input_digest patches/lineageos/android_system_vold/11d8982f824d52e8122c7aa732207ba66b8f23c8-exfat-fsck-timeout-120s.patch)" || return 1
     lineage_vold_manifest_digest="$(_locked_input_digest locks/lineage-pdx235-20261016-build-manifest.xml)" || return 1
-    lineage_vold_binary_digest="$(PYTHONPATH=src python3 - "${PIXENEOS_VOLD_ARTIFACT_DIR}" <<'PY'
-import sys
-from pathlib import Path
-from lineage_vold import _artifact, _sha256
-
-binary, _ = _artifact(Path(sys.argv[1]))
-print(_sha256(binary))
-PY
-)" || return 1
+    lineage_vold_binary_digest="$(python3 src/ci/check_lineage_vold_artifact.py \
+      --artifact-dir "${PIXENEOS_VOLD_ARTIFACT_DIR}" \
+      --scope "${OUTPUT_SCOPE}" \
+      --base-build-id "${PIXENEOS_VOLD_BASE_BUILD_ID}" \
+      --source-target "${GRAPHENEOS[OTA_TARGET]:-}")" || return 1
     if [[ ! "${lineage_vold_binary_digest}" =~ ^[0-9a-f]{64}$ ]]; then
       echo "Error: source-built vold artifact has no valid binary digest." >&2
       return 1
