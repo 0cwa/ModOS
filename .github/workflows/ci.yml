@@ -105,6 +105,9 @@ jobs:
       - name: Test bounded original Vold source dependency resolver
         run: python3 tests/vold_source_closure_test.py
 
+      - name: Test Sony vendor makefile-only regeneration guard
+        run: python3 tests/vold_vendor_makefiles_test.py
+
       - name: Test pdx235 Custota metadata preparation
         run: bash tests/pdx235_custota_metadata_test.sh
 
