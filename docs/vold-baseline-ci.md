@@ -61,11 +61,26 @@ The source reasoning is grounded in three exact upstream revisions:
 
 **Important external dependency:** the exact official public manifest does
 **not** contain `vendor/sony/pdx235` or
-`vendor/sony/sm6375-common`. Do not invent their contents or disable
-Soong missing-dependency checks. The product's `extract-files.py` and the
-matching authenticated source image can help resolve the original proprietary
-inputs, but that derivation requires separate evidence and must not be
-treated as publisher-identical build configuration automatically.
+`vendor/sony/sm6375-common`. Do not invent proprietary blobs or disable
+Soong missing-dependency checks. There is a narrower, source-grounded route
+for their *makefiles*: the immutable
+`device/sony/pdx235/extract-files.py --regenerate_makefiles` uses the
+pinned `tools/extract-utils` and both Sony device trees to produce
+`pdx235-vendor.mk`, `sm6375-common-vendor.mk`, `BoardConfigVendor.mk`,
+and the relevant `Android.bp` declarations **without extracting any
+proprietary binaries**. This is confirmed by the pinned extract-utils code:
+the `--regenerate_makefiles` path skips source extraction. The probe's
+[`prepare_vold_vendor_makefiles.py`](../src/ci/prepare_vold_vendor_makefiles.py)
+runs that specific mode once after source sync and records a hash-only
+`sony-generated-makefiles-report.json` receipt, reused on subsequent
+iterations. It rejects unexpected binary blobs, symlinks and changes.
+
+Generated public makefile declarations are **not** equivalent to the
+original unpublished proprietary vendor files or complete product inputs.
+If `m vold` requires actual missing blobs, the build still fails closed.
+An independently verified original OTA may supply some blob bytes to the
+reviewed extract-utils workflow, but neither runtime compatibility nor
+publisher-identity follows merely from regenerating makefiles.
 
 The on-disk dependency resolver
 [`src/ci/vold_source_closure.py`](../src/ci/vold_source_closure.py)
