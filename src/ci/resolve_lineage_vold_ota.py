@@ -58,12 +58,45 @@ def choose_official_file(builds: object, expected_sha256: str = "") -> tuple[str
                     raise SourceSelectionError("official base OTA URL has an unexpected path")
             matches.append((url, sha))
     unique = set(matches)
+    if not unique:
+        raise SourceSelectionError("exact 20261016 pdx235 OTA is absent in official builds API")
     if len(unique) != 1:
-        raise SourceSelectionError("exact 20261016 pdx235 OTA is absent or ambiguous in official builds API")
+        raise SourceSelectionError("exact 20261016 pdx235 OTA is ambiguous in official builds API")
     url, sha = unique.pop()
     if expected_sha256 and (not re.fullmatch(r"[a-f0-9]{64}", expected_sha256) or sha != expected_sha256):
         raise SourceSelectionError("official API source SHA-256 disagrees with the immutable source lock")
     return url, sha
+
+
+def resolve_source(builds: object | None, lock: dict) -> tuple[str, str]:
+    """API exact-match preferred; verified archival pin is an allowed fallback.
+
+    If the API lists this historical OTA with a *different* hash, refuse it:
+    do not hide a real source-identity mismatch behind the archival fallback.
+    """
+    url = lock.get("source_ota_url")
+    sha = lock.get("source_ota_sha256")
+    if not isinstance(url, str) or not isinstance(sha, str):
+        raise SourceSelectionError("historical source OTA is not immutably pinned")
+    if not re.fullmatch(r"[0-9a-f]{64}", sha):
+        raise SourceSelectionError("historical source OTA has an invalid SHA-256")
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in ("mirrorbits.lineageos.org", "download.lineageos.org")
+        or parsed.username or parsed.password or parsed.query or parsed.fragment
+        or not parsed.path.endswith("/full/pdx235/20261016/" + EXPECTED)
+    ):
+        raise SourceSelectionError("historical source OTA URL is not the locked official archive")
+
+    if builds is None:
+        return url, sha
+    try:
+        return choose_official_file(builds, sha)
+    except SourceSelectionError as exc:
+        if "is absent in official builds API" in str(exc):
+            return url, sha
+        raise
 
 
 def main() -> int:
@@ -78,14 +111,15 @@ def main() -> int:
              "--max-time", "60", "--proto", "=https", "--proto-redir", "=https", ENDPOINT],
             capture_output=True, check=False,
         )
-        if completed.returncode:
-            raise SourceSelectionError("official LineageOS builds API could not be fetched")
-        payload = completed.stdout
-        if len(payload) > MAX_METADATA_BYTES:
-            raise SourceSelectionError("official build metadata exceeds size limit")
-        builds = json.loads(payload)
+        builds = None
+        if completed.returncode == 0:
+            if len(completed.stdout) > MAX_METADATA_BYTES:
+                raise SourceSelectionError("official build metadata exceeds size limit")
+            builds = json.loads(completed.stdout)
         contract = json.loads((Path(__file__).resolve().parents[2] / "locks/lineage-vold-exfat-timeout.json").read_text())
-        url, sha = choose_official_file(builds, contract.get("source_ota_sha256", ""))
+        url, sha = resolve_source(builds, contract)
+        if builds is None:
+            print("Notice: official builds API unavailable; using previously authenticated, SHA-pinned official archive", file=sys.stderr)
         if args.output.is_symlink():
             raise SourceSelectionError("output file is an unsafe symlink")
         with args.output.open("a", encoding="utf-8") as output:
