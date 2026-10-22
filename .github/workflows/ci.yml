@@ -220,7 +220,7 @@ jobs:
           work="$(mktemp -d -- "${scratch}/modos-vold-baseline.XXXXXXXX")"
           echo "VOLD_BASELINE_WORK=${work}" >> "${GITHUB_ENV}"
 
-      - name: Resolve exact 2026-10-16 OTA through official Lineage API
+      - name: Resolve exact authenticated 2026-10-16 OTA or reviewed archive
         id: official
         shell: bash
         run: python3 src/ci/resolve_lineage_vold_ota.py --output "${GITHUB_OUTPUT}"
