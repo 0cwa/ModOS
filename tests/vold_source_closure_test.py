@@ -63,6 +63,29 @@ class VoldSourceClosureTest(unittest.TestCase):
         self.assertEqual(closure.owner("system/fs/fs_mgr/fs_mgr/Android.bp", self.manifest), "system/fs/fs_mgr")
         self.assertIsNone(closure.owner("vendor/sony/pdx235/pdx235-vendor.mk", self.manifest))
 
+    def test_expand_only_when_all_missing_inputs_have_pinned_owners(self):
+        good = {
+            "proposed_project_additions": ["system/update_engine"],
+            "unpinned_missing_paths": [],
+            "modules_without_verified_owner": [],
+        }
+        next_selection = closure.next_projects_after_diagnostic(self.initial, good, self.seed)
+        self.assertEqual(
+            next_selection["selected_projects"],
+            sorted(set(self.initial) | {"system/update_engine"}),
+        )
+        for name, value in (
+            ("unpinned_missing_paths", ["vendor/sony/pdx235/BoardConfigVendor.mk"]),
+            ("modules_without_verified_owner", ["unknown_genrule"]),
+        ):
+            bad = {**good, name: value}
+            self.assertIsNone(
+                closure.next_projects_after_diagnostic(self.initial, bad, self.seed)
+            )
+        oversized = {**good, "proposed_project_additions": ["p" + str(i) for i in range(31)]}
+        with self.assertRaises(closure.ClosureError):
+            closure.next_projects_after_diagnostic(self.initial, oversized, self.seed)
+
     def test_static_soong_modules_trace_defaults_and_transitive_references(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
