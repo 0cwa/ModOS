@@ -660,7 +660,8 @@ test_workflow_inventory_is_intentional() (
     multi-release.yml \
     release-lineage.yml \
     release.yml \
-    renovate.yml)"
+    renovate.yml \
+    vold-baseline.yml)"
 
   actual="$(find "${WORKFLOW_DIR}" -maxdepth 1 -type f \
     \( -name '*.yml' -o -name '*.yaml' \) -exec basename {} \; | sort)"
