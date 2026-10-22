@@ -156,13 +156,13 @@ def sync(
     if not resume:
         manifest_commit = lock["projects"]["manifest"]["revision"]
         command([
-        repo, "init", "-u", "https://github.com/LineageOS/android.git",
-        "-b", manifest_commit
+            repo, "init", "-u", "https://github.com/LineageOS/android.git",
+            "-b", manifest_commit,
         ], source)
         # Do not overwrite .repo/manifest.xml: Repo manages this file, and
-    # recent versions regenerate it during subsequent sync/init operations.
-    # Instead install the immutable flattened manifest in Repo's manifest
-    # checkout and formally select it with -m, as supported by Repo.
+        # recent versions regenerate it during subsequent sync/init operations.
+        # Instead install the immutable flattened manifest in Repo's manifest
+        # checkout and formally select it with -m, as supported by Repo.
         manifest_name = "modos-vold-original-20261016.xml"
         manifest_dir = source / ".repo/manifests"
         if manifest_dir.is_symlink() or not manifest_dir.is_dir():
@@ -222,7 +222,7 @@ def build_baseline(
     if selected is not None:
         report["selected_source_projects"] = len(selected)
         report["selected_source_paths_sha256"] = hashlib.sha256(
-            ("\\n".join(sorted(selected)) + "\\n").encode()
+            ("\n".join(sorted(selected)) + "\n").encode()
         ).hexdigest()
         report["source_checkout_scope"] = "manifest-pinned-subset"
     else:
