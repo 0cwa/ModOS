@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ProbeOrchestrationTest(unittest.TestCase):
     def run_probe(self, *, stage="probe", vendor_blocked=False,
                   static_additions=1, build_failures=0, diagnosed=True,
-                  reference=True):
+                  reference=True, resume=False, run_directory=False):
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)
             binaries = work / "bin"
@@ -58,6 +58,7 @@ class ProbeOrchestrationTest(unittest.TestCase):
                 elif args[0].endswith("build_original_vold.py"):
                     if args[1] in ("sync", "sync-vendor-sources"):
                         option("--source-root").mkdir(exist_ok=True)
+                        (option("--source-root") / ".repo").mkdir(exist_ok=True)
                     else:
                         builds = sum(x[0].endswith("build_original_vold.py") and x[1] in ("probe", "compare") for x in previous)
                         if builds <= int(os.environ["TEST_BUILD_FAILURES"]):
@@ -78,6 +79,13 @@ class ProbeOrchestrationTest(unittest.TestCase):
                 "TEST_BUILD_FAILURES": str(build_failures),
                 "TEST_DIAGNOSED": str(int(diagnosed)),
             })
+            if resume:
+                (work / "source/.repo").mkdir(parents=True)
+                (work / "source-selection.json").write_text('{"selected_projects": ["system/vold", "system/gsid"]}')
+            if run_directory:
+                run_dir = work / "runs/fixture"
+                run_dir.mkdir(parents=True)
+                environment["VOLD_RUN_DIR"] = str(run_dir)
             if stage == "compare" and reference:
                 original = work / "authenticated-reference-fixture"
                 original.write_bytes(b"reference fixture")
@@ -111,6 +119,28 @@ class ProbeOrchestrationTest(unittest.TestCase):
         self.assertTrue(all("--resume" in x and "--projects-file" in x for x in resume))
         actions = [x[1] for x in calls]
         self.assertLess(actions.index("index"), actions.index("probe"))
+
+    def test_vendor_stage_stops_before_toolchains_and_compile(self):
+        result, calls = self.run_probe(stage="vendor")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([x[1] for x in self.build_calls(calls)], ["sync-vendor-sources"])
+        self.assertFalse(any(x[1] in ("index", "probe", "compare") for x in calls))
+
+    def test_prepare_syncs_and_scans_without_compiling(self):
+        result, calls = self.run_probe(stage="prepare")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([x[1] for x in self.build_calls(calls)], ["sync-vendor-sources", "sync", "sync"])
+        self.assertIn("compilation has not run", result.stdout)
+
+    def test_resume_preserves_selection_and_uses_separate_diagnostics(self):
+        result, calls = self.run_probe(resume=True, run_directory=True, static_additions=0)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(x[1] == "plan" for x in calls))
+        self.assertIn("--resume", self.build_calls(calls)[0])
+        for args in calls:
+            for option in ("--output", "--report"):
+                if option in args:
+                    self.assertIn("/runs/fixture/", args[args.index(option) + 1])
 
     def test_static_scans_are_bounded(self):
         result, calls = self.run_probe(static_additions=99)

@@ -223,7 +223,7 @@ class VoldSourceClosureTest(unittest.TestCase):
                 if argv[1] == "init" and "-m" in argv:
                     (repo_dir / "manifest.xml").write_text(f'<manifest><include name="{argv[-1]}" /></manifest>')
                 if argv[1] == "sync":
-                    for project in argv[4:]:
+                    for project in argv[6:]:
                         (cwd / project).mkdir(parents=True, exist_ok=True)
                         (cwd / project / ".git").mkdir(exist_ok=True)
 
@@ -241,7 +241,8 @@ class VoldSourceClosureTest(unittest.TestCase):
                 original.sync(source, self.baseline, manifest_bytes, 2, more, resume=True)
                 self.assertEqual(len(log), 1)
                 self.assertEqual(log[0][1], "sync")
-                self.assertEqual(log[0][4:], ["system/update_engine"])
+                self.assertEqual(log[0][2:6], ["--current-branch", "--no-tags", "--no-clone-bundle", "-j2"])
+                self.assertEqual(log[0][6:], ["system/update_engine"])
                 log.clear()
                 original.sync(source, self.baseline, manifest_bytes, 2, more, resume=True)
                 self.assertEqual(log, [], "unchanged pinned checkout should not re-run repo sync")

@@ -108,11 +108,17 @@ jobs:
       - name: Test bounded original Vold source dependency resolver
         run: python3 tests/vold_source_closure_test.py
 
-      - name: Test Sony vendor makefile-only regeneration guard
+      - name: Test immutable Sony vendor acquisition and regeneration
         run: python3 tests/vold_vendor_makefiles_test.py
 
       - name: Test original vold probe ordering and bounded expansion
         run: python3 tests/vold_probe_orchestration_test.py
+
+      - name: Test persistent local original vold build commands
+        run: python3 tests/vold_local_test.py
+
+      - name: Test authenticated local build tool setup
+        run: python3 tests/vold_local_tools_test.py
 
       - name: Generate the provisional original vold source plan
         run: python3 src/ci/vold_source_closure.py plan --output "${RUNNER_TEMP}/vold-source-plan.json"
