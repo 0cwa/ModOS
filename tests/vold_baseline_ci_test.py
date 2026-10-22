@@ -78,6 +78,85 @@ class OriginalVoldBaselineTest(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 comparator.write_receipt(evidence, mismatch)
 
+    def test_repo_uses_selected_immutable_manifest_not_internal_override(self):
+        lock, manifest = builder.load_contract()
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source"
+            calls = []
+
+            def fake_command(argv, cwd, **_kwargs):
+                calls.append(argv)
+                repo_dir = cwd / ".repo"
+                if argv[1] == "init" and "-m" not in argv:
+                    (repo_dir / "manifests").mkdir(parents=True)
+                    (repo_dir / "manifest.xml").write_text("old default")
+                if argv[1] == "init" and "-m" in argv:
+                    manifest_name = argv[argv.index("-m") + 1]
+                    (repo_dir / "manifest.xml").write_bytes(
+                        (repo_dir / "manifests" / manifest_name).read_bytes()
+                    )
+
+            with (
+                patch.object(builder.shutil, "which", return_value="/trusted/repo"),
+                patch.object(builder, "command", side_effect=fake_command),
+                patch.object(builder, "verify_checkout"),
+            ):
+                builder.sync(source, lock, manifest, jobs=2)
+            self.assertEqual([call[1] for call in calls], ["init", "init", "sync"])
+            self.assertEqual(calls[1][-2:], ["-m", "modos-vold-original-20261016.xml"])
+            self.assertEqual(
+                (source / ".repo/manifests/modos-vold-original-20261016.xml").read_bytes(),
+                manifest,
+            )
+
+    def test_baseline_build_removes_stale_output_and_rejects_nonidentical_bytes(self):
+        lock, manifest = builder.load_contract()
+        original = self.original_elf()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            (source / ".repo").mkdir(parents=True)
+            (source / ".repo/manifest.xml").write_bytes(manifest)
+            out = source / lock["build"]["artifact"]
+            out.parent.mkdir(parents=True)
+            out.write_bytes(b"stale build must be deleted")
+            reference = root / "official-vold"
+            reference.write_bytes(original)
+
+            def fake_compile(argv, cwd, **_kwargs):
+                self.assertEqual(argv[:2], ["bash", "-euc"])
+                self.assertFalse(out.exists(), "stale binary must be removed first")
+                self.assertIn("m -j2 vold", argv[2])
+                out.write_bytes(original)
+                out.chmod(0o755)
+
+            with (
+                patch.object(builder, "verify_checkout"),
+                patch.object(builder, "command", side_effect=fake_compile),
+            ):
+                report = builder.build_baseline(
+                    source, root / "proof", reference, lock, manifest, 2
+                )
+                self.assertTrue(report["byte_identical"])
+                self.assertEqual(report["reference_sha256"], report["built_sha256"])
+
+            def fake_bad_compile(argv, cwd, **_kwargs):
+                bad = bytearray(original)
+                bad[-1] = 99
+                out.write_bytes(bad)
+                out.chmod(0o755)
+
+            with (
+                patch.object(builder, "verify_checkout"),
+                patch.object(builder, "command", side_effect=fake_bad_compile),
+                self.assertRaises(comparator.BaselineError),
+            ):
+                builder.build_baseline(
+                    source, root / "mismatch", reference, lock, manifest, 2
+                )
+            bad_report = json.loads((root / "mismatch/baseline-report.json").read_text())
+            self.assertFalse(bad_report["byte_identical"])
+
     def test_workflow_is_opt_in_readonly_original_only(self):
         flow = (ROOT / ".github/workflows/vold-baseline.yml").read_text()
         original = (ROOT / "src/ci/build_original_vold.py").read_text()
