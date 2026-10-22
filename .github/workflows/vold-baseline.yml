@@ -4,6 +4,16 @@ name: Qualify original LineageOS pdx235 vold (no patch)
 # once this *baseline-only* workflow is merged to the default branch.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Static plan, source-only compile probe (not proof), or authenticated byte comparison
+        type: choice
+        required: true
+        default: plan
+        options:
+          - plan
+          - probe
+          - compare
 
 permissions:
   contents: read
@@ -13,7 +23,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  dependency_plan:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout immutable manifest and source probe
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Trace the initial pinned source selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 src/ci/vold_source_closure.py plan --output "${RUNNER_TEMP}/vold-source-plan.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          info = json.loads((Path(os.environ["RUNNER_TEMP"]) / "vold-source-plan.json").read_text())
+          assert info["schema_version"] == 1
+          count = len(info["selected_projects"])
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
+              summary.write(f"### Provisional vold source graph: {count}/1243 manifest projects\n")
+              summary.write("This is a source probe, **not** a complete Soong closure or a reproduced binary.\n")
+              summary.write("Sony vendor declarations cannot be regenerated from the public lists alone: the pinned generator reads proprietary ELF inputs.\n")
+          PY
+      - name: Upload static source dependency selection
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vold-source-provisional-plan
+          path: ${{ runner.temp }}/vold-source-plan.json
+          retention-days: 14
+
   prerequisites:
+    needs: dependency_plan
+    if: inputs.mode != 'plan'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -37,6 +82,7 @@ jobs:
           }
 
   unmodified_vold:
+    name: ${{ inputs.mode == 'probe' && 'Source compile probe — NOT QUALIFIED' || 'Authentic byte-for-byte original vold check' }}
     needs: prerequisites
     runs-on: [self-hosted, linux, x64, modos-lineage-large]
     timeout-minutes: 360
@@ -53,9 +99,15 @@ jobs:
 
       - name: Validate isolated host and reserve scratch workspace
         shell: bash
+        env:
+          BASELINE_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
-          for binary in repo avbroot curl unzip openssl sha256sum debugfs git python3 realpath; do
+          binaries=(repo git python3 realpath)
+          if [[ "$BASELINE_MODE" == compare ]]; then
+            binaries+=(avbroot curl unzip openssl sha256sum debugfs)
+          fi
+          for binary in "${binaries[@]}"; do
             command -v "$binary" >/dev/null || {
               echo "::error::Missing required executable: $binary"
               exit 1
@@ -68,8 +120,8 @@ jobs:
           }
           path="$(realpath -e -- "$path")"
           free="$(df -PB1 "$path" | awk 'END {print $4}')"
-          (( free >= 250000000000 )) || {
-            echo '::error::At least 250 GB free space is required before syncing the complete 1,243-project tree'
+          (( free >= 100000000000 )) || {
+            echo '::error::The subset probe requires at least 100 GB as a conservative starting allowance (not a proven maximum)'
             exit 1
           }
           workspace="$(mktemp -d "$path/modos-original-vold.XXXXXXXX")"
@@ -77,6 +129,7 @@ jobs:
           echo "VOLD_WORK=$workspace" >> "$GITHUB_ENV"
 
       - name: Fetch only the immutable official October 16 source OTA
+        if: inputs.mode == 'compare'
         shell: bash
         run: |
           set -euo pipefail
@@ -96,45 +149,35 @@ jobs:
             --output "$VOLD_WORK/source.zip" "$url"
 
       - name: Authenticate official publisher and extract original vold
+        if: inputs.mode == 'compare'
         shell: bash
         run: |
           set -euo pipefail
           bash src/ci/extract_original_vold.sh "$VOLD_WORK/source.zip" "$VOLD_WORK/reference"
 
-      - name: Synchronize the exact 1,243-project original manifest
+
+      - name: Probe missing project dependencies and compare original when selected
         shell: bash
+        env:
+          VOLD_PROBE_STAGE: ${{ inputs.mode }}
+          VOLD_PROBE_JOBS: '4'
         run: |
           set -euo pipefail
-          python3 src/ci/build_original_vold.py sync \
-            --source-root "$VOLD_WORK/source" --jobs 4
+          export VOLD_SOURCE_REF="${VOLD_WORK}/reference/original-vold"
+          bash src/ci/probe_original_vold.sh
 
-      - name: Build unmodified vold and require byte-exact equality
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 src/ci/build_original_vold.py compare \
-            --source-root "$VOLD_WORK/source" \
-            --reference-vold "$VOLD_WORK/reference/original-vold" \
-            --output-dir "$VOLD_WORK/baseline" --jobs 4
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          p = Path(os.environ['VOLD_WORK']) / 'baseline' / 'baseline-report.json'
-          data = json.loads(p.read_text())
-          assert data['byte_identical'] is True
-          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as report:
-              report.write('## Unmodified vold reproduced byte-for-byte\n')
-              report.write(f"Source OTA SHA-256: `{data['official_ota_sha256']}`\n\n")
-              report.write(f"Original vold SHA-256: `{data['reference_sha256']}`\n")
-          PY
-
-      - name: Retain small comparison receipt only
+      - name: Upload only small dependency diagnostics or comparison receipt
         if: always() && env.VOLD_WORK != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: original-pdx235-vold-reproducibility-report
-          path: ${{ env.VOLD_WORK }}/baseline/baseline-report.json
+          name: vold-probe-${{ inputs.mode }}-diagnostics
+          path: |
+            ${{ env.VOLD_WORK }}/baseline-*/baseline-report.json
+            ${{ env.VOLD_WORK }}/source-selection.json
+            ${{ env.VOLD_WORK }}/sony-vendor-input-report.json
+            ${{ env.VOLD_WORK }}/source-index-*.json
+            ${{ env.VOLD_WORK }}/dependency-diagnosis-*.json
+            ${{ env.VOLD_WORK }}/probe-only.txt
           if-no-files-found: warn
           retention-days: 14
 

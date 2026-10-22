@@ -1,0 +1,43 @@
+{
+  "byte_identical_vold_qualified": false,
+  "command": [
+    "python3",
+    "-B",
+    "device/sony/pdx235/extract-files.py",
+    "--regenerate_makefiles"
+  ],
+  "date": "2026-10-22",
+  "environment": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPATH": "tools/extract-utils"
+  },
+  "exit_status": 1,
+  "input_sha256": {
+    "device/sony/pdx235/extract-files.py": "440af4750e0496627003295606935d3a534f2e758ab42adacd3d5da6e255f0e0",
+    "device/sony/pdx235/proprietary-files.txt": "93da9a7ac7957afde23ac9c59425947a29b410d01fd5b1fcde2efb5ec155855f",
+    "device/sony/sm6375-common/extract-files.py": "266ac34e070a5755d513979ad74196b4341c363915b0cfaa24e51d4bf49d6ec8",
+    "device/sony/sm6375-common/proprietary-files.txt": "8056cdd324881ba179fbac2553e77ddc0d1456ade7ef1e37f9630bb5f6c39a29",
+    "tools/extract-utils/extract_utils/elf.py": "58d3a6db079185d94e2d283211f73fa71f32bb882618ac47b0feb6d2f5e01d31",
+    "tools/extract-utils/extract_utils/main.py": "3470e7a43a9788f2699c13d627750b7f5fdc448bf364a48a3a7c86f2b931562d",
+    "tools/extract-utils/extract_utils/makefiles.py": "2a550851c75a2a32d4d294338df3e73f7d95b4418721653224565d27ba6fa111",
+    "tools/extract-utils/extract_utils/module.py": "1d1f77c66e05a3f3fea1e710caca7842c38c11b76c1a7bb486724826e72f73ef"
+  },
+  "kind": "sony-vendor-regeneration-public-source-replay",
+  "original_scripts_modified": false,
+  "partial_outputs": [
+    "vendor/sony/pdx235/Android.bp",
+    "vendor/sony/pdx235/Android.mk",
+    "vendor/sony/pdx235/BoardConfigVendor.mk",
+    "vendor/sony/pdx235/pdx235-vendor.mk"
+  ],
+  "proprietary_binaries_present": false,
+  "public_source_revisions": {
+    "LineageOS/android_device_sony_pdx235": "0559de69466e1e9af69b121985f592c4f4609283",
+    "LineageOS/android_device_sony_sm6375-common": "d1d80af1ad9032cb092ff6d85db437709cc54e28",
+    "LineageOS/android_tools_extract-utils": "ff6589c6b0a4a00c592e98940e9e6b6a50c76569"
+  },
+  "python_version": "Python 3.12.14",
+  "schema_version": 1,
+  "stderr": "Traceback (most recent call last):\n  File \"device/sony/pdx235/extract-files.py\", line 63, in <module>\n    utils.run()\n  File \"tools/extract-utils/extract_utils/main.py\", line 219, in run\n    self.write_makefiles()\n  File \"tools/extract-utils/extract_utils/main.py\", line 160, in write_makefiles\n    module.write_makefiles(\n  File \"tools/extract-utils/extract_utils/module.py\", line 738, in write_makefiles\n    proprietary_file.write_makefiles(self, ctx)\n  File \"tools/extract-utils/extract_utils/module.py\", line 215, in write_makefiles\n    write_product_packages(\n  File \"tools/extract-utils/extract_utils/makefiles.py\", line 683, in write_product_packages\n    w(write_lib_package, lib64_tree, packages_ctx)\n  File \"tools/extract-utils/extract_utils/makefiles.py\", line 626, in w\n    return write_packages_group(\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"tools/extract-utils/extract_utils/makefiles.py\", line 565, in write_packages_group\n    package_name = fn(file, builder, *args, **kwargs)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"tools/extract-utils/extract_utils/makefiles.py\", line 382, in write_lib_package\n    return write_elfs_package(\n           ^^^^^^^^^^^^^^^^^^^\n  File \"tools/extract-utils/extract_utils/makefiles.py\", line 266, in write_elfs_package\n    machine, bits, libs = get_file_machine_bits_libs(f_path, gen_deps)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"tools/extract-utils/extract_utils/elf.py\", line 43, in get_file_machine_bits_libs\n    with open(file_path, 'rb') as f:\n         ^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: 'vendor/sony/pdx235/proprietary/vendor/lib64/camera/com.qti.eeprom.hi846_back_eeprom.so'\n",
+  "stdout": "Parsing device/sony/pdx235/proprietary-files.txt\nParsing device/sony/sm6375-common/proprietary-files.txt\n"
+}

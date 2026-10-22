@@ -117,6 +117,9 @@ class OriginalVoldBaselineTest(unittest.TestCase):
             source = root / "source"
             (source / ".repo").mkdir(parents=True)
             (source / ".repo/manifest.xml").write_bytes(manifest)
+            release = source / lock["build"]["release_config"]["path"]
+            release.parent.mkdir(parents=True)
+            release.write_text("# Updated manually\naosp_target_release=cp2a\n")
             out = source / lock["build"]["artifact"]
             out.parent.mkdir(parents=True)
             out.write_bytes(b"stale build must be deleted")
@@ -124,7 +127,7 @@ class OriginalVoldBaselineTest(unittest.TestCase):
             reference.write_bytes(original)
 
             def fake_compile(argv, cwd, **_kwargs):
-                self.assertEqual(argv[:2], ["bash", "-euc"])
+                self.assertEqual(argv[:2], ["bash", "-ec"])
                 self.assertFalse(out.exists(), "stale binary must be removed first")
                 self.assertIn("m -j2 vold", argv[2])
                 out.write_bytes(original)
@@ -166,17 +169,20 @@ class OriginalVoldBaselineTest(unittest.TestCase):
         self.assertNotIn("  schedule:", flow)
         self.assertIn("runs-on: [self-hosted, linux, x64, modos-lineage-large]", flow)
         self.assertIn("MODOS_VOLD_BASELINE_RUNNER_READY", flow)
-        self.assertIn("free >= 250000000000", flow)
+        self.assertIn("free >= 100000000000", flow)
         self.assertIn("contents: read", flow)
         self.assertIn("baseline-report.json", flow)
         self.assertIn("rm -rf -- \"$VOLD_WORK\"", flow)
-        self.assertIn("src/ci/build_original_vold.py compare", flow)
+        self.assertIn("src/ci/probe_original_vold.sh", flow)
+        probe = (ROOT / "src/ci/probe_original_vold.sh").read_text()
+        self.assertIn("src/ci/build_original_vold.py compare", probe)
+        self.assertIn("src/ci/build_original_vold.py probe", probe)
         self.assertIn("source_care_map_require_lineageos_pdx235_publisher", auth)
         self.assertIn("avbroot ota verify", auth)
         self.assertIn("avbroot ota extract", auth)
         self.assertIn("comparison(official, built, lock)", original)
-        self.assertIn("verify_checkout(source, manifest, clean=True)", original)
-        for text in (flow, original, auth):
+        self.assertIn("verify_checkout(source, manifest, clean=True, selected=selected)", original)
+        for text in (flow, original, auth, probe):
             self.assertNotIn("git apply", text)
             self.assertNotIn("ota patch", text)
             self.assertNotIn("force-publish", text)

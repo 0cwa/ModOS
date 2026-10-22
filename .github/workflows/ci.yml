@@ -102,6 +102,29 @@ jobs:
       - name: Test unmodified original vold CI-only baseline
         run: python3 tests/vold_baseline_ci_test.py
 
+      - name: Test actual Repo manifest selection and bounded build inputs
+        run: python3 tests/vold_original_build_test.py
+
+      - name: Test bounded original Vold source dependency resolver
+        run: python3 tests/vold_source_closure_test.py
+
+      - name: Test Sony vendor makefile-only regeneration guard
+        run: python3 tests/vold_vendor_makefiles_test.py
+
+      - name: Test original vold probe ordering and bounded expansion
+        run: python3 tests/vold_probe_orchestration_test.py
+
+      - name: Generate the provisional original vold source plan
+        run: python3 src/ci/vold_source_closure.py plan --output "${RUNNER_TEMP}/vold-source-plan.json"
+
+      - name: Retain the provisional original vold source plan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vold-source-provisional-plan
+          path: ${{ runner.temp }}/vold-source-plan.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Test pdx235 Custota metadata preparation
         run: bash tests/pdx235_custota_metadata_test.sh
 

@@ -30,6 +30,15 @@
   },
   "build": {
     "target": "lineage_pdx235-userdebug",
+    "product": "lineage_pdx235",
+    "release": "cp2a",
+    "variant": "userdebug",
+    "setup_command": "_lunch_meat lineage_pdx235 cp2a userdebug",
+    "release_config": {
+      "path": "vendor/lineage/vars/aosp_target_release",
+      "sha256": "258eaaeb1fc743ee5fd3a0ade38905be3bbfe3d2624d7fd477dd966a68d67eb6",
+      "source_url": "https://github.com/LineageOS/android_vendor_lineage/blob/87daf527b0288b60c9cc07c05a5f5aad1660c234/vars/aosp_target_release"
+    },
     "command": "m vold",
     "artifact": "out/target/product/pdx235/system/bin/vold",
     "elf_class": 64,
