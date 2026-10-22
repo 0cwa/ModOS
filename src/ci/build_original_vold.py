@@ -232,7 +232,7 @@ def build_baseline(
     if selected is not None:
         report["selected_source_projects"] = len(selected)
         report["selected_source_paths_sha256"] = hashlib.sha256(
-            ("\\n".join(sorted(selected)) + "\\n").encode()
+            ("\n".join(sorted(selected)) + "\n").encode()
         ).hexdigest()
         report["source_checkout_scope"] = "manifest-pinned-subset"
     else:
