@@ -34,10 +34,18 @@ this job. Provision an isolated **self-hosted Linux x64** runner with:
   trusted build runner is available. Until enabled, the heavy PR job is
   intentionally skipped.
 
-The baseline job selects the exact
-`lineage-24.0-20261016-nightly-pdx235-signed.zip` from the **official
-LineageOS builds API**, refusing a substituted later nightly. It checks the
-API SHA-256 against downloaded bytes, verifies the embedded certificate
+The baseline job selects only the exact
+`lineage-24.0-20261016-nightly-pdx235-signed.zip`. Its immutable OTA SHA-256
+(`8af46661a1440e98018bb2abb155317d6d4ae54e051160f0786b75c1e6806c82`)
+and official mirror URL were recovered from successful, independently signed
+ModOS source-verification runs
+[#39632433468](https://github.com/0cwa/ModOS/actions/runs/39632433468)
+and [#39678546023](https://github.com/0cwa/ModOS/actions/runs/39678546023),
+and pinned in the source lock. The job first checks the **official
+LineageOS builds API**; if that historical nightly has rotated out of its
+list, it uses only the pinned original archive URL and SHA-256. Any
+conflicting API digest is rejected. It checks that SHA against downloaded
+bytes, verifies the embedded certificate
 against the independently pinned official LineageOS publisher public key,
 and performs cryptographic whole-OTA verification with `avbroot ota verify`.
 It then extracts `system.img` and the original `/system/bin/vold` as
@@ -65,10 +73,9 @@ and first differing byte offset. A mismatch fails the job, and **no patched
 build is allowed**. CI retains the report only, not the large source checkout,
 vold binary, decrypted partitions or an OTA.
 
-If the official API no longer lists the 2026-10-16 archive or the full source
-cannot be compiled on the runner, this gate correctly remains blocked.
-Investigate and independently pin the archived source rather than silently
-substituting an unrelated image. Even a successful fixture/unit test is NOT
+If the immutable archive becomes unavailable or the full source cannot be
+compiled on the runner, this gate remains blocked. Never substitute a newer
+nightly or an unverified mirror. Even a successful fixture/unit test is NOT
 a successful real baseline reproduction.
 
 ## Second gate: compile the modified vold only after success
