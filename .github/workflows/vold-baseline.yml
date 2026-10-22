@@ -168,6 +168,7 @@ jobs:
           path: |
             ${{ env.VOLD_WORK }}/baseline-*/baseline-report.json
             ${{ env.VOLD_WORK }}/source-selection.json
+            ${{ env.VOLD_WORK }}/sony-generated-makefiles-report.json
             ${{ env.VOLD_WORK }}/source-index-*.json
             ${{ env.VOLD_WORK }}/dependency-diagnosis-*.json
             ${{ env.VOLD_WORK }}/probe-only.txt
