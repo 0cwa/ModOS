@@ -1,0 +1,150 @@
+name: Qualify original LineageOS pdx235 vold (no patch)
+
+# Intentionally manual and nonpublishing. workflow_dispatch is available
+# once this *baseline-only* workflow is merged to the default branch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unmodified-pdx235-vold-baseline
+  cancel-in-progress: false
+
+jobs:
+  prerequisites:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Require a trusted dedicated large build runner
+        shell: bash
+        env:
+          BASELINE_READY: ${{ vars.MODOS_VOLD_BASELINE_RUNNER_READY }}
+          SCRATCH: ${{ vars.MODOS_LINEAGE_LARGE_SCRATCH }}
+          SOURCE_REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$REPOSITORY" == '0cwa/ModOS' && "$SOURCE_REF" == refs/heads/main ]] || {
+            echo '::error::Unmodified vold source build is restricted to the repository main branch'
+            exit 1
+          }
+          [[ "$BASELINE_READY" == 'true' && "$SCRATCH" == /* ]] || {
+            echo '::error::Configure MODOS_VOLD_BASELINE_RUNNER_READY=true and MODOS_LINEAGE_LARGE_SCRATCH with an absolute private scratch path'
+            exit 1
+          }
+
+  unmodified_vold:
+    needs: prerequisites
+    runs-on: [self-hosted, linux, x64, modos-lineage-large]
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    env:
+      MODOS_LINEAGE_LARGE_SCRATCH: ${{ vars.MODOS_LINEAGE_LARGE_SCRATCH }}
+    steps:
+      - name: Checkout pinned source and tests
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Validate isolated host and reserve scratch workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in repo avbroot curl unzip openssl sha256sum debugfs git python3 realpath; do
+            command -v "$binary" >/dev/null || {
+              echo "::error::Missing required executable: $binary"
+              exit 1
+            }
+          done
+          path="$MODOS_LINEAGE_LARGE_SCRATCH"
+          [[ "$path" == /* && -d "$path" && ! -L "$path" ]] || {
+            echo '::error::Scratch must be an existing real absolute directory'
+            exit 1
+          }
+          path="$(realpath -e -- "$path")"
+          free="$(df -PB1 "$path" | awk 'END {print $4}')"
+          (( free >= 250000000000 )) || {
+            echo '::error::At least 250 GB free space is required before syncing the complete 1,243-project tree'
+            exit 1
+          }
+          workspace="$(mktemp -d "$path/modos-original-vold.XXXXXXXX")"
+          echo "VOLD_SCRATCH=$path" >> "$GITHUB_ENV"
+          echo "VOLD_WORK=$workspace" >> "$GITHUB_ENV"
+
+      - name: Fetch only the immutable official October 16 source OTA
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          lock = json.loads(Path('locks/lineage-vold-baseline-20261016.json').read_text())
+          assert lock['source_ota_url'] == (
+              'https://mirrorbits.lineageos.org/full/pdx235/20261016/'
+              'lineage-24.0-20261016-nightly-pdx235-signed.zip'
+          )
+          print(lock['source_ota_url'])
+          PY
+          )"
+          curl --fail --location --retry 3 --connect-timeout 30 \
+            --proto '=https' --proto-redir '=https' \
+            --output "$VOLD_WORK/source.zip" "$url"
+
+      - name: Authenticate official publisher and extract original vold
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash src/ci/extract_original_vold.sh "$VOLD_WORK/source.zip" "$VOLD_WORK/reference"
+
+      - name: Synchronize the exact 1,243-project original manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 src/ci/build_original_vold.py sync \
+            --source-root "$VOLD_WORK/source" --jobs 4
+
+      - name: Build unmodified vold and require byte-exact equality
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 src/ci/build_original_vold.py compare \
+            --source-root "$VOLD_WORK/source" \
+            --reference-vold "$VOLD_WORK/reference/original-vold" \
+            --output-dir "$VOLD_WORK/baseline" --jobs 4
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ['VOLD_WORK']) / 'baseline' / 'baseline-report.json'
+          data = json.loads(p.read_text())
+          assert data['byte_identical'] is True
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as report:
+              report.write('## Unmodified vold reproduced byte-for-byte\n')
+              report.write(f"Source OTA SHA-256: `{data['official_ota_sha256']}`\n\n")
+              report.write(f"Original vold SHA-256: `{data['reference_sha256']}`\n")
+          PY
+
+      - name: Retain small comparison receipt only
+        if: always() && env.VOLD_WORK != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: original-pdx235-vold-reproducibility-report
+          path: ${{ env.VOLD_WORK }}/baseline/baseline-report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove original OTA, complete tree, and binary from trusted runner
+        if: always() && env.VOLD_WORK != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VOLD_WORK" == "$VOLD_SCRATCH"/modos-original-vold.* ]] || {
+            echo '::error::Refusing scratch cleanup outside the isolated baseline workspace'
+            exit 1
+          }
+          rm -rf -- "$VOLD_WORK"
