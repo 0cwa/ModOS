@@ -23,6 +23,9 @@ class VoldSourceClosureTest(unittest.TestCase):
 
     def test_pinned_70_project_bootstrap_is_strictly_smaller_than_full_manifest(self):
         self.assertEqual(len(self.manifest), 1243)
+        # The official manifest omits path= for dozens of AOSP projects.
+        self.assertIn("device/common", self.manifest)
+        self.assertIn("toolchain/pgo-profiles", self.manifest)
         self.assertEqual(len(self.initial), 70)
         self.assertEqual(len(self.initial), len(set(self.initial)))
         self.assertTrue({"system/vold", "build/soong", "frameworks/base", "device/sony/pdx235"}.issubset(self.initial))
