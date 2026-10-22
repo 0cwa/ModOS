@@ -37,6 +37,8 @@ def read_binary(path: Path) -> bytes:
 def comparison_report(reference: bytes, built: bytes, lock: dict, source_sha256: str) -> dict:
     if not isinstance(source_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", source_sha256):
         raise BaselineMismatch("verified official OTA SHA-256 is required")
+    if source_sha256 != lock.get("source_ota_sha256"):
+        raise BaselineMismatch("unmodified reference OTA differs from the pinned authenticated source SHA-256")
     base = lock["base_build_id"]
     if base != "lineage-24.0-20261016-nightly-pdx235-signed":
         raise BaselineMismatch("source lock refers to a different LineageOS baseline")
