@@ -99,6 +99,9 @@ class VoldSourceClosureTest(unittest.TestCase):
                     (repo_dir / "manifest.xml").write_bytes(
                         (repo_dir / "manifests" / argv[-1]).read_bytes()
                     )
+                if argv[1] == "sync":
+                    for project in argv[4:]:
+                        (cwd / project).mkdir(parents=True, exist_ok=True)
 
             with (
                 patch.object(original.shutil, "which", return_value="/usr/bin/repo"),
@@ -114,7 +117,10 @@ class VoldSourceClosureTest(unittest.TestCase):
                 original.sync(source, self.baseline, manifest_bytes, 2, more, resume=True)
                 self.assertEqual(len(log), 1)
                 self.assertEqual(log[0][1], "sync")
-                self.assertIn("system/update_engine", log[0])
+                self.assertEqual(log[0][4:], ["system/update_engine"])
+                log.clear()
+                original.sync(source, self.baseline, manifest_bytes, 2, more, resume=True)
+                self.assertEqual(log, [], "unchanged pinned checkout should not re-run repo sync")
 
     def test_selections_are_checked_against_unchanged_manifest(self):
         raw = (ROOT / self.baseline["manifest"]["path"]).read_bytes()
