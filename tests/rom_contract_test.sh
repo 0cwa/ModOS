@@ -170,6 +170,28 @@ test_selection_fingerprint() (
   if grep -Eq '^boot_animation(_sha256)?=' "${fingerprint_input}"; then
     fail "default-off fingerprint must omit boot-animation fields"
   fi
+  # Adding the optional vold module must not republish unchanged builds.
+  if grep -Eq '^(module\.lineage-vold-exfat-timeout|lineage_vold_)' "${fingerprint_input}"; then
+    fail "disabled source-built vold unexpectedly changed the selection identity"
+  fi
+  local fake_vold_digest enabled_vold_manifest field
+  fake_vold_digest="$(printf "%064d" 0)"
+  SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT=true
+  for field in SELECTION_LINEAGE_VOLD_LOCK_SHA256 \
+    SELECTION_LINEAGE_VOLD_ADAPTER_SHA256 \
+    SELECTION_LINEAGE_VOLD_BUILDER_SHA256 \
+    SELECTION_LINEAGE_VOLD_VERIFIER_SHA256 \
+    SELECTION_LINEAGE_VOLD_PATCH_SHA256 \
+    SELECTION_LINEAGE_VOLD_MANIFEST_SHA256 \
+    SELECTION_LINEAGE_VOLD_BINARY_SHA256; do
+    printf -v "${field}" "%s" "${fake_vold_digest}"
+  done
+  enabled_vold_manifest="$(selection_variant_manifest)" ||
+    fail "enabled vold identity serialization failed"
+  grep -Fxq "module.lineage-vold-exfat-timeout=true" <<<"${enabled_vold_manifest}" ||
+    fail "enabled vold was omitted from the selection identity"
+  grep -Fxq "lineage_vold_binary_sha256=${fake_vold_digest}" <<<"${enabled_vold_manifest}" ||
+    fail "enabled vold binary digest was omitted from the selection identity"
 
   MAGISK[PREINIT]="sda10"
   ADDITIONALS[ROOT]="true"

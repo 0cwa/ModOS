@@ -85,6 +85,7 @@ class HealthAuditTests(unittest.TestCase):
         self.assertTrue(selections["microg"])
         self.assertTrue(selections["custota"])
         self.assertFalse(selections["fdroid_privileged_extension"])
+        self.assertFalse(selections["lineage_vold"])
 
     def test_every_enabled_module_owns_results_and_disabled_is_not_failure(self):
         ctx, fake = fake_ctx()
@@ -98,6 +99,9 @@ class HealthAuditTests(unittest.TestCase):
                               if c["check"] == "privapp-dump"), "PASS")
         self.assertEqual(next(c["status"] for c in checks
                               if c["module"] == "fdroid_privileged_extension"),
+                         "NOT_TESTED")
+        self.assertEqual(next(c["status"] for c in checks
+                              if c["module"] == "lineage_vold"),
                          "NOT_TESTED")
         self.assertEqual(next(c["status"] for c in checks
                               if c["module"] == "fsck_sysfs_sepolicy"),
@@ -114,6 +118,16 @@ class HealthAuditTests(unittest.TestCase):
                              " shell pm grant " in c or "install " in c
                              for c in calls))
         self.assertEqual(calls.count("adb shell cat /proc/sys/kernel/random/boot_id"), 2)
+
+    def test_vold_health_check_never_claims_proof_of_patched_binary(self):
+        from modos_health.checks import lineage_vold
+        ctx, fake = fake_ctx()
+        results = lineage_vold.check(ctx)
+        self.assertEqual(results[0]["check"], "vold-executable-present")
+        self.assertEqual(results[0]["status"], "PASS")
+        self.assertEqual(results[1]["status"], "NOT_TESTED")
+        self.assertIn("cannot attest", results[1]["detail"])
+        self.assertNotIn("sha256sum", " ".join(" ".join(c) for c in fake.calls))
 
     def test_microg_missing_deny_is_a_failure(self):
         fake = FakeADB()

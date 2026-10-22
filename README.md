@@ -292,6 +292,29 @@ any new OTA assets. Local-unpublished builds do not require source publication.
 The recorded signed APT metadata is audit provenance; builds verify the lock's
 package URL, size, and SHA-256, but do not repeat the APT signature check.
 
+### Source-built vold timeout for LineageOS pdx235
+
+The experimental `lineage-vold-exfat-timeout` module aims to raise only the
+exFAT fsck timeout from 45 to 120 seconds. **It is default-off and has not
+passed a real unmodified-binary reproduction test.** Before compiling a patched
+`vold`, the dedicated, nonpublishing large-runner CI must build **unmodified
+`vold`** from the locked 1,243-project LineageOS 2026-10-16 manifest and
+demonstrate a *byte-for-byte match* against the executable extracted from the
+publisher-authenticated official OTA. A matching ABI or source revision is
+not sufficient. A mismatch blocks all subsequent patched builds.
+
+After that baseline gate passes, the separate `build` command requires the
+baseline report, exact unmodified binary and OTA reference before applying
+the isolated exFAT timeout patch. System/product identity, ELF dependencies,
+root ownership, actual `vold_exec` metadata, and independently approved
+binary SHA-256 are also checked prior to production use. Public scheduled
+LineageOS and manual selectors remain **disabled**, and GrapheneOS is excluded.
+
+See [`docs/lineage-vold-exfat-timeout.md`](docs/lineage-vold-exfat-timeout.md)
+for the complete CI runner setup, baseline-first acceptance sequence,
+provenance requirements and remaining device qualification gates. No vold OTA
+has been authorized for force-publish.
+
 ### Custom boot animation (enabled by default)
 
 All builds use the checked-in `custom/boot-animation/bootanimation.zip` by

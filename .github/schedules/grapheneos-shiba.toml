@@ -20,4 +20,6 @@ MAGISK_PREINIT = "sda10"
 # These modules are only supported on LineageOS pdx235, not GrapheneOS.
 'ADDITIONALS[EXFATPROGS_FSCK]' = false
 'ADDITIONALS[FSCK_SYSFS_SEPOLICY]' = false
+# Vold remains disabled until an independently qualified binary is pinned.
+'ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]' = false
 FORCE_UPDATE = false

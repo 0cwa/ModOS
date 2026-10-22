@@ -72,6 +72,11 @@ on:
         required: false
         type: boolean
         default: false
+      lineage-vold-exfat-timeout:
+        description: Replace pdx235 vold with an independently qualified and SHA-pinned source-built binary
+        required: false
+        type: boolean
+        default: false
       update-channel:
         required: true
         type: string
@@ -152,6 +157,7 @@ env:
   ADDITIONALS_SHIZUKU: ${{ inputs.shizuku }}
   ADDITIONALS_EXFATPROGS_FSCK: ${{ inputs.exfatprogs-fsck }}
   ADDITIONALS_FSCK_SYSFS_SEPOLICY: ${{ inputs.fsck-sysfs-sepolicy }}
+  ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT: ${{ inputs.lineage-vold-exfat-timeout }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 
 # Publishing inherits the caller job's permission ceiling. A reusable
@@ -178,6 +184,11 @@ jobs:
           DEVICE_CANDIDATE_RECIPIENT_BASE64: ${{ inputs.device-candidate-recipient-base64 }}
           PUBLISH_REQUEST: ${{ inputs.publish }}
         run: |
+          if [[ "${ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT:-false}" == true ]] &&
+            [[ "${ROM_FAMILY}" != lineageos || "${DEVICE_NAME}" != pdx235 ]]; then
+            echo '::error::Source-built vold is supported only for LineageOS pdx235'
+            exit 1
+          fi
           if [[ "${EXPORT_DEVICE_CANDIDATE}" == true ]]; then
             [[ ("${DEVELOPMENT_PROFILE}" == care-map-pdx235 ||
                  "${DEVELOPMENT_PROFILE}" == care-map-pdx235-lineage24) &&
@@ -228,6 +239,17 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: ${{ inputs.publish && inputs.release-type != 'build-only' }}
+
+      - name: Download approved source-built vold artifact
+        if: inputs.lineage-vold-exfat-timeout
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 src/ci/fetch_lineage_vold_artifact.py --output-dir "${RUNNER_TEMP}/lineage-vold-artifact"
+          echo "PIXENEOS_VOLD_ARTIFACT_DIR=${RUNNER_TEMP}/lineage-vold-artifact" >> "${GITHUB_ENV}"
+          echo "PIXENEOS_VOLD_BASE_BUILD_ID=lineage-24.0-20261016-nightly-pdx235-signed" >> "${GITHUB_ENV}"
 
       - name: Build and verify exfatprogs corresponding-source bundle
         if: inputs.exfatprogs-fsck && inputs.publish && inputs.release-type != 'build-only' && inputs.rom-family == 'lineageos' && inputs.device-id == 'pdx235'

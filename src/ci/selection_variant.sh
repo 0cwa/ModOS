@@ -48,6 +48,14 @@ function selection_variant_manifest() {
     SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256
     SELECTION_MODULE_FSCK_SYSFS_SEPOLICY
     SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256
+    SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT
+    SELECTION_LINEAGE_VOLD_LOCK_SHA256
+    SELECTION_LINEAGE_VOLD_ADAPTER_SHA256
+    SELECTION_LINEAGE_VOLD_BUILDER_SHA256
+    SELECTION_LINEAGE_VOLD_VERIFIER_SHA256
+    SELECTION_LINEAGE_VOLD_PATCH_SHA256
+    SELECTION_LINEAGE_VOLD_MANIFEST_SHA256
+    SELECTION_LINEAGE_VOLD_BINARY_SHA256
     SELECTION_BOOT_ANIMATION
   )
 
@@ -76,6 +84,7 @@ function selection_variant_manifest() {
     SELECTION_MODULE_SHIZUKU \
     SELECTION_MODULE_EXFATPROGS_FSCK \
     SELECTION_MODULE_FSCK_SYSFS_SEPOLICY \
+    SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT \
     SELECTION_BOOT_ANIMATION; do
     value="${!field}"
     if [[ "${value}" != 'true' && "${value}" != 'false' ]]; then
@@ -89,7 +98,14 @@ function selection_variant_manifest() {
     SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256 \
     SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256 \
     SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256 \
-    SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256; do
+    SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256 \
+    SELECTION_LINEAGE_VOLD_LOCK_SHA256 \
+    SELECTION_LINEAGE_VOLD_ADAPTER_SHA256 \
+    SELECTION_LINEAGE_VOLD_BUILDER_SHA256 \
+    SELECTION_LINEAGE_VOLD_VERIFIER_SHA256 \
+    SELECTION_LINEAGE_VOLD_PATCH_SHA256 \
+    SELECTION_LINEAGE_VOLD_MANIFEST_SHA256 \
+    SELECTION_LINEAGE_VOLD_BINARY_SHA256; do
     value="${!field}"
     if [[ "${value}" != 'disabled' && ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
       echo "Error: selection identity field ${field} is not a SHA-256 digest." >&2
@@ -143,6 +159,34 @@ function selection_variant_manifest() {
     return 1
   fi
 
+  if [[ "${SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT}" == 'true' ]]; then
+    for field in SELECTION_LINEAGE_VOLD_LOCK_SHA256 \
+      SELECTION_LINEAGE_VOLD_ADAPTER_SHA256 \
+      SELECTION_LINEAGE_VOLD_BUILDER_SHA256 \
+      SELECTION_LINEAGE_VOLD_VERIFIER_SHA256 \
+      SELECTION_LINEAGE_VOLD_PATCH_SHA256 \
+      SELECTION_LINEAGE_VOLD_MANIFEST_SHA256 \
+      SELECTION_LINEAGE_VOLD_BINARY_SHA256; do
+      if [[ ! "${!field}" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "Error: enabled source-built Vold lacks a checked digest in ${field}." >&2
+        return 1
+      fi
+    done
+  else
+    for field in SELECTION_LINEAGE_VOLD_LOCK_SHA256 \
+      SELECTION_LINEAGE_VOLD_ADAPTER_SHA256 \
+      SELECTION_LINEAGE_VOLD_BUILDER_SHA256 \
+      SELECTION_LINEAGE_VOLD_VERIFIER_SHA256 \
+      SELECTION_LINEAGE_VOLD_PATCH_SHA256 \
+      SELECTION_LINEAGE_VOLD_MANIFEST_SHA256 \
+      SELECTION_LINEAGE_VOLD_BINARY_SHA256; do
+      if [[ "${!field}" != 'disabled' ]]; then
+        echo "Error: disabled source-built Vold has an unexpected digest in ${field}." >&2
+        return 1
+      fi
+    done
+  fi
+
   printf '%s\n' \
     'pixene-module-selection-v1' \
     "rom_family=${SELECTION_ROM_FAMILY}" \
@@ -178,6 +222,20 @@ function selection_variant_manifest() {
   printf '%s\n' \
     "module.fsck-sysfs-sepolicy=${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" \
     "fsck_sysfs_sepolicy_adapter_sha256=${SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256}"
+
+  # Preserve the existing release fingerprint whenever this optional module
+  # is disabled; include its artifact digests only for enabled builds.
+  if [[ "${SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT}" == "true" ]]; then
+    printf '%s\n' \
+      "module.lineage-vold-exfat-timeout=true" \
+      "lineage_vold_lock_sha256=${SELECTION_LINEAGE_VOLD_LOCK_SHA256}" \
+      "lineage_vold_adapter_sha256=${SELECTION_LINEAGE_VOLD_ADAPTER_SHA256}" \
+      "lineage_vold_builder_sha256=${SELECTION_LINEAGE_VOLD_BUILDER_SHA256}" \
+      "lineage_vold_verifier_sha256=${SELECTION_LINEAGE_VOLD_VERIFIER_SHA256}" \
+      "lineage_vold_patch_sha256=${SELECTION_LINEAGE_VOLD_PATCH_SHA256}" \
+      "lineage_vold_manifest_sha256=${SELECTION_LINEAGE_VOLD_MANIFEST_SHA256}" \
+      "lineage_vold_binary_sha256=${SELECTION_LINEAGE_VOLD_BINARY_SHA256}"
+  fi
 
   if [[ "${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" == 'true' ]]; then
     local policy_patcher_root libclang_identity policy_patcher_digest value
