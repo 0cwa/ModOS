@@ -32,6 +32,14 @@ python3 src/ci/vold_source_closure.py plan --output "${selection}"
 python3 src/ci/build_original_vold.py sync \
   --source-root "${VOLD_WORK}/source" --projects-file "${selection}" --jobs "${jobs}"
 
+# The pinned Sony public device trees reference proprietary vendor-generated
+# mk files absent from the source manifest. Generate ONLY makefile declarations
+# using their reviewed --regenerate_makefiles option. This does not download,
+# synthesize or validate vendor blobs; absent binaries remain build blockers.
+python3 src/ci/prepare_vold_vendor_makefiles.py \
+  --source-root "${VOLD_WORK}/source" \
+  --report "${VOLD_WORK}/sony-generated-makefiles-report.json"
+
 # Most missing dependencies are reported during Soong setup before the
 # expensive target compile. Resolve their exact pinned project paths once
 # and reuse the same checkout and Android out directory on each iteration.
