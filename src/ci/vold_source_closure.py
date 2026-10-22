@@ -14,14 +14,12 @@ import json
 from pathlib import Path
 import re
 import sys
-from typing import Any
 import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[2]
 SEED = ROOT / "locks/lineage-vold-source-probe-20261016.json"
 BASELINE = ROOT / "locks/lineage-vold-baseline-20261016.json"
-PATH_RE = re.compile(r"^[A-Za-z0-9_.+-]+(?:/[A-Za-z0-9_.+-]+)+$")
 PATH_IN_LOG = re.compile(
     r"(?<![A-Za-z0-9_.+-])"
     r"((?:android|art|bionic|bootable|build|device|development|external|"
@@ -70,10 +68,15 @@ def verified_contract() -> tuple[dict, dict[str, str], dict]:
     projects: dict[str, str] = {}
     for element in xml.findall("project"):
         path, revision = element.get("path"), element.get("revision")
-        if not path or not PATH_RE.fullmatch(path) and "/" in path or not revision or not re.fullmatch("[0-9a-f]{40}", revision):
-            # Root-level paths are valid in official Android manifests.
-            if not path or not re.fullmatch(r"[A-Za-z0-9_.+-]+(?:/[A-Za-z0-9_.+-]+)*", path) or not revision or not re.fullmatch("[0-9a-f]{40}", revision):
-                raise ClosureError("manifest contains an invalid project identity")
+        # One-segment roots (eg. art, bionic) are valid. Any path escaping
+        # source root or any branch/tag-based revision is not.
+        if (
+            not path
+            or not re.fullmatch(r"[A-Za-z0-9_.+-]+(?:/[A-Za-z0-9_.+-]+)*", path)
+            or not revision
+            or not re.fullmatch(r"[0-9a-f]{40}", revision)
+        ):
+            raise ClosureError("manifest contains an invalid project identity")
         if path in projects:
             raise ClosureError("source manifest contains duplicate project paths")
         projects[path] = revision
