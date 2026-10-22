@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Trace the initial pinned 67-project source selection
+      - name: Trace the initial pinned 70-project source selection
         shell: bash
         run: |
           set -euo pipefail
@@ -115,7 +115,7 @@ jobs:
           path="$(realpath -e -- "$path")"
           free="$(df -PB1 "$path" | awk 'END {print $4}')"
           (( free >= 100000000000 )) || {
-            echo '::error::The 67-project subset probe requires at least 100 GB as a conservative starting allowance (not a proven maximum)'
+            echo '::error::The 70-project subset probe requires at least 100 GB as a conservative starting allowance (not a proven maximum)'
             exit 1
           }
           workspace="$(mktemp -d "$path/modos-original-vold.XXXXXXXX")"
