@@ -181,9 +181,24 @@ def sync(
     if active_manifest.read_bytes() != manifest:
         raise BuildError("repo's active manifest differs from the pinned source")
     # Explicit project-path sync prevents all 1,243 projects being fetched.
-    # On repeated probes, keep the same pinned workspace and fetch only the
-    # new members; repo does not need to re-download already pinned projects.
-    command([repo, "sync", "--no-clone-bundle", f"-j{jobs}", *(selected or [])], source)
+    # On resume, preverify existing project HEADs and cleanliness, then fetch
+    # *only newly selected* missing projects. Preserve the original Soong out
+    # tree and all previously fetched Git objects across source expansions.
+    to_sync = selected
+    if resume:
+        assert selected is not None
+        present = []
+        missing = []
+        for project in selected:
+            path = source / project
+            if path.is_symlink() or (path.exists() and not path.is_dir()):
+                raise BuildError(f"previously synced project path is unsafe: {project}")
+            (present if path.is_dir() else missing).append(project)
+        if present:
+            verify_checkout(source, manifest, clean=True, selected=present)
+        to_sync = missing
+    if to_sync is None or to_sync:
+        command([repo, "sync", "--no-clone-bundle", f"-j{jobs}", *(to_sync or [])], source)
     verify_checkout(source, manifest, clean=True, selected=selected)
 
 
