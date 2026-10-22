@@ -165,7 +165,7 @@ jobs:
         if: steps.definition.outputs.fsck_sysfs_sepolicy == 'true'
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.97.1
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
 
       - name: Install libclang for fsck sysfs selection identity
         if: steps.definition.outputs.fsck_sysfs_sepolicy == 'true'
