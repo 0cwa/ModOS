@@ -122,13 +122,27 @@ def sync(source: Path, lock: dict, manifest: bytes, jobs: int) -> None:
         repo, "init", "-u", "https://github.com/LineageOS/android.git",
         "-b", manifest_commit
     ], source)
+    # Do not overwrite .repo/manifest.xml: Repo manages this file, and
+    # recent versions regenerate it during subsequent sync/init operations.
+    # Instead install the immutable flattened manifest in Repo's manifest
+    # checkout and formally select it with -m, as supported by Repo.
+    manifest_name = "modos-vold-original-20261016.xml"
+    manifest_dir = source / ".repo/manifests"
+    if manifest_dir.is_symlink() or not manifest_dir.is_dir():
+        raise BuildError("repo manifests checkout is unavailable or unsafe")
+    pinned_manifest = manifest_dir / manifest_name
+    if pinned_manifest.exists() or pinned_manifest.is_symlink():
+        raise BuildError("preexisting untrusted local pinned manifest")
+    pinned_manifest.write_bytes(manifest)
+    command([
+        repo, "init", "-u", "https://github.com/LineageOS/android.git",
+        "-b", manifest_commit, "-m", manifest_name
+    ], source)
     active_manifest = source / ".repo/manifest.xml"
-    if not active_manifest.exists() and not active_manifest.is_symlink():
-        raise BuildError("repo init did not create the active manifest")
-    if active_manifest.is_dir():
-        raise BuildError("unexpected repo manifest directory")
-    active_manifest.unlink()
-    active_manifest.write_bytes(manifest)
+    if not active_manifest.exists() or active_manifest.is_dir():
+        raise BuildError("repo did not activate the immutable full manifest")
+    if active_manifest.read_bytes() != manifest:
+        raise BuildError("repo's active manifest differs from the pinned source")
     command([repo, "sync", "--no-clone-bundle", f"-j{jobs}"], source)
     verify_checkout(source, manifest, clean=True)
 
