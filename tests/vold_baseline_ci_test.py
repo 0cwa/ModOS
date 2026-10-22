@@ -178,7 +178,7 @@ class OriginalVoldBaselineTest(unittest.TestCase):
         self.assertIn("avbroot ota verify", auth)
         self.assertIn("avbroot ota extract", auth)
         self.assertIn("comparison(official, built, lock)", original)
-        self.assertIn("verify_checkout(source, manifest, clean=True)", original)
+        self.assertIn("verify_checkout(source, manifest, clean=True, selected=selected)", original)
         for text in (flow, original, auth, probe):
             self.assertNotIn("git apply", text)
             self.assertNotIn("ota patch", text)
