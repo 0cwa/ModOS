@@ -1,4 +1,4 @@
-# First gate: reproduce LineageOS pdx235's original vold in CI
+# Build and qualify LineageOS pdx235's original vold locally
 
 This is a **separate, nonpublishing, unmodified-source** workflow. It does
 not use or import the exFAT timeout patch, the ModOS vold injection module,
@@ -8,6 +8,132 @@ A patched vold must never be promoted on the basis of synthetic ELF fixtures
 or mere compatibility. First prove that a clean build of the **unmodified**
 source produces the identical executable found in the cryptographically
 authenticated original LineageOS OTA.
+
+**A GitHub runner is optional.** The local entry point acquires the pinned
+source and vendor inputs, keeps them between invocations, builds only `m vold`,
+and performs the same authenticated byte comparison. The two public vendor
+mirrors have been downloaded and verified with the real pinned generator;
+an Android compilation and byte-identical result are still outstanding.
+
+## Local quick start
+
+Use Linux x86_64 with an SSD and a work directory without whitespace. Ubuntu
+24.04 is the documented setup. On another operating system, use a Linux x86_64
+build machine or VM. The local command needs no GitHub token, repository
+variables, Actions runner registration, phone, `adb`, or signing keys.
+
+From a checkout of this repository, install the host packages once:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y \
+  git git-lfs gnupg openssh-client openssl curl python3 build-essential flex bison \
+  zip unzip rsync bc zlib1g-dev libc6-dev-i386 lib32z1-dev \
+  libx11-dev x11proto-core-dev libgl1-mesa-dev libxml2-utils xsltproc \
+  fontconfig libssl-dev libelf-dev lz4 erofs-utils e2fsprogs
+```
+
+This follows the [AOSP host setup](https://source.android.com/docs/setup/start/requirements)
+with the extraction utilities used here. The pinned Android projects provide
+their matching compiler and JDK; do not replace those with a random host JDK.
+
+Choose one persistent directory, install the small host tools there, then build:
+
+```sh
+export VOLD_LOCAL_WORK="$HOME/build/modos-vold"
+python3 src/ci/setup_vold_local_tools.py --work-dir "$VOLD_LOCAL_WORK"
+source "$VOLD_LOCAL_WORK/host-tools/env.sh"
+
+# Check the host before a long build.
+python3 src/ci/vold_local.py doctor --for compare --work-dir "$VOLD_LOCAL_WORK"
+
+# One command: vendor inputs, source sync, compile, authenticate, compare.
+python3 src/ci/vold_local.py compare --work-dir "$VOLD_LOCAL_WORK" --jobs 4
+```
+
+The setup command installs a SHA-256-pinned official Repo launcher and the
+existing [publisher-authenticated avbroot tool](executable-tool-trust.md).
+Its `avbroot` wrapper uses the existing sealed executable runner. Repo retains
+its normal signed bootstrap; pinning its launcher does not claim that every
+future Repo implementation version is pinned. Nothing is installed globally.
+Run `source .../host-tools/env.sh` in each new terminal. If the ModOS checkout
+moves, rerun setup to refresh the wrapper's absolute path. `--repo-only` skips
+avbroot installation until comparison is needed.
+
+`compare` first performs a compile-only probe. Only after that succeeds does it
+download the exact locked OTA, verify its digest and publisher signature,
+extract a fresh reference, and repeat the incremental `m vold` comparison.
+The source checkout and intermediate output are reused. An existing OTA can
+be supplied with `--ota-file /absolute/path/lineage-24.0-20261016-nightly-pdx235-signed.zip`;
+its exact filename, SHA-256 and signature are still checked.
+
+### Smaller stages and resuming
+
+All stages accept the same `--work-dir` and `--jobs` options. Repeating a command
+resumes the same pinned checkout. Each invocation writes a new log directory.
+
+| Command | Work performed |
+| --- | --- |
+| `plan` | Write the provisional 84-project selection, without downloads; preserve any expanded active selection. |
+| `doctor --for vendor` | Check only the host tools needed for vendor preparation. |
+| `vendor` | Sync the three small public prerequisite projects, acquire/verify both pinned vendor trees, and regenerate their eight declarations. Stop before toolchains. |
+| `prepare` | Run vendor preparation, sync the selected source/toolchain projects, and perform bounded static dependency scans. |
+| `probe` | Prepare/resume sources and compile the unmodified `vold`, without downloading an OTA. |
+| `compare` | Compile first, then authenticate the exact OTA and require byte-for-byte equality. |
+
+For the inexpensive first check:
+
+```sh
+python3 src/ci/vold_local.py vendor --work-dir "$VOLD_LOCAL_WORK" --jobs 2
+```
+
+The verified vendor worktree content is 684,866,192 bytes (about 685 MB), plus
+Git objects and metadata. This is measured vendor content, not a full build
+space estimate. The 84-project source seed is still provisional. `doctor`
+reports available disk and RAM; 100 GB free is an initial planning allowance,
+not a proven minimum or maximum, and it does not block a resumed workspace.
+Use `--min-free-gb 100` to impose an explicit floor. Full Android's upstream
+64 GB RAM / 400 GB disk guidance concerns a full platform build, not a measured
+requirement for this narrower target. Reduce `--jobs` if memory is tight.
+
+Persistent files are arranged as follows:
+
+| Path under the work directory | Purpose |
+| --- | --- |
+| `source/` | Manifest-pinned public projects and separately pinned vendor trees. |
+| `source/out/` | Incremental Android build outputs. |
+| `source-selection.json` | Current approved source selection, including discovered dependencies. |
+| `cache/` | Exact OTA downloads and resumable partial downloads. |
+| `host-tools/` | Private Repo launcher and authenticated avbroot installation. |
+| `runs/<timestamp>-<stage>/` | Invocation status, logs, source/vendor diagnostics and comparison receipts. |
+
+Failures retain the checkout, outputs and logs. Resolve the reported problem
+and rerun the same command. Source revisions and inventories are rechecked;
+modified or extra source files are rejected, never silently reset. Concurrent
+commands against one work directory are prevented. There is no automatic
+cleanup. A cached reference ELF or editable receipt is never accepted as
+authentication: every comparison reextracts the reference from the verified
+OTA. Large extracted partitions remain in that invocation's `reference/`
+directory and may be removed after reviewing its results.
+
+### Interrupted initial Repo setup
+
+An interruption during the first `repo init` can leave `source/.repo/` before
+the pinned manifest has been installed and selected. Resume reports the
+specific manifest validation failure and leaves that metadata untouched.
+If the failure followed an interrupted first initialization, retain only the
+incomplete source directory under a new name:
+
+```sh
+VOLD_INCOMPLETE_SOURCE="$(mktemp -d "$VOLD_LOCAL_WORK/source.incomplete.XXXXXXXX")"
+mv -T -- "$VOLD_LOCAL_WORK/source" "$VOLD_INCOMPLETE_SOURCE"
+```
+
+Then rerun the command that failed with the same `--work-dir`. Keep
+`source-selection.json`, `cache/`, `host-tools/`, and `runs/` in place; the
+new initialization preserves that selection and those retained files. For
+a previously complete checkout, investigate any changed pinned manifest or
+local override instead of treating the validation failure as interrupted setup.
 
 ## Exact pinned inputs
 
@@ -91,50 +217,69 @@ The source reasoning is grounded in three exact upstream revisions:
   the common product also includes proprietary `vendor/sony/sm6375-common`.
   Two other Sony vendor BoardConfig files are referenced.
 
-### Verified proprietary-input blocker
+### Working vendor acquisition from pinned public mirrors
 
-The exact public manifest does **not** contain `vendor/sony/pdx235` or
-`vendor/sony/sm6375-common`. The original assumption that
-`--regenerate_makefiles` can generate their declarations using only public
-file lists is incorrect at the pinned revisions. This option skips
-extraction, but the subsequent
-[`write_elfs_package`](https://github.com/LineageOS/android_tools_extract-utils/blob/ff6589c6b0a4a00c592e98940e9e6b6a50c76569/extract_utils/makefiles.py#L256-L271)
-still calls
-[`get_file_machine_bits_libs`](https://github.com/LineageOS/android_tools_extract-utils/blob/ff6589c6b0a4a00c592e98940e9e6b6a50c76569/extract_utils/elf.py#L38-L57),
-which opens each proprietary ELF to determine its architecture and dependencies.
+The official public manifest omits `vendor/sony/pdx235` and
+`vendor/sony/sm6375-common`, but their inputs are available from TheMuppets.
+The supplementary [vendor candidate lock](../locks/lineage-vold-vendor-candidate-20261016.json)
+records these exact commits, Git trees, complete SHA-256 inventories, source
+input hashes, and the eight generated declaration hashes:
 
-An actual replay of the unchanged pinned Python sources on 2026-10-22
-failed with `FileNotFoundError` for
-`vendor/sony/pdx235/proprietary/vendor/lib64/camera/com.qti.eeprom.hi846_back_eeprom.so`.
-Upstream had already written four partial vendor declaration files. Those
-files are not successful or qualified preparation. The reproducible command,
-source revisions, input hashes and normalized traceback are retained in
-[`docs/evidence/vold-vendor-preflight-20261022.json`](evidence/vold-vendor-preflight-20261022.json).
-This replay ran Python extraction code only; it did **not** compile Android.
+| Vendor project | Immutable revision | Files / content bytes |
+| --- | --- | ---: |
+| [TheMuppets/proprietary_vendor_sony_pdx235](https://github.com/TheMuppets/proprietary_vendor_sony_pdx235/tree/1e503a56c0d16de1f19f2b011581908dac29065b) | `1e503a56c0d16de1f19f2b011581908dac29065b` | 232 / 380,859,981 |
+| [TheMuppets/proprietary_vendor_sony_sm6375-common](https://github.com/TheMuppets/proprietary_vendor_sony_sm6375-common/tree/2114108d5adfe787503ad0c87508d78123551991) | `2114108d5adfe787503ad0c87508d78123551991` | 882 / 304,006,211 |
 
-To avoid downloading toolchains before this known failure, the probe first
-syncs exactly three pinned source projects: both Sony device trees and
-`tools/extract-utils`. The
-[`prepare_vold_vendor_makefiles.py`](../src/ci/prepare_vold_vendor_makefiles.py)
-preflight verifies those revisions and writes `sony-vendor-input-report.json`
-with `status: blocked` and `makefiles_generated: false`, then exits before
-invoking the generator or syncing the remaining seed projects. It rejects
-the former synthetic-success receipts; arbitrary existing vendor files
-also remain unqualified.
+These are reproducible third-party mirror candidates. Their public availability,
+immutable identities and source compatibility permit a genuine build probe;
+they do not prove the official OTA builder used those exact vendor commits.
+The receipts say `publisher_authenticated: false` and preserve the final
+byte-identical comparison requirement.
 
-**Both real build modes are currently blocked here.** A reviewed acquisition
-and provenance contract for the required proprietary inputs is needed before
-vendor preparation can be enabled. Authenticating the pinned original OTA
-may provide a source for some of these bytes, but extraction, fixups, original
-build inputs and every required file must be accounted for. The present code
-does not claim that this acquisition is implemented. Do not fabricate files,
-disable ELF checks or enable missing-dependency flags to bypass this gate.
+The acquisition helper shallow-fetches those exact commits, verifies complete
+file inventories, checks the three public prerequisite revisions, and runs the
+unchanged pinned `extract-files.py --regenerate_makefiles`. It accepts success
+only when regeneration preserves all eight locked declarations byte for byte.
+Untracked/ignored files, changed revisions, unresolved LFS pointers, unsafe
+links, different mirrors and changed inventories are rejected. A resumed run
+verifies and reuses completed worktrees without fetching them again. The main
+build verifier allows only these two independently verified supplemental roots,
+and records their complete provenance in the comparison report.
+
+Actual verification on 2026-10-22 established:
+
+- All 1,106 proprietary-list destinations are present (228 device + 878 common).
+- All 27 explicit common-list SHA-1 requirements match, including the two
+  expected post-fixup hashes.
+- The exact upstream generator succeeds and all eight generated declarations
+  match the pinned mirrors byte for byte.
+- The real local `vendor` command succeeds twice on a proper Repo checkout;
+  both receipts match and all five projects' fetch records are unchanged.
+
+The recorded evidence is
+[vendor candidate compatibility](evidence/vold-vendor-candidate-20261022.json)
+and [real local vendor integration](evidence/vold-local-vendor-integration-20261022.json).
+These checks run real extraction Python code and Git operations, not Android
+compilation.
+
+The earlier [source-list-only failure](evidence/vold-vendor-preflight-20261022.json)
+remains historical evidence: `--regenerate_makefiles` reads proprietary ELF
+architecture and dependency metadata, so empty vendor trees do fail. Acquiring
+the actual blobs resolves that failure; fabricating declarations is unnecessary.
+
+LineageOS also officially documents
+[extracting proprietary inputs directly from an installable ZIP](https://github.com/LineageOS/lineage_wiki/blob/main/pages/extracting_blobs_from_zips.md)
+by passing the archive to the device's `extract-files.py`. The exact authenticated
+October 16 OTA is an alternative source to investigate if a future mirror pin
+is unavailable or produces a binary mismatch. This workflow currently uses the
+verified mirror contract; a different extraction/fixup result needs its own
+recorded inventory, rather than silently replacing these pinned inputs.
 
 The on-disk dependency resolver
 [`src/ci/vold_source_closure.py`](../src/ci/vold_source_closure.py)
 verifies the complete original manifest and produces a pinned selection.
-After the vendor-input gate is resolved and a limited
-`repo sync <project paths>` succeeds, it scans available `Android.bp`
+After vendor acquisition and a limited
+`repo sync <project paths>` succeed, it scans available `Android.bp`
 definitions for a **partial** transitive module graph. Up to three static
 scans batch missing providers from reviewed hints before compilation,
 syncing only newly selected pinned projects. Unknown, ambiguous and generated
@@ -145,10 +290,10 @@ diagnostics is mapped to its **exact existing** project in the official
 manifest. Known module names have reviewed initial provider hints; unknown
 providers and unpinned vendor paths stop for manual investigation.
 
-Once prerequisites have passed, within a single CI run,
+Once prerequisites have passed, in each local or CI invocation,
 [`src/ci/probe_original_vold.sh`](../src/ci/probe_original_vold.sh)
-automatically repeats up to **three** controlled passes. It caches already
-synchronized projects in the same working tree, fetches only newly identified
+automatically repeats up to **three** controlled passes. It retains already
+synchronized projects and the expanded selection in the same working tree, fetches only newly identified
 pinned dependencies, and saves small diagnostic JSON documents showing
 unknown modules and other blockers. It never enables
 `SOONG_ALLOW_MISSING_DEPENDENCIES`, changes the build target, or applies
@@ -181,115 +326,30 @@ same `vold-source-provisional-plan` artifact. This provides a low-cost plan
 on the merged commit even when the GitHub connector cannot dispatch manual
 workflows. These CI steps never sync Android sources or run the compiler.
 
-## Runner provisioning for source compilation
+## Optional GitHub Actions execution
 
-For `probe` or `compare`, the workflow still requires a trusted,
-isolated self-hosted Linux x64 runner labeled `modos-lineage-large`.
-Provide a dedicated scratch filesystem with **at least 100 GB free as an
-experimental starting allowance**, sufficient CPU/RAM, the Android 17
-build prerequisites, and `repo`, `git`, `python3`, and `realpath`.
-The authenticated `compare` mode additionally needs `avbroot`, `debugfs`,
-`unzip`, `curl`, `openssl`, and `sha256sum`. One iteration may require
-more storage. The 100 GB threshold is **not an empirically measured maximum
-or proof** that the selected dependency graph is complete.
+The local commands above require no Actions configuration. The existing manual
+`.github/workflows/vold-baseline.yml` remains available for an owner who wants
+to use a trusted dedicated Linux x64 runner. `plan` runs on a standard hosted
+runner and needs no repository variables; ordinary PR/main CI also uploads the
+same provisional plan artifact.
 
-Set repository Actions variables:
+The optional `probe` and `compare` jobs remain main-only, read-only,
+nonpublishing, and gated by `MODOS_VOLD_BASELINE_RUNNER_READY=true` plus an
+absolute private `MODOS_LINEAGE_LARGE_SCRATCH` directory on a runner labeled
+`modos-lineage-large`. The workflow's 100 GB free-space check is an initial
+allowance, not measured closure evidence. It uploads small diagnostics and
+cleans its temporary checkout. Local runs retain their workspace instead.
 
-- `MODOS_LINEAGE_LARGE_SCRATCH` — an absolute, real, isolated scratch
-  directory on the trusted self-hosted runner.
-- `MODOS_VOLD_BASELINE_RUNNER_READY=true` — only when that runner has been
-  provisioned and independently checked.
-
-Use `probe` to attempt the smaller pinned source checkout and compile
-unmodified `m vold` **without downloading the official source OTA**.
-A successfully compiled probe is **not** binary-equality evidence; its
-workflow job explicitly labels it as unqualified. It is useful for
-discovering missing modules, vendor inputs and toolchains cheaply.
-At the current reviewed revision it stops at the known vendor-input gate
-before downloading the large seed or invoking `m vold`.
-
-Only after a successful, reviewed `probe`, use `compare` for a real proof.
-The compare workflow downloads the OTA before the source probe; running it
-while the known vendor gate is blocked would waste that download.
-It first reauthenticates the exact
-publisher-signed official 2026-10-16 OTA, extracts the original
-`/system/bin/vold`, and invokes the same bounded dependency solver.
-**Only** a real `byte_identical: true` report with equal original and
-built hashes qualifies this baseline. If the binaries differ, it emits a
-diagnostic comparison receipt and fails.
-
-### Hosted-runner alternatives and observed access
-
-Checked on 2026-10-22: GitHub documents larger Ubuntu x64 runners with
-4 CPUs / 16 GB RAM / 150 GB storage and 8 CPUs / 32 GB RAM / 300 GB storage.
-Those are plausible experimental build hosts, not measured requirements
-for this incomplete dependency closure. The 100 GB free-space gate does not
-prove either machine has enough RAM or working space after tool installation.
-See GitHub's [larger runner specifications](https://docs.github.com/en/actions/reference/runners/larger-runners).
-
-GitHub's managed larger runners require an organization or enterprise on
-Team or Enterprise Cloud; `0cwa/ModOS` is currently owned by a user account.
-They cannot be assumed available merely by changing `runs-on` to an invented
-label. An actual organization runner with repository access, or a dedicated
-trusted self-hosted Linux x64 machine, must be provisioned and checked first.
-See [GitHub-hosted runner availability](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
-and [managing larger runners](https://docs.github.com/en/actions/how-tos/manage-runners/larger-runners/manage-larger-runners).
-Standard Ubuntu runners advertise only 14 GB storage and remain suitable
-for this plan/unit-test workload, not the current Android build preflight.
-
-The last original-baseline attempt
-[#39699955476](https://github.com/0cwa/ModOS/actions/runs/39699955476)
-failed its hosted prerequisites job with both readiness variables empty;
-the self-hosted build job was skipped. This is evidence about that run,
-not proof of the current runner inventory. The connected GitHub actions
-expose repository changes, CI inspection and reruns, but no workflow dispatch,
-runner inventory or variable mutation. No runner or configuration change
-has been claimed on that basis.
-
-For an owner with the GitHub CLI configured, the explicit manual plan is:
-
-```sh
-gh workflow run vold-baseline.yml --repo 0cwa/ModOS --ref main -f mode=plan
-```
-
-After resolving the authenticated vendor-input contract and verifying the
-trusted runner, set the two documented repository variables and dispatch
-`-f mode=probe`. Inspect its source selection and diagnostics. Dispatch
-`-f mode=compare` only once that actual compile succeeds. The connector's
-missing dispatch capability does not justify changing any qualification gate.
-
-From a checked-out repository, local inspection is also possible without
-compiling or obtaining the proprietary vendor files:
-
-```sh
-python3 src/ci/vold_source_closure.py plan --output /tmp/vold-projects.json
-# After a limited repo sync on a trusted build host:
-python3 src/ci/vold_source_closure.py index \
-  --source-root /path/to/pinned-source \
-  --selection /tmp/vold-projects.json \
-  --output /tmp/vold-blueprint-graph.json
-# After an unsuccessful m vold build:
-python3 src/ci/vold_source_closure.py diagnose \
-  --selection /tmp/vold-projects.json \
-  --log /path/to/build-failure.log \
-  --output /tmp/vold-diagnosis.json \
-  --next-selection /tmp/vold-projects-expanded.json
-```
-
-All selection changes must remain part of the exact original manifest.
-The build helper supports `sync --projects-file ... --resume` to fetch
-additional pinned projects without repeating an entire sync.
-
-The workflow uses a read-only GitHub token, never receives release or
-signing secrets, uploads diagnostics/comparison receipts only, and clears
-the large checkout and original OTA after completion. Do not use an
-untrusted shared runner.
+No runner registration, repository setting change, or Actions dispatch is
+needed for the documented local build.
 
 ## After the first authentic success
 
-Review the actual run URL and download its
-`vold-probe-compare-diagnostics` artifact. Record the exact
-source, manifest and reference SHA-256, plus the CI commit and run ID.
+Review the local `runs/<timestamp>-compare/compare/baseline-*/baseline-report.json`
+and its authenticated reference receipt, or the optional Actions diagnostics
+artifact. Record the exact source, manifest, vendor lock and reference SHA-256,
+plus the ModOS commit and local invocation identifier or CI run ID.
 Verify the report contains `byte_identical: true` with equal SHA-256s.
 Independent assessment of the real reference extraction and Android
 build remains essential. Do not infer these properties from synthetic tests.

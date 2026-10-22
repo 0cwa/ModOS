@@ -47,7 +47,8 @@ jobs:
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
               summary.write(f"### Provisional vold source graph: {count}/1243 manifest projects\n")
               summary.write("This is a source probe, **not** a complete Soong closure or a reproduced binary.\n")
-              summary.write("Sony vendor declarations cannot be regenerated from the public lists alone: the pinned generator reads proprietary ELF inputs.\n")
+              summary.write("Sony proprietary inputs use separately locked TheMuppets candidate trees, verified before fetching toolchains.\n")
+              summary.write("Local builds need no Actions runner: see docs/vold-baseline-ci.md and src/ci/vold_local.py.\n")
           PY
       - name: Upload static source dependency selection
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

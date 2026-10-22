@@ -47,6 +47,14 @@ This repository acts as a server.
 
 ## Usage
 
+### Build the original pdx235 vold locally
+
+The unmodified LineageOS `vold` reproduction workflow can run on a local Linux
+x86_64 computer. It acquires pinned Sony vendor inputs from TheMuppets, retains
+source downloads and incremental output, and checks the result against the
+authenticated original OTA. See [local build setup and commands](docs/vold-baseline-ci.md).
+This qualification workflow does not require a GitHub Actions runner.
+
 ### Getting Started
 
 Reading the [AVBRoot docs](https://github.com/chenxiaolong/AVBRoot) is essential before proceeding with PixeneOS.

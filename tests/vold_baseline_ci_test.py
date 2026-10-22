@@ -135,6 +135,7 @@ class OriginalVoldBaselineTest(unittest.TestCase):
 
             with (
                 patch.object(builder, "verify_checkout"),
+                patch.object(builder, "verified_vendor_inputs", return_value={"publisher_authenticated": False, "fixture": True}),
                 patch.object(builder, "command", side_effect=fake_compile),
             ):
                 report = builder.build_baseline(
@@ -142,6 +143,7 @@ class OriginalVoldBaselineTest(unittest.TestCase):
                 )
                 self.assertTrue(report["byte_identical"])
                 self.assertEqual(report["reference_sha256"], report["built_sha256"])
+                self.assertFalse(report["supplemental_vendor_inputs"]["publisher_authenticated"])
 
             def fake_bad_compile(argv, cwd, **_kwargs):
                 bad = bytearray(original)
@@ -151,6 +153,7 @@ class OriginalVoldBaselineTest(unittest.TestCase):
 
             with (
                 patch.object(builder, "verify_checkout"),
+                patch.object(builder, "verified_vendor_inputs", return_value={"publisher_authenticated": False, "fixture": True}),
                 patch.object(builder, "command", side_effect=fake_bad_compile),
                 self.assertRaises(comparator.BaselineError),
             ):

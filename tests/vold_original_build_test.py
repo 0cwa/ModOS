@@ -132,8 +132,46 @@ class OriginalVoldBuildTest(unittest.TestCase):
             ):
                 builder.sync(source, self.lock, self.manifest, 2,
                              ["system/vold", "system/update_engine"], resume=True)
-            self.assertEqual(calls, [["/trusted/repo", "sync", "--no-clone-bundle", "-j2", "system/update_engine"]])
+            self.assertEqual(calls, [["/trusted/repo", "sync", "--current-branch", "--no-tags", "--no-clone-bundle", "-j2", "system/update_engine"]])
             self.assertEqual(verify.call_args_list[0].kwargs["selected"], ["system/vold"])
+
+    def test_interrupted_init_guidance_preserves_inputs_and_original_pin_error(self):
+        for state, diagnostic in (
+            ("missing-active", "repo selected manifest is unavailable"),
+            ("initial-manifest", "repo selected manifest differs from the exact official snapshot"),
+            ("changed-pin", "repo selected manifest differs from the exact official snapshot"),
+        ):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as tmp:
+                work = Path(tmp)
+                source = work / "source"
+                manifests = source / ".repo/manifests"
+                manifests.mkdir(parents=True)
+                selection = work / "source-selection.json"
+                selection.write_text('{"selected_projects":["system/vold"]}\n')
+                if state == "initial-manifest":
+                    (source / ".repo/manifest.xml").write_text(
+                        '<manifest><include name="default.xml" /></manifest>'
+                    )
+                    (manifests / "default.xml").write_text("<manifest />")
+                elif state == "changed-pin":
+                    (source / ".repo/manifest.xml").write_text(
+                        f'<manifest><include name="{builder.MANIFEST_NAME}" /></manifest>'
+                    )
+                    (manifests / builder.MANIFEST_NAME).write_text("changed pinned bytes")
+                before = {p.relative_to(work): p.read_bytes() for p in work.rglob("*") if p.is_file()}
+                with (
+                    patch.object(builder, "command") as command,
+                    self.assertRaises(builder.BuildError) as failure,
+                ):
+                    builder.sync(source, self.lock, self.manifest, 2, ["system/vold"], resume=True)
+                message = str(failure.exception)
+                self.assertIn(diagnostic, message)
+                self.assertIn("If the first Repo initialization was interrupted", message)
+                self.assertIn(f"rename only the incomplete source directory {source}", message)
+                self.assertIn("For a previously completed checkout, investigate", message)
+                command.assert_not_called()
+                after = {p.relative_to(work): p.read_bytes() for p in work.rglob("*") if p.is_file()}
+                self.assertEqual(after, before)
 
     def test_vendor_prerequisite_mode_only_requests_three_pinned_projects(self):
         with (
@@ -146,6 +184,13 @@ class OriginalVoldBuildTest(unittest.TestCase):
         self.assertEqual(args[3], 2)
         self.assertEqual(args[4], ["device/sony/pdx235", "device/sony/sm6375-common", "tools/extract-utils"])
         self.assertTrue(set(args[4]).issubset(builder.project_map(self.manifest)))
+        self.assertFalse(args[5])
+        with (
+            patch.object(sys, "argv", ["builder", "sync-vendor-sources", "--source-root", "/fixture", "--resume"]),
+            patch.object(builder, "sync") as sync,
+        ):
+            self.assertEqual(builder.main(), 0)
+        self.assertTrue(sync.call_args.args[5])
 
     def test_unrecorded_vendor_or_unselected_source_is_not_build_input(self):
         for unexpected in ("vendor/sony/pdx235/Android.bp", "system/update_engine/Android.bp"):
@@ -155,8 +200,33 @@ class OriginalVoldBuildTest(unittest.TestCase):
                 bad = source / unexpected
                 bad.parent.mkdir(parents=True, exist_ok=True)
                 bad.write_text("unrecorded source")
+                with self.assertRaisesRegex(builder.BuildError, "unrecorded source|supplemental vendor input verification failed"):
+                    builder.verify_source_workspace(source, self.manifest, ["system/vold"])
+
+    def test_vendor_allowance_is_limited_to_independently_verified_locked_roots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            for relpath in ("system/vold", "vendor/sony/pdx235", "vendor/sony/sm6375-common"):
+                (source / relpath).mkdir(parents=True)
+            receipt = {"publisher_authenticated": False, "fixture": True}
+            with patch.object(builder, "verified_vendor_inputs", return_value=receipt) as verify:
+                self.assertEqual(builder.verify_source_workspace(source, self.manifest, ["system/vold"]), receipt)
+                verify.assert_called_once_with(source)
+                (source / "vendor/sony/unlocked").mkdir()
                 with self.assertRaisesRegex(builder.BuildError, "unrecorded source"):
                     builder.verify_source_workspace(source, self.manifest, ["system/vold"])
+
+    def test_compile_requires_real_vendor_inputs_before_running_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            self.selected_manifest(source, self.manifest)
+            with (
+                patch.object(builder, "verify_checkout"),
+                patch.object(builder, "command") as command,
+                self.assertRaisesRegex(builder.BuildError, "supplemental vendor input verification failed"),
+            ):
+                builder.compile_original_vold(source, self.lock, self.manifest, 2)
+            command.assert_not_called()
 
     def test_manifest_exported_links_are_checked_without_scanning_project_contents(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -183,6 +253,7 @@ class OriginalVoldBuildTest(unittest.TestCase):
             artifact.chmod(0o755)
             with (
                 patch.object(builder, "verify_checkout"),
+                patch.object(builder, "verified_vendor_inputs", return_value={"fixture": True}),
                 patch.object(builder, "command"),
                 self.assertRaisesRegex(builder.BuildError, "did not produce"),
             ):
@@ -213,6 +284,7 @@ class OriginalVoldBuildTest(unittest.TestCase):
 
             with (
                 patch.object(builder, "verify_checkout"),
+                patch.object(builder, "verified_vendor_inputs", return_value={"fixture": True}),
                 patch.object(builder, "command", side_effect=compile_fixture),
                 patch.dict(os.environ, {"OUT_DIR": "/other-build", "OUT_DIR_COMMON_BASE": "/common", "ANDROID_PRODUCT_OUT": "/other-product", "ALLOW_MISSING_DEPENDENCIES": "false"}),
             ):
@@ -221,6 +293,7 @@ class OriginalVoldBuildTest(unittest.TestCase):
                 with (
                     self.subTest(flag=flag),
                     patch.object(builder, "verify_checkout"),
+                    patch.object(builder, "verified_vendor_inputs", return_value={"fixture": True}),
                     patch.object(builder, "command") as compile_command,
                     patch.dict(os.environ, {flag: "true"}),
                     self.assertRaisesRegex(builder.BuildError, "bypass must be disabled"),
@@ -250,6 +323,7 @@ class OriginalVoldBuildTest(unittest.TestCase):
                 )
                 with (
                     patch.object(builder, "verify_checkout"),
+                    patch.object(builder, "verified_vendor_inputs", return_value={"fixture": True}),
                     self.assertRaises(subprocess.CalledProcessError),
                 ):
                     builder.compile_original_vold(source, self.lock, self.manifest, 2)
@@ -272,6 +346,7 @@ class OriginalVoldBuildTest(unittest.TestCase):
 
             with (
                 patch.object(builder, "verify_checkout") as verify,
+                patch.object(builder, "verified_vendor_inputs", return_value={"fixture": True}),
                 patch.object(builder, "command", side_effect=changed_source),
                 self.assertRaisesRegex(builder.BuildError, "unrecorded source"),
             ):

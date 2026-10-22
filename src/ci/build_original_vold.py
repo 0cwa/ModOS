@@ -197,9 +197,27 @@ def verify_checkout(
                 raise BuildError(f"source project has unreviewed local content: {relpath}")
 
 
-def verify_source_workspace(source: Path, manifest: bytes, selected: list[str] | None) -> None:
+def verified_vendor_inputs(source: Path) -> dict:
+    # Vendor repositories are absent from the public release manifest. They
+    # have a separate immutable candidate lock, never a blanket vendor/ allowlist.
+    from prepare_vold_vendor_makefiles import VendorInputError, verify_vendor_checkout
+    try:
+        return verify_vendor_checkout(source)
+    except (OSError, ValueError, VendorInputError, subprocess.CalledProcessError) as exc:
+        raise BuildError(f"supplemental vendor input verification failed: {exc}") from exc
+
+
+def verify_source_workspace(
+    source: Path, manifest: bytes, selected: list[str] | None,
+    *, require_vendor: bool = False,
+) -> dict | None:
     """Reject unrecorded source outside clean pinned projects before building."""
     approved = set(project_map(manifest) if selected is None else selected)
+    from prepare_vold_vendor_makefiles import VENDOR_PATHS
+    vendor = None
+    if require_vendor or any((source / path).exists() or (source / path).is_symlink() for path in VENDOR_PATHS):
+        vendor = verified_vendor_inputs(source)
+        approved.update(VENDOR_PATHS)
     exported = {}
     for project in ET.fromstring(manifest).findall("project"):
         project_path = project.get("path", project.get("name", ""))
@@ -237,6 +255,7 @@ def verify_source_workspace(source: Path, manifest: bytes, selected: list[str] |
                 pending.append(path)
                 continue
             raise BuildError(f"unrecorded source outside selected pinned projects: {relative}")
+    return vendor
 
 
 def sync(
@@ -246,19 +265,31 @@ def sync(
     if source.is_symlink() or source.exists() and not source.is_dir():
         raise BuildError("source directory must be a real directory")
     if resume:
-        verify_active_manifest(source, manifest)
+        try:
+            verify_active_manifest(source, manifest)
+        except BuildError as exc:
+            raise BuildError(
+                f"{exc}. Resume never replaces unverified Repo metadata. "
+                "If the first Repo initialization was interrupted, rename only "
+                f"the incomplete source directory {source} to an unused sibling "
+                "path, then rerun the same local command with the same --work-dir. "
+                "Retain source-selection.json and the rest of the work directory. "
+                "For a previously completed checkout, investigate the manifest "
+                "mismatch instead of treating it as interrupted setup. See "
+                "docs/vold-baseline-ci.md#interrupted-initial-repo-setup."
+            ) from exc
     elif source.exists() and any(source.iterdir()):
         raise BuildError("source directory must be new or empty; use --resume to add pinned dependencies")
     repo = shutil.which("repo")
     if repo is None:
-        raise BuildError("repo tool is unavailable on source build runner")
+        raise BuildError("repo tool is unavailable; see docs/vold-baseline-ci.md for local setup")
     source.mkdir(parents=True, exist_ok=True)
     source = source.resolve(strict=True)
     if not resume:
         manifest_commit = lock["projects"]["manifest"]["revision"]
         command([
             repo, "init", "-u", "https://github.com/LineageOS/android.git",
-            "-b", manifest_commit,
+            "-b", manifest_commit, "--depth=1",
         ], source)
         # Do not overwrite .repo/manifest.xml: Repo manages this file, and
         # recent versions regenerate it during subsequent sync/init operations.
@@ -273,7 +304,7 @@ def sync(
         pinned_manifest.write_bytes(manifest)
         command([
             repo, "init", "-u", "https://github.com/LineageOS/android.git",
-            "-b", manifest_commit, "-m", MANIFEST_NAME
+            "-b", manifest_commit, "--depth=1", "-m", MANIFEST_NAME
         ], source)
     verify_active_manifest(source, manifest)
     # Explicit project-path sync prevents all 1,243 projects being fetched.
@@ -297,7 +328,7 @@ def sync(
             verify_checkout(source, manifest, clean=True, selected=present)
         to_sync = missing
     if to_sync is None or to_sync:
-        command([repo, "sync", "--no-clone-bundle", f"-j{jobs}", *(to_sync or [])], source)
+        command([repo, "sync", "--current-branch", "--no-tags", "--no-clone-bundle", f"-j{jobs}", *(to_sync or [])], source)
     verify_checkout(source, manifest, clean=True, selected=selected)
 
 
@@ -310,7 +341,7 @@ def compile_original_vold(
         raise BuildError("baseline source directory is missing or unsafe")
     source = source.resolve(strict=True)
     verify_checkout(source, manifest, clean=True, selected=selected)
-    verify_source_workspace(source, manifest, selected)
+    verify_source_workspace(source, manifest, selected, require_vendor=True)
     release_config = source / lock["build"]["release_config"]["path"]
     if (
         release_config.is_symlink() or not release_config.is_file()
@@ -358,7 +389,7 @@ def compile_original_vold(
     # would fail before configuration (for example at USE_LEFTOVERS).
     command(["bash", "-ec", script], source, env=environment)
     verify_checkout(source, manifest, clean=True, selected=selected)
-    verify_source_workspace(source, manifest, selected)
+    verify_source_workspace(source, manifest, selected, require_vendor=True)
     if artifact.is_symlink() or not artifact.is_file() or not artifact.stat().st_mode & 0o111:
         raise BuildError("source build did not produce a regular executable vold")
     return artifact
@@ -381,6 +412,7 @@ def build_baseline(
     report["build_release"] = lock["build"]["release"]
     report["build_setup_command"] = lock["build"]["setup_command"]
     report["release_config_sha256"] = lock["build"]["release_config"]["sha256"]
+    report["supplemental_vendor_inputs"] = verified_vendor_inputs(source)
     if selected is not None:
         report["selected_source_projects"] = len(selected)
         report["selected_source_paths_sha256"] = hashlib.sha256(
@@ -403,7 +435,7 @@ def main() -> int:
         opt.add_argument("--jobs", type=int, default=4)
         if name != "sync-vendor-sources":
             opt.add_argument("--projects-file", type=Path, help="optional validated subset plan; never weakens the binary equality gate")
-        if name == "sync":
+        if name in ("sync", "sync-vendor-sources"):
             opt.add_argument("--resume", action="store_true", help="fetch missing approved projects within the same checkout")
         if name == "compare":
             opt.add_argument("--reference-vold", type=Path, required=True)
@@ -415,10 +447,11 @@ def main() -> int:
         lock, manifest = load_contract()
         selected = verified_selection(getattr(args, "projects_file", None), manifest)
         if args.mode == "sync-vendor-sources":
-            # Diagnose the known proprietary-input gate before downloading the
-            # large compiler/toolchain checkout. This fixed set is not a build
-            # selection and never authorizes compiling or qualifying a binary.
-            sync(args.source_root, lock, manifest, args.jobs, list(VENDOR_PREREQUISITE_PROJECTS))
+            # Acquire/verify the small source lists before fetching toolchains.
+            # Resume never resyncs existing clean worktrees or erases an
+            # expanded dependency selection from an earlier local invocation.
+            sync(args.source_root, lock, manifest, args.jobs,
+                 list(VENDOR_PREREQUISITE_PROJECTS), args.resume)
         elif args.mode == "sync":
             if args.resume and selected is None:
                 raise BuildError("full-manifest checkout does not support incremental resume")

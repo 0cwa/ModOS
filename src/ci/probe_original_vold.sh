@@ -5,15 +5,26 @@
 # Never apply the timeout patch or publish an OTA.
 set -euo pipefail
 
-: "${VOLD_WORK:?isolated scratch workspace is required}"
-: "${VOLD_PROBE_STAGE:?probe or compare stage is required}"
+: "${VOLD_WORK:?isolated persistent build workspace is required}"
+: "${VOLD_PROBE_STAGE:?vendor, prepare, probe or compare stage is required}"
 
-[[ "${VOLD_PROBE_STAGE}" == probe || "${VOLD_PROBE_STAGE}" == compare ]] || {
+[[ "${VOLD_PROBE_STAGE}" == vendor || "${VOLD_PROBE_STAGE}" == prepare || "${VOLD_PROBE_STAGE}" == probe || "${VOLD_PROBE_STAGE}" == compare ]] || {
   echo 'Error: unsupported unmodified vold dependency stage' >&2
   exit 1
 }
 [[ "${VOLD_WORK}" == /* && -d "${VOLD_WORK}" && ! -L "${VOLD_WORK}" ]] || {
-  echo 'Error: isolated scratch directory is missing or unsafe' >&2
+  echo 'Error: isolated build directory is missing or unsafe' >&2
+  exit 1
+}
+VOLD_WORK="$(realpath -e -- "${VOLD_WORK}")"
+run_dir="${VOLD_RUN_DIR:-${VOLD_WORK}}"
+[[ "${run_dir}" == /* && -d "${run_dir}" && ! -L "${run_dir}" ]] || {
+  echo 'Error: diagnostic directory is missing or unsafe' >&2
+  exit 1
+}
+run_dir="$(realpath -e -- "${run_dir}")"
+[[ "${run_dir}" == "${VOLD_WORK}" || "${run_dir}" == "${VOLD_WORK}/"* ]] || {
+  echo 'Error: diagnostic directory must be inside the build workspace' >&2
   exit 1
 }
 [[ "${VOLD_PROBE_STAGE}" != compare || ( "${VOLD_SOURCE_REF:-}" == /* && -s "${VOLD_SOURCE_REF}" && ! -L "${VOLD_SOURCE_REF}" ) ]] || {
@@ -27,16 +38,31 @@ jobs="${VOLD_PROBE_JOBS:-4}"
 }
 
 selection="${VOLD_WORK}/source-selection.json"
-python3 src/ci/vold_source_closure.py plan --output "${selection}"
-# Check the three small pinned public vendor-input projects BEFORE fetching
-# toolchains. At these revisions --regenerate_makefiles still reads absent
-# proprietary ELF files. The preflight records that blocker without generating
-# misleading partial declarations or downloading the rest of the source seed.
+if [[ -e "${selection}" || -L "${selection}" ]]; then
+  [[ -f "${selection}" && -s "${selection}" && ! -L "${selection}" ]] || {
+    echo 'Error: persistent source selection is missing or unsafe' >&2
+    exit 1
+  }
+else
+  python3 src/ci/vold_source_closure.py plan --output "${selection}"
+fi
+# The exact public lists require real proprietary ELF inputs. Fetch/verify
+# separately locked mirror trees before the toolchains; never create stubs.
+# Keep earlier source selection expansions and reuse existing clean projects.
+resume=()
+if [[ -e "${VOLD_WORK}/source/.repo" || -L "${VOLD_WORK}/source/.repo" ]]; then
+  resume=(--resume)
+fi
 python3 src/ci/build_original_vold.py sync-vendor-sources \
-  --source-root "${VOLD_WORK}/source" --jobs "${jobs}"
+  --source-root "${VOLD_WORK}/source" --jobs "${jobs}" "${resume[@]}"
 python3 src/ci/prepare_vold_vendor_makefiles.py \
   --source-root "${VOLD_WORK}/source" \
-  --report "${VOLD_WORK}/sony-vendor-input-report.json"
+  --report "${run_dir}/sony-vendor-input-report.json"
+
+if [[ "${VOLD_PROBE_STAGE}" == vendor ]]; then
+  echo "Verified pinned vendor inputs; receipt: ${run_dir}/sony-vendor-input-report.json"
+  exit 0
+fi
 
 python3 src/ci/build_original_vold.py sync --resume \
   --source-root "${VOLD_WORK}/source" --projects-file "${selection}" --jobs "${jobs}"
@@ -45,11 +71,11 @@ python3 src/ci/build_original_vold.py sync --resume \
 # compiling. Unknown or conditional modules remain diagnostics for real Soong;
 # they are never mapped to guessed repositories. Stop after three scans.
 for scan in 1 2 3; do
-  next="${VOLD_WORK}/selection-static-next.json"
+  next="${run_dir}/selection-static-next.json"
   rm -f -- "${next}"
   python3 src/ci/vold_source_closure.py index \
     --source-root "${VOLD_WORK}/source" --selection "${selection}" \
-    --output "${VOLD_WORK}/source-index-static-${scan}.json" \
+    --output "${run_dir}/source-index-static-${scan}.json" \
     --next-selection "${next}"
   if [[ ! -f "${next}" ]]; then
     break
@@ -59,13 +85,18 @@ for scan in 1 2 3; do
     --source-root "${VOLD_WORK}/source" --projects-file "${selection}" --jobs "${jobs}"
 done
 
+if [[ "${VOLD_PROBE_STAGE}" == prepare ]]; then
+  echo 'Prepared pinned source selection and vendor inputs; compilation has not run.'
+  exit 0
+fi
+
 # Most missing dependencies are reported during Soong setup before the
 # expensive target compile. Resolve their exact pinned project paths once
 # and reuse the same checkout and Android out directory on each iteration.
 # Unknown module providers must stop for review; never turn on missing
 # dependency flags or attempt an unverified project URL.
 for iteration in 1 2 3; do
-  log="${VOLD_WORK}/vold-build-pass-${iteration}.log"
+  log="${run_dir}/vold-build-pass-${iteration}.log"
   if [[ "${VOLD_PROBE_STAGE}" == probe ]]; then
     build_cmd=(python3 src/ci/build_original_vold.py probe
       --source-root "${VOLD_WORK}/source" --projects-file "${selection}" --jobs "${jobs}")
@@ -73,14 +104,14 @@ for iteration in 1 2 3; do
     build_cmd=(python3 src/ci/build_original_vold.py compare
       --source-root "${VOLD_WORK}/source" --projects-file "${selection}"
       --reference-vold "${VOLD_SOURCE_REF}"
-      --output-dir "${VOLD_WORK}/baseline-${iteration}" --jobs "${jobs}")
+      --output-dir "${run_dir}/baseline-${iteration}" --jobs "${jobs}")
   fi
 
   if "${build_cmd[@]}" >"${log}" 2>&1; then
     tail -n 15 -- "${log}"
     if [[ "${VOLD_PROBE_STAGE}" == probe ]]; then
       echo '::notice::Unmodified vold compiled, but no authenticated binary equality has been established.'
-      echo "Compile-only probe completed; next stage MUST use authenticated compare." >"${VOLD_WORK}/probe-only.txt"
+      echo "Compile-only probe completed; next stage MUST use authenticated compare." >"${run_dir}/probe-only.txt"
     else
       echo '::notice::Unmodified vold is byte-identical to the authenticated reference.'
     fi
@@ -89,11 +120,11 @@ for iteration in 1 2 3; do
 
   echo "::warning::Pinned source probe pass ${iteration} failed. Last diagnostic lines:"
   tail -n 55 -- "${log}"
-  next="${VOLD_WORK}/selection-next.json"
+  next="${run_dir}/selection-next.json"
   rm -f -- "${next}"
   python3 src/ci/vold_source_closure.py diagnose \
     --selection "${selection}" --log "${log}" \
-    --output "${VOLD_WORK}/dependency-diagnosis-${iteration}.json" \
+    --output "${run_dir}/dependency-diagnosis-${iteration}.json" \
     --next-selection "${next}"
 
   if [[ ! -f "${next}" || "${iteration}" == 3 ]]; then
