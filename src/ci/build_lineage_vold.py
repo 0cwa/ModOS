@@ -34,16 +34,20 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def load_contract() -> tuple[dict, bytes, bytes]:
+def load_contract(*, verify_patch: bool = True) -> tuple[dict, bytes, bytes]:
     lock_bytes = LOCK_PATH.read_bytes()
     manifest_bytes = MANIFEST_PATH.read_bytes()
-    patch_path = ROOT / json.loads(lock_bytes)["patch"]["path"]
-    patch_bytes = patch_path.read_bytes()
     lock = json.loads(lock_bytes)
     if digest(manifest_bytes) != lock["manifest"]["sha256"]:
         raise BuildError("checked-in LineageOS manifest failed its SHA-256 check")
-    if digest(patch_bytes) != lock["patch"]["sha256"]:
-        raise BuildError("pinned vold timeout patch failed its SHA-256 check")
+    # The unmodified reproduction phase must not even open the timeout patch.
+    # Only a later explicitly requested patched build verifies and applies it.
+    patch_bytes = b""
+    if verify_patch:
+        patch_path = ROOT / lock["patch"]["path"]
+        patch_bytes = patch_path.read_bytes()
+        if digest(patch_bytes) != lock["patch"]["sha256"]:
+            raise BuildError("pinned vold timeout patch failed its SHA-256 check")
     return lock, manifest_bytes, patch_bytes
 
 
@@ -194,7 +198,7 @@ def command_baseline(
     from lineage_vold_baseline import (
         BaselineMismatch, comparison_report, read_binary, require_exact_match, write_report,
     )
-    lock, manifest_bytes, _patch_bytes = load_contract()
+    lock, manifest_bytes, _patch_bytes = load_contract(verify_patch=False)
     source_root = source_root.expanduser().resolve(strict=True)
     if not (source_root / ".repo/manifest.xml").is_file():
         raise BuildError("baseline source root is not a repo checkout")
