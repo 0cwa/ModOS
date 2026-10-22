@@ -24,7 +24,7 @@ class BaselineFirstTest(unittest.TestCase):
         self.lock = json.loads((ROOT / "locks/lineage-vold-exfat-timeout.json").read_text())
         self.reference = LineageVoldContractTest.fixture_elf()
         self.digest = hashlib.sha256(self.reference).hexdigest()
-        self.ota_digest = "e" * 64
+        self.ota_digest = self.lock["source_ota_sha256"]
 
     def test_identical_binary_is_required_and_report_roundtrips(self):
         good = baseline.comparison_report(self.reference, self.reference, self.lock, self.ota_digest)
