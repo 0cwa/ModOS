@@ -114,6 +114,34 @@ class BaselineFirstTest(unittest.TestCase):
                     root / "nonexistent-report.json", reference, reference,
                 )
 
+    def test_archived_ota_fallback_is_sha_pinned_and_cannot_hide_disagreement(self):
+        expected_url = self.lock["source_ota_url"]
+        expected_sha = self.lock["source_ota_sha256"]
+        self.assertEqual(
+            ota.resolve_source(None, self.lock), (expected_url, expected_sha)
+        )
+        self.assertEqual(
+            ota.resolve_source([], self.lock), (expected_url, expected_sha)
+        )
+        current = [{
+            "type": "nightly",
+            "files": [{
+                "type": "nightly", "filename": ota.EXPECTED,
+                "url": expected_url,
+                "sha256": expected_sha,
+            }],
+        }]
+        self.assertEqual(
+            ota.resolve_source(current, self.lock), (expected_url, expected_sha)
+        )
+        forged = copy.deepcopy(current)
+        forged[0]["files"][0]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(ota.SourceSelectionError, "disagrees"):
+            ota.resolve_source(forged, self.lock)
+        bad_lock = {**self.lock, "source_ota_url": "https://evil.invalid/" + ota.EXPECTED}
+        with self.assertRaisesRegex(ota.SourceSelectionError, "locked official archive"):
+            ota.resolve_source(None, bad_lock)
+
     def test_official_api_requires_one_exact_nightly_and_digest(self):
         record = {
             "type": "nightly",
