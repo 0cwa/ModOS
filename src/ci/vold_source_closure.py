@@ -273,6 +273,20 @@ def blueprint_module_graph(source_root: Path, selected: list[str]) -> dict:
     }
 
 
+def next_projects_after_diagnostic(
+    selected: list[str], diagnostic: dict, seed: dict,
+) -> dict | None:
+    """Stop expensive source iteration when no safe bounded next step exists."""
+    if diagnostic["unpinned_missing_paths"] or diagnostic["modules_without_verified_owner"]:
+        return None
+    additions = diagnostic["proposed_project_additions"]
+    if len(additions) > 30:
+        raise ClosureError("too many automatic additions: require independent review")
+    if not additions:
+        return None
+    return selection_record(sorted(set(selected + additions)), seed)
+
+
 def write_json(path: Path, report: dict) -> None:
     if path.is_symlink():
         raise ClosureError("refusing to replace a symbolic-link source report")
@@ -314,14 +328,16 @@ def main() -> int:
             else:
                 report = missing_dependencies(args.log.read_text(errors="replace"), selected, projects, seed)
                 if args.next_selection is not None:
-                    additions = report["proposed_project_additions"]
-                    if len(additions) > 30:
-                        raise ClosureError("too many automatic additions: require independent review")
-                    if additions:
-                        write_json(args.next_selection, selection_record(sorted(set(selected + additions)), seed))
+                    expansion = next_projects_after_diagnostic(selected, report, seed)
+                    if expansion is not None:
+                        write_json(args.next_selection, expansion)
                         report["next_selection"] = str(args.next_selection)
                     else:
                         report["next_selection"] = None
+                        report["blocked_on_unresolved_inputs"] = bool(
+                            report["unpinned_missing_paths"]
+                            or report["modules_without_verified_owner"]
+                        )
             write_json(args.output, report)
             print(json.dumps(report, sort_keys=True))
     except (OSError, ValueError, KeyError, TypeError) as exc:
