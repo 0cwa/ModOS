@@ -187,24 +187,19 @@ def sync(
     verify_checkout(source, manifest, clean=True, selected=selected)
 
 
-def build_baseline(
-    source: Path, dest: Path, reference: Path, lock: dict, manifest: bytes,
-    jobs: int, selected: list[str] | None = None,
-) -> dict:
+def compile_original_vold(
+    source: Path, lock: dict, manifest: bytes, jobs: int,
+    selected: list[str] | None = None,
+) -> Path:
+    """Do not apply or import the patch. A successful compile is NOT proof."""
     if source.is_symlink() or not (source / ".repo/manifest.xml").exists():
         raise BuildError("baseline source directory is missing or unsafe")
     source = source.resolve(strict=True)
     verify_checkout(source, manifest, clean=True, selected=selected)
-    official = read_vold(reference)
-    if dest.is_symlink() or (dest.exists() and (
-        not dest.is_dir() or any(dest.iterdir())
-    )):
-        raise BuildError("baseline output directory must be new or empty")
-    dest.mkdir(parents=True, exist_ok=True)
     artifact = source / lock["build"]["artifact"]
     if artifact.is_symlink():
         raise BuildError("Android vold build artifact cannot be a symbolic link")
-    # Never mistake an existing build's vold for a result of this build.
+    # An earlier trial must not be mistaken for the current compiler result.
     if artifact.exists():
         if not artifact.is_file():
             raise BuildError("unexpected prior vold output type")
@@ -215,14 +210,29 @@ def build_baseline(
         f"m -j{jobs} vold"
     )
     command(["bash", "-euc", script], source)
-    if not artifact.exists() or not artifact.stat().st_mode & 0o111:
-        raise BuildError("source build did not produce an executable vold")
+    if artifact.is_symlink() or not artifact.is_file() or not artifact.stat().st_mode & 0o111:
+        raise BuildError("source build did not produce a regular executable vold")
+    return artifact
+
+
+def build_baseline(
+    source: Path, dest: Path, reference: Path, lock: dict, manifest: bytes,
+    jobs: int, selected: list[str] | None = None,
+) -> dict:
+    """A build is only *qualified* if every byte matches the official OTA."""
+    official = read_vold(reference)
+    if dest.is_symlink() or (dest.exists() and (
+        not dest.is_dir() or any(dest.iterdir())
+    )):
+        raise BuildError("baseline output directory must be new or empty")
+    dest.mkdir(parents=True, exist_ok=True)
+    artifact = compile_original_vold(source, lock, manifest, jobs, selected)
     built = read_vold(artifact)
     report = comparison(official, built, lock)
     if selected is not None:
         report["selected_source_projects"] = len(selected)
         report["selected_source_paths_sha256"] = hashlib.sha256(
-            ("\n".join(sorted(selected)) + "\n").encode()
+            ("\\n".join(sorted(selected)) + "\\n").encode()
         ).hexdigest()
         report["source_checkout_scope"] = "manifest-pinned-subset"
     else:
@@ -235,7 +245,7 @@ def build_baseline(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
-    for name in ("sync", "compare"):
+    for name in ("sync", "probe", "compare"):
         opt = sub.add_parser(name)
         opt.add_argument("--source-root", type=Path, required=True)
         opt.add_argument("--jobs", type=int, default=4)
@@ -255,6 +265,11 @@ def main() -> int:
             if args.resume and selected is None:
                 raise BuildError("full-manifest checkout does not support incremental resume")
             sync(args.source_root, lock, manifest, args.jobs, selected, args.resume)
+        elif args.mode == "probe":
+            if selected is None:
+                raise BuildError("compilation probe requires an explicit pinned subset selection")
+            compile_original_vold(args.source_root, lock, manifest, args.jobs, selected)
+            print("Dependency probe compiled; this is NOT byte-identical proof or release approval.")
         else:
             report = build_baseline(
                 args.source_root, args.output_dir, args.reference_vold,
