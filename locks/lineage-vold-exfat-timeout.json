@@ -4,6 +4,8 @@
   "rom_family": "lineageos",
   "device": "pdx235",
   "base_build_id": "lineage-24.0-20261016-nightly-pdx235-signed",
+  "source_ota_sha256": "8af46661a1440e98018bb2abb155317d6d4ae54e051160f0786b75c1e6806c82",
+  "source_ota_url": "https://mirrorbits.lineageos.org/full/pdx235/20261016/lineage-24.0-20261016-nightly-pdx235-signed.zip",
   "approved_binary_sha256": "",
   "artifact_distribution": {
     "repository": "0cwa/ModOS",
