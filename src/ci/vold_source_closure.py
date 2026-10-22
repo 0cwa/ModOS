@@ -67,7 +67,9 @@ def verified_contract() -> tuple[dict, dict[str, str], dict]:
         raise ClosureError("pinned project manifest cannot be parsed") from exc
     projects: dict[str, str] = {}
     for element in xml.findall("project"):
-        path, revision = element.get("path"), element.get("revision")
+        # Repo defaults omitted project paths to the project name.
+        # The official pinned manifest uses that form for 44 projects.
+        path, revision = element.get("path", element.get("name")), element.get("revision")
         # One-segment roots (eg. art, bionic) are valid. Any path escaping
         # source root or any branch/tag-based revision is not.
         if (
