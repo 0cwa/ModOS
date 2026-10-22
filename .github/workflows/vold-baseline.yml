@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Trace the initial pinned 70-project source selection
+      - name: Trace the initial pinned source selection
         shell: bash
         run: |
           set -euo pipefail
@@ -47,7 +47,7 @@ jobs:
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
               summary.write(f"### Provisional vold source graph: {count}/1243 manifest projects\n")
               summary.write("This is a source probe, **not** a complete Soong closure or a reproduced binary.\n")
-              summary.write("A real build also requires the missing Sony vendor configuration and a verified Android toolchain.\n")
+              summary.write("Sony vendor declarations cannot be regenerated from the public lists alone: the pinned generator reads proprietary ELF inputs.\n")
           PY
       - name: Upload static source dependency selection
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -99,9 +99,15 @@ jobs:
 
       - name: Validate isolated host and reserve scratch workspace
         shell: bash
+        env:
+          BASELINE_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
-          for binary in repo avbroot curl unzip openssl sha256sum debugfs git python3 realpath; do
+          binaries=(repo git python3 realpath)
+          if [[ "$BASELINE_MODE" == compare ]]; then
+            binaries+=(avbroot curl unzip openssl sha256sum debugfs)
+          fi
+          for binary in "${binaries[@]}"; do
             command -v "$binary" >/dev/null || {
               echo "::error::Missing required executable: $binary"
               exit 1
@@ -115,7 +121,7 @@ jobs:
           path="$(realpath -e -- "$path")"
           free="$(df -PB1 "$path" | awk 'END {print $4}')"
           (( free >= 100000000000 )) || {
-            echo '::error::The 70-project subset probe requires at least 100 GB as a conservative starting allowance (not a proven maximum)'
+            echo '::error::The subset probe requires at least 100 GB as a conservative starting allowance (not a proven maximum)'
             exit 1
           }
           workspace="$(mktemp -d "$path/modos-original-vold.XXXXXXXX")"
@@ -168,7 +174,7 @@ jobs:
           path: |
             ${{ env.VOLD_WORK }}/baseline-*/baseline-report.json
             ${{ env.VOLD_WORK }}/source-selection.json
-            ${{ env.VOLD_WORK }}/sony-generated-makefiles-report.json
+            ${{ env.VOLD_WORK }}/sony-vendor-input-report.json
             ${{ env.VOLD_WORK }}/source-index-*.json
             ${{ env.VOLD_WORK }}/dependency-diagnosis-*.json
             ${{ env.VOLD_WORK }}/probe-only.txt

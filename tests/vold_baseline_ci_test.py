@@ -117,6 +117,9 @@ class OriginalVoldBaselineTest(unittest.TestCase):
             source = root / "source"
             (source / ".repo").mkdir(parents=True)
             (source / ".repo/manifest.xml").write_bytes(manifest)
+            release = source / lock["build"]["release_config"]["path"]
+            release.parent.mkdir(parents=True)
+            release.write_text("# Updated manually\naosp_target_release=cp2a\n")
             out = source / lock["build"]["artifact"]
             out.parent.mkdir(parents=True)
             out.write_bytes(b"stale build must be deleted")
@@ -124,7 +127,7 @@ class OriginalVoldBaselineTest(unittest.TestCase):
             reference.write_bytes(original)
 
             def fake_compile(argv, cwd, **_kwargs):
-                self.assertEqual(argv[:2], ["bash", "-euc"])
+                self.assertEqual(argv[:2], ["bash", "-ec"])
                 self.assertFalse(out.exists(), "stale binary must be removed first")
                 self.assertIn("m -j2 vold", argv[2])
                 out.write_bytes(original)

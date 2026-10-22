@@ -7,7 +7,32 @@
   "source_evidence": [
     "https://github.com/LineageOS/android_system_vold/blob/11d8982f824d52e8122c7aa732207ba66b8f23c8/Android.bp",
     "https://github.com/LineageOS/android_device_sony_pdx235/blob/0559de69466e1e9af69b121985f592c4f4609283/device.mk",
-    "https://github.com/LineageOS/android_device_sony_sm6375-common/blob/d1d80af1ad9032cb092ff6d85db437709cc54e28/common.mk"
+    "https://github.com/LineageOS/android_device_sony_sm6375-common/blob/d1d80af1ad9032cb092ff6d85db437709cc54e28/common.mk",
+    "https://android.googlesource.com/platform/hardware/libhardware_legacy/+/2a073cd42ec822914ed4e680e7b708485d3a172b/Android.bp",
+    "https://android.googlesource.com/platform/system/libbase/+/fef4173e19d97cd4b4fc09a06bccbf800d0d3937/Android.bp",
+    "https://android.googlesource.com/platform/system/gsid/+/35a92d40f529b605fad8ff622691e76901044cc8/Android.bp",
+    "https://android.googlesource.com/platform/system/libhidl/+/061055fc4dad78e5d25a77d9217001794656f16b/Android.bp",
+    "https://android.googlesource.com/platform/system/server_configurable_flags/+/5069ba739faebf91ae72096577ae17e13061af72/libflags/Android.bp",
+    "https://android.googlesource.com/platform/system/libhwbinder/+/2f5282448223b97c541181a5b94a05c2ac17ff17/Android.bp",
+    "https://github.com/LineageOS/android_system_libfmq/blob/f727482ff0c6a26b4c64c5106c62c176415b2d81/Android.bp",
+    "https://android.googlesource.com/platform/system/hardware/interfaces/+/9c3469aa3d4aeec5b2bc8e8ae8fdb4437dab4edb/suspend/aidl/default/Android.bp",
+    "https://android.googlesource.com/platform/system/hardware/interfaces/+/9c3469aa3d4aeec5b2bc8e8ae8fdb4437dab4edb/suspend/aidl/Android.bp",
+    "https://android.googlesource.com/platform/system/tools/hidl/+/5d0e05e6535fea94a674a359102bdd42944714f4/Android.bp",
+    "https://android.googlesource.com/platform/system/tools/aidl/+/9a94664f74536bf28010207fd1804b04c6435e2c/Android.bp",
+    "https://github.com/LineageOS/android_build_soong/blob/183e59578606687d66096cbce86cb50c27f4e9d7/cc/gen.go",
+    "https://github.com/LineageOS/android_build_soong/blob/183e59578606687d66096cbce86cb50c27f4e9d7/aconfig/codegen/cc_aconfig_library.go",
+    "https://github.com/LineageOS/android_build/blob/73e37454cdac3892c961e554524ccc52b1bfcf00/tools/aconfig/aconfig_storage_read_api/Android.bp",
+    "https://android.googlesource.com/platform/external/rust/cxx/+/41972f6ebbe9c21eeed3fdf5c1b0805f2c8b824c/Android.bp",
+    "https://android.googlesource.com/platform/external/rust/android-crates-io/+/1f5e95cd6e996995023c9c0f7df0f15a8a43269e/crates/anyhow/Android.bp",
+    "https://android.googlesource.com/platform/external/rust/android-crates-io/+/1f5e95cd6e996995023c9c0f7df0f15a8a43269e/crates/memmap2/Android.bp",
+    "https://android.googlesource.com/platform/external/rust/android-crates-io/+/1f5e95cd6e996995023c9c0f7df0f15a8a43269e/crates/thiserror/Android.bp",
+    "https://github.com/LineageOS/android_system_core/blob/7c3f32fe89c52b4176fd288ba5bb4f907809c202/libcrypto_utils/Android.bp",
+    "https://android.googlesource.com/platform/system/libvintf/+/df89ad736e14ac375f61d50fa543ae7cd746a140/Android.bp",
+    "https://android.googlesource.com/platform/external/tinyxml2/+/33ba115074c80a720826efffab1937d5b355c3b8/Android.bp",
+    "https://android.googlesource.com/platform/system/tools/sysprop/+/deead2d06508faeca98c236feea7e59bb4c43c8c/Android.bp",
+    "https://github.com/LineageOS/android_device_sony_pdx235/blob/0559de69466e1e9af69b121985f592c4f4609283/extract-files.py",
+    "https://github.com/LineageOS/android_device_sony_sm6375-common/blob/d1d80af1ad9032cb092ff6d85db437709cc54e28/extract-files.py",
+    "https://github.com/LineageOS/android_tools_extract-utils/blob/ff6589c6b0a4a00c592e98940e9e6b6a50c76569/extract_utils/makefiles.py"
   ],
   "candidate_groups": {
     "core_build_toolchain": [
@@ -81,12 +106,28 @@
       "vendor/qcom/opensource/commonsys-intf/display",
       "vendor/qcom/opensource/commonsys/display",
       "vendor/qcom/opensource/display",
-      "tools/extract-utils"
+      "tools/extract-utils",
+      "vendor/qcom/opensource/dataservices",
+      "vendor/qcom/opensource/usb"
     ],
     "module_service_api": [
       "packages/modules/adb",
       "packages/modules/Connectivity",
       "packages/modules/ArtPrebuilt"
+    ],
+    "verified_native_and_generated_transitive": [
+      "external/rust/android-crates-io",
+      "external/rust/cxx",
+      "hardware/libhardware_legacy",
+      "system/gsid",
+      "system/hardware/interfaces",
+      "system/libbase",
+      "system/libfmq",
+      "system/libhidl",
+      "system/libhwbinder",
+      "system/server_configurable_flags",
+      "system/tools/aidl",
+      "system/tools/hidl"
     ]
   },
   "direct_module_to_project_hints": {
@@ -105,14 +146,14 @@
     "libbinder_ndk": "frameworks/native",
     "libcutils": "system/core",
     "libutils": "system/core",
-    "libbase": "system/core",
+    "libbase": "system/libbase",
     "libselinux": "external/selinux",
     "libcrypto": "external/boringssl",
     "liblog": "system/logging",
     "liblogwrap": "system/core",
     "libhardware": "hardware/libhardware",
-    "libhardware_legacy": "hardware/libhardware",
-    "libgsi": "system/fs/fs_mgr",
+    "libhardware_legacy": "hardware/libhardware_legacy",
+    "libgsi": "system/gsid",
     "libext2_uuid": "external/e2fsprogs",
     "libext4_utils": "system/extras",
     "libf2fs_sparseblock": "system/extras",
@@ -128,7 +169,32 @@
     "fuseMedia.bpf": "system/bpfprogs",
     "mke2fs": "external/e2fsprogs",
     "libfec_rs": "system/extras",
-    "libasync_safe": "bionic"
+    "libasync_safe": "bionic",
+    "libhidlbase": "system/libhidl",
+    "libhidlbase-combined-impl": "system/libhidl",
+    "server_configurable_flags": "system/server_configurable_flags",
+    "libhwbinder-impl-internal": "system/libhwbinder",
+    "libhwbinder-impl-shared-libs": "system/libhwbinder",
+    "libfmq-base": "system/libfmq",
+    "libfmq": "system/libfmq",
+    "hidl-module-defaults": "system/tools/hidl",
+    "hidl-gen": "system/tools/hidl",
+    "aidl": "system/tools/aidl",
+    "aidl-cpp": "system/tools/aidl",
+    "system_suspend_defaults": "system/hardware/interfaces",
+    "android.system.suspend-V1-ndk": "system/hardware/interfaces",
+    "suspend_service_flags_c_lib": "system/hardware/interfaces",
+    "libcrypto_utils": "system/core",
+    "libaconfig_storage_read_api_cc": "build/make",
+    "aconfig_lib_cc_static_link.defaults": "build/make",
+    "libcxx": "external/rust/cxx",
+    "cxx-bridge-header": "external/rust/cxx",
+    "libanyhow": "external/rust/android-crates-io",
+    "libmemmap2": "external/rust/android-crates-io",
+    "libthiserror": "external/rust/android-crates-io",
+    "libvintf": "system/libvintf",
+    "libtinyxml2": "external/tinyxml2",
+    "sysprop_cpp": "system/tools/sysprop"
   },
   "known_unpinned_vendor_inputs": [
     "vendor/sony/pdx235/pdx235-vendor.mk",
@@ -136,5 +202,59 @@
     "vendor/sony/sm6375-common/sm6375-common-vendor.mk",
     "vendor/sony/sm6375-common/BoardConfigVendor.mk"
   ],
-  "qualification_note": "Initial hints, not a complete Soong source closure. Repo sync and build errors must discover additional immutable manifest projects; missing proprietary vendor inputs cannot be fabricated."
+  "qualification_note": "Reviewed seed and provider hints, not a complete Soong source closure. Static scanning omits variables and implicit generators and may include inactive product branches. Repo sync and build errors may discover additional immutable manifest projects. Missing proprietary vendor inputs cannot be fabricated or replaced with generated declarations lacking provenance.",
+  "reviewed_dependency_chains": [
+    {
+      "consumer": "vold_default_libs",
+      "providers": [
+        "system/libbase",
+        "system/gsid",
+        "hardware/libhardware_legacy",
+        "system/libhidl"
+      ],
+      "finding": "Pinned Android.bp files place libbase, libgsi, libhardware_legacy and libhidlbase in distinct manifest projects; the previous hints pointed three of these at other already-selected projects."
+    },
+    {
+      "consumer": "libhidlbase-combined-impl",
+      "providers": [
+        "system/libhwbinder",
+        "system/libfmq",
+        "system/tools/hidl"
+      ],
+      "finding": "Pinned HIDL defaults require libhwbinder-impl-internal, libfmq-base and hidl-module-defaults; generated HIDL sources also require hidl-gen."
+    },
+    {
+      "consumer": "libhardware_legacy -> libpower_defaults",
+      "providers": [
+        "system/hardware/interfaces",
+        "system/server_configurable_flags"
+      ],
+      "finding": "Pinned legacy hardware defaults inherit system_suspend_defaults and use android.system.suspend-V1-ndk; the suspend defaults also require server_configurable_flags."
+    },
+    {
+      "consumer": "libvold_binder AIDL sources",
+      "providers": [
+        "system/tools/aidl"
+      ],
+      "finding": "Pinned Soong cc/gen.go invokes aidl-cpp for AIDL source generation; the tool is declared in system/tools/aidl."
+    },
+    {
+      "consumer": "vold_flags_c_lib -> libaconfig_storage_read_api_cc",
+      "providers": [
+        "build/make",
+        "external/rust/cxx",
+        "external/rust/android-crates-io"
+      ],
+      "finding": "Pinned Soong cc_aconfig_library adds the native aconfig reader. Its C++ bridge requires Rust libcxx, libanyhow, libmemmap2 and libthiserror; the latter three are in the single pinned android-crates-io project. This implicit generator edge is not visible in vold Android.bp alone."
+    },
+    {
+      "consumer": "Sony product and vendor namespace declarations",
+      "providers": [
+        "vendor/qcom/opensource/dataservices",
+        "vendor/qcom/opensource/usb"
+      ],
+      "finding": "Pinned extract-files.py namespace_imports reference dataservices; pinned common.mk adds the usb/etc namespace. These public projects do not provide the proprietary Sony vendor blobs."
+    }
+  ],
+  "vendor_prerequisite_note": "Pinned extract-utils --regenerate_makefiles still opens proprietary ELF files to determine machine, bitness and DT_NEEDED. Public proprietary-file lists alone cannot regenerate usable vendor declarations. A real replay fails at the missing pdx235 proprietary/vendor/lib64/camera/com.qti.eeprom.hi846_back_eeprom.so input; generated files from a failed replay are partial and unqualified. The workflow must stop before large source downloads until an authenticated vendor-input or exact declaration provenance plan is reviewed."
 }

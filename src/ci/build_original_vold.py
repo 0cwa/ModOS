@@ -22,6 +22,10 @@ from vold_baseline_compare import BaselineError, comparison, read_vold, require_
 
 ROOT = Path(__file__).resolve().parents[2]
 LOCK = ROOT / "locks/lineage-vold-baseline-20261016.json"
+MANIFEST_NAME = "modos-vold-original-20261016.xml"
+VENDOR_PREREQUISITE_PROJECTS = (
+    "device/sony/pdx235", "device/sony/sm6375-common", "tools/extract-utils",
+)
 
 
 class BuildError(ValueError):
@@ -47,6 +51,16 @@ def load_contract() -> tuple[dict, bytes]:
         raise BuildError("pinned source manifest digest differs")
     if lock["build"]["target"] != "lineage_pdx235-userdebug" or lock["build"]["command"] != "m vold":
         raise BuildError("baseline build target differs from reviewed source")
+    build = lock["build"]
+    if (
+        (build.get("product"), build.get("release"), build.get("variant"))
+        != ("lineage_pdx235", "cp2a", "userdebug")
+        or build.get("setup_command") != "_lunch_meat lineage_pdx235 cp2a userdebug"
+        or build.get("release_config", {}).get("path") != "vendor/lineage/vars/aosp_target_release"
+        or build.get("release_config", {}).get("sha256")
+        != "258eaaeb1fc743ee5fd3a0ade38905be3bbfe3d2624d7fd477dd966a68d67eb6"
+    ):
+        raise BuildError("baseline product/release/variant differs from pinned LineageOS setup")
     projects = project_map(manifest)
     if len(projects) != 1243:
         raise BuildError("unexpected number of projects in source manifest")
@@ -98,6 +112,54 @@ def verified_selection(selection_file: Path | None, manifest: bytes) -> list[str
     return validate_selection(selection, projects, seed)
 
 
+def verify_active_manifest(source: Path, manifest: bytes) -> None:
+    """Validate Repo's selected file, including its modern include wrapper.
+
+    Repo's Link() writes .repo/manifest.xml as a single include, not a copy
+    of the selected manifest. Check that include without permitting another
+    manifest, a local override, or a linked file outside this checkout.
+    """
+    repo_dir = source / ".repo"
+    if repo_dir.is_symlink() or not repo_dir.is_dir():
+        raise BuildError("repo metadata directory is missing or unsafe")
+    for local in (repo_dir / "local_manifest.xml", repo_dir / "local_manifests"):
+        if local.is_symlink() or (local.exists() and (
+            not local.is_dir() or any(local.iterdir())
+        )):
+            raise BuildError("local manifest overrides are forbidden for the pinned baseline")
+    active = repo_dir / "manifest.xml"
+    if not active.is_file():
+        raise BuildError("repo selected manifest is unavailable")
+    if not active.is_symlink() and active.read_bytes() == manifest:
+        # Support an existing legacy checkout with the exact flattened file.
+        return
+    manifest_dir = repo_dir / "manifests"
+    pinned = manifest_dir / MANIFEST_NAME
+    if (
+        manifest_dir.is_symlink() or not manifest_dir.is_dir()
+        or pinned.is_symlink() or not pinned.is_file()
+        or pinned.read_bytes() != manifest
+    ):
+        raise BuildError("repo selected manifest differs from the exact official snapshot")
+    if active.is_symlink():
+        if active.resolve(strict=True) != pinned.resolve(strict=True):
+            raise BuildError("repo manifest link does not select the pinned snapshot")
+        return
+    try:
+        wrapper = ET.fromstring(active.read_bytes())
+    except ET.ParseError as exc:
+        raise BuildError("invalid repo manifest selection wrapper") from exc
+    children = list(wrapper)
+    if (
+        wrapper.tag != "manifest" or wrapper.attrib or (wrapper.text or "").strip()
+        or len(children) != 1 or children[0].tag != "include"
+        or children[0].attrib != {"name": MANIFEST_NAME}
+        or list(children[0]) or (children[0].text or "").strip()
+        or (children[0].tail or "").strip()
+    ):
+        raise BuildError("repo manifest wrapper must select only the exact pinned snapshot")
+
+
 def verify_checkout(
     source: Path, manifest: bytes, *, clean: bool = False,
     selected: list[str] | None = None,
@@ -105,10 +167,9 @@ def verify_checkout(
     repo = shutil.which("repo")
     if repo is None:
         raise BuildError("repo is required to verify complete source revisions")
+    source = source.resolve(strict=True)
     expected = project_map(manifest)
-    active_manifest = source / ".repo/manifest.xml"
-    if active_manifest.is_dir() or not active_manifest.exists() or active_manifest.read_bytes() != manifest:
-        raise BuildError("repo selected manifest differs from the exact official snapshot")
+    verify_active_manifest(source, manifest)
     if selected is None:
         # The legacy full-checkout gate remains unchanged for fully synced trees.
         result = subprocess.run(
@@ -136,6 +197,48 @@ def verify_checkout(
                 raise BuildError(f"source project has unreviewed local content: {relpath}")
 
 
+def verify_source_workspace(source: Path, manifest: bytes, selected: list[str] | None) -> None:
+    """Reject unrecorded source outside clean pinned projects before building."""
+    approved = set(project_map(manifest) if selected is None else selected)
+    exported = {}
+    for project in ET.fromstring(manifest).findall("project"):
+        project_path = project.get("path", project.get("name", ""))
+        if project_path not in approved:
+            continue
+        for entry in project:
+            if entry.tag in ("linkfile", "copyfile"):
+                exported[entry.attrib["dest"]] = (
+                    entry.tag, source / project_path / entry.attrib["src"]
+                )
+    parents = {
+        parent.as_posix()
+        for path in approved | set(exported)
+        for parent in Path(path).parents if parent != Path(".")
+    }
+    pending = [source]
+    while pending:
+        for path in pending.pop().iterdir():
+            relative = path.relative_to(source).as_posix()
+            if relative in approved:
+                continue  # verify_checkout checks each entire Git worktree.
+            if relative in exported:
+                kind, original = exported[relative]
+                if kind == "linkfile":
+                    if not path.is_symlink() or path.resolve() != original.resolve():
+                        raise BuildError(f"manifest linkfile differs from pinned source: {relative}")
+                elif path.is_symlink() or not path.is_file() or path.read_bytes() != original.read_bytes():
+                    raise BuildError(f"manifest copyfile differs from pinned source: {relative}")
+                continue
+            if relative in (".repo", "out"):
+                if path.is_symlink() or not path.is_dir():
+                    raise BuildError(f"build workspace directory is unsafe: {relative}")
+                continue
+            if relative in parents and path.is_dir() and not path.is_symlink():
+                pending.append(path)
+                continue
+            raise BuildError(f"unrecorded source outside selected pinned projects: {relative}")
+
+
 def sync(
     source: Path, lock: dict, manifest: bytes, jobs: int,
     selected: list[str] | None = None, resume: bool = False,
@@ -143,16 +246,14 @@ def sync(
     if source.is_symlink() or source.exists() and not source.is_dir():
         raise BuildError("source directory must be a real directory")
     if resume:
-        if not (source / ".repo/manifest.xml").is_file():
-            raise BuildError("resuming a subset requires the existing pinned repo checkout")
-        if (source / ".repo/manifest.xml").read_bytes() != manifest:
-            raise BuildError("resuming checkout with a different manifest is forbidden")
+        verify_active_manifest(source, manifest)
     elif source.exists() and any(source.iterdir()):
         raise BuildError("source directory must be new or empty; use --resume to add pinned dependencies")
     repo = shutil.which("repo")
     if repo is None:
         raise BuildError("repo tool is unavailable on source build runner")
     source.mkdir(parents=True, exist_ok=True)
+    source = source.resolve(strict=True)
     if not resume:
         manifest_commit = lock["projects"]["manifest"]["revision"]
         command([
@@ -163,23 +264,18 @@ def sync(
         # recent versions regenerate it during subsequent sync/init operations.
         # Instead install the immutable flattened manifest in Repo's manifest
         # checkout and formally select it with -m, as supported by Repo.
-        manifest_name = "modos-vold-original-20261016.xml"
         manifest_dir = source / ".repo/manifests"
         if manifest_dir.is_symlink() or not manifest_dir.is_dir():
             raise BuildError("repo manifests checkout is unavailable or unsafe")
-        pinned_manifest = manifest_dir / manifest_name
+        pinned_manifest = manifest_dir / MANIFEST_NAME
         if pinned_manifest.exists() or pinned_manifest.is_symlink():
             raise BuildError("preexisting untrusted local pinned manifest")
         pinned_manifest.write_bytes(manifest)
         command([
             repo, "init", "-u", "https://github.com/LineageOS/android.git",
-            "-b", manifest_commit, "-m", manifest_name
+            "-b", manifest_commit, "-m", MANIFEST_NAME
         ], source)
-    active_manifest = source / ".repo/manifest.xml"
-    if not active_manifest.exists() or active_manifest.is_dir():
-        raise BuildError("repo did not activate the immutable full manifest")
-    if active_manifest.read_bytes() != manifest:
-        raise BuildError("repo's active manifest differs from the pinned source")
+    verify_active_manifest(source, manifest)
     # Explicit project-path sync prevents all 1,243 projects being fetched.
     # On resume, preverify existing project HEADs and cleanliness, then fetch
     # *only newly selected* missing projects. Preserve the original Soong out
@@ -193,7 +289,10 @@ def sync(
             path = source / project
             if path.is_symlink() or (path.exists() and not path.is_dir()):
                 raise BuildError(f"previously synced project path is unsafe: {project}")
-            (present if path.is_dir() else missing).append(project)
+            # Parent directories and interrupted checkout directories are not
+            # fetched projects. Repo worktrees have a .git file/link/directory.
+            git_marker = path / ".git"
+            (present if git_marker.exists() or git_marker.is_symlink() else missing).append(project)
         if present:
             verify_checkout(source, manifest, clean=True, selected=present)
         to_sync = missing
@@ -211,7 +310,20 @@ def compile_original_vold(
         raise BuildError("baseline source directory is missing or unsafe")
     source = source.resolve(strict=True)
     verify_checkout(source, manifest, clean=True, selected=selected)
+    verify_source_workspace(source, manifest, selected)
+    release_config = source / lock["build"]["release_config"]["path"]
+    if (
+        release_config.is_symlink() or not release_config.is_file()
+        or hashlib.sha256(release_config.read_bytes()).hexdigest()
+        != lock["build"]["release_config"]["sha256"]
+    ):
+        raise BuildError("pinned LineageOS release configuration is missing or changed")
     artifact = source / lock["build"]["artifact"]
+    for parent in artifact.parents:
+        if parent == source:
+            break
+        if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+            raise BuildError("Android vold output directory is unsafe")
     if artifact.is_symlink():
         raise BuildError("Android vold build artifact cannot be a symbolic link")
     # An earlier trial must not be mistaken for the current compiler result.
@@ -219,12 +331,34 @@ def compile_original_vold(
         if not artifact.is_file():
             raise BuildError("unexpected prior vold output type")
         artifact.unlink()
+    # At this pinned revision, lunch requires product/release/variant and also
+    # invokes roomservice, which can fetch unselected sources. Its unchanged
+    # _lunch_meat helper performs the same configuration without roomservice.
+    # Kernel auto-construction is outside this individual target's scope.
     script = (
-        "source build/envsetup.sh && "
-        f"lunch {lock['build']['target']} && "
+        "source build/envsetup.sh || exit $?; "
+        "function build_kernel() { echo 'Automatic kernel builds are outside the pinned vold probe' >&2; exit 1; }; "
+        f"check_product {lock['build']['product']} {lock['build']['release']} && "
+        f"{lock['build']['setup_command']} && "
         f"m -j{jobs} vold"
     )
-    command(["bash", "-euc", script], source)
+    environment = os.environ.copy()
+    for variable in ("SOONG_ALLOW_MISSING_DEPENDENCIES", "ALLOW_MISSING_DEPENDENCIES"):
+        if environment.get(variable, "").lower() not in ("", "false", "0"):
+            raise BuildError(f"missing-dependency bypass must be disabled: {variable}")
+        environment.pop(variable, None)
+    # An inherited runner output override must not reuse another build tree.
+    for variable in ("OUT_DIR_COMMON_BASE", "ANDROID_PRODUCT_OUT", "ANDROID_BUILD_TOP", "TOP", "BASH_ENV"):
+        environment.pop(variable, None)
+    environment["OUT_DIR"] = "out"
+    environment["USE_LEFTOVERS"] = "0"
+    environment["ROOMSERVICE_DRYRUN"] = "true"
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    # Upstream envsetup intentionally reads unset optional variables; nounset
+    # would fail before configuration (for example at USE_LEFTOVERS).
+    command(["bash", "-ec", script], source, env=environment)
+    verify_checkout(source, manifest, clean=True, selected=selected)
+    verify_source_workspace(source, manifest, selected)
     if artifact.is_symlink() or not artifact.is_file() or not artifact.stat().st_mode & 0o111:
         raise BuildError("source build did not produce a regular executable vold")
     return artifact
@@ -244,6 +378,9 @@ def build_baseline(
     artifact = compile_original_vold(source, lock, manifest, jobs, selected)
     built = read_vold(artifact)
     report = comparison(official, built, lock)
+    report["build_release"] = lock["build"]["release"]
+    report["build_setup_command"] = lock["build"]["setup_command"]
+    report["release_config_sha256"] = lock["build"]["release_config"]["sha256"]
     if selected is not None:
         report["selected_source_projects"] = len(selected)
         report["selected_source_paths_sha256"] = hashlib.sha256(
@@ -260,11 +397,12 @@ def build_baseline(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
-    for name in ("sync", "probe", "compare"):
+    for name in ("sync", "sync-vendor-sources", "probe", "compare"):
         opt = sub.add_parser(name)
         opt.add_argument("--source-root", type=Path, required=True)
         opt.add_argument("--jobs", type=int, default=4)
-        opt.add_argument("--projects-file", type=Path, help="optional validated subset plan; never weakens the binary equality gate")
+        if name != "sync-vendor-sources":
+            opt.add_argument("--projects-file", type=Path, help="optional validated subset plan; never weakens the binary equality gate")
         if name == "sync":
             opt.add_argument("--resume", action="store_true", help="fetch missing approved projects within the same checkout")
         if name == "compare":
@@ -275,8 +413,13 @@ def main() -> int:
         parser.error("--jobs must be between 1 and 16")
     try:
         lock, manifest = load_contract()
-        selected = verified_selection(args.projects_file, manifest)
-        if args.mode == "sync":
+        selected = verified_selection(getattr(args, "projects_file", None), manifest)
+        if args.mode == "sync-vendor-sources":
+            # Diagnose the known proprietary-input gate before downloading the
+            # large compiler/toolchain checkout. This fixed set is not a build
+            # selection and never authorizes compiling or qualifying a binary.
+            sync(args.source_root, lock, manifest, args.jobs, list(VENDOR_PREREQUISITE_PROJECTS))
+        elif args.mode == "sync":
             if args.resume and selected is None:
                 raise BuildError("full-manifest checkout does not support incremental resume")
             sync(args.source_root, lock, manifest, args.jobs, selected, args.resume)

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import contextlib
+import io
 from pathlib import Path
 import sys
 import tempfile
@@ -21,18 +23,22 @@ class VoldSourceClosureTest(unittest.TestCase):
         self.seed, self.manifest, self.baseline = closure.verified_contract()
         self.initial = closure.initial_projects(self.seed)
 
-    def test_pinned_70_project_bootstrap_is_strictly_smaller_than_full_manifest(self):
+    def test_pinned_84_project_bootstrap_is_strictly_smaller_than_full_manifest(self):
         self.assertEqual(len(self.manifest), 1243)
         # The official manifest omits path= for dozens of AOSP projects.
         self.assertIn("device/common", self.manifest)
         self.assertIn("toolchain/pgo-profiles", self.manifest)
-        self.assertEqual(len(self.initial), 70)
+        self.assertEqual(len(self.initial), 84)
         self.assertEqual(len(self.initial), len(set(self.initial)))
         self.assertTrue({"system/vold", "build/soong", "frameworks/base", "device/sony/pdx235"}.issubset(self.initial))
         self.assertTrue(set(self.initial).issubset(self.manifest))
         self.assertEqual(self.seed["manifest_sha256"], self.baseline["manifest"]["sha256"])
         self.assertIn("vendor/sony/pdx235/pdx235-vendor.mk", self.seed["known_unpinned_vendor_inputs"])
         self.assertNotIn("vendor/sony/pdx235", self.manifest)
+        self.assertEqual(self.seed["direct_module_to_project_hints"]["libbase"], "system/libbase")
+        self.assertEqual(self.seed["direct_module_to_project_hints"]["libgsi"], "system/gsid")
+        self.assertEqual(self.seed["direct_module_to_project_hints"]["libhardware_legacy"], "hardware/libhardware_legacy")
+        self.assertTrue({"external/rust/cxx", "external/rust/android-crates-io", "system/tools/aidl"}.issubset(self.initial))
 
     def test_invalid_or_unpinned_expansions_fail_closed(self):
         correct = closure.selection_record(self.initial, self.seed)
@@ -42,6 +48,7 @@ class VoldSourceClosureTest(unittest.TestCase):
             lambda x: x.update(selected_projects=["system/vold"]),
             lambda x: x.update(selected_projects=x["selected_projects"] + ["vendor/sony/pdx235"]),
             lambda x: x.update(selected_projects=x["selected_projects"] * 2),
+            lambda x: x.update(selected_projects=[[]]),
         ]:
             selection = dict(correct)
             mutate(selection)
@@ -59,9 +66,43 @@ class VoldSourceClosureTest(unittest.TestCase):
         self.assertIn("system/update_engine", report["proposed_project_additions"])
         self.assertIn("vendor/sony/pdx235/pdx235-vendor.mk", report["unpinned_missing_paths"])
         self.assertIn("unsupported_vendor_blob", report["modules_without_verified_owner"])
+        self.assertNotIn("vold", report["modules_observed"], "the requesting module is not the missing provider")
         self.assertNotIn("vendor/sony/pdx235", report["proposed_project_additions"])
         self.assertEqual(closure.owner("system/fs/fs_mgr/fs_mgr/Android.bp", self.manifest), "system/fs/fs_mgr")
         self.assertIsNone(closure.owner("vendor/sony/pdx235/pdx235-vendor.mk", self.manifest))
+
+    def test_real_soong_diagnostics_do_not_mistake_requesters_for_missing_modules(self):
+        hint_seed = {**self.seed, "direct_module_to_project_hints": {"libupdate": "system/update_engine"}}
+        for log in (
+            'error: module "vold" depends on undefined module "libupdate".',
+            'error: module "vold" variant "android_arm64" depends on undefined module "libupdate".',
+            'error: module "libupdate" is missing',
+            'error: module "vold" missing dependencies: libupdate',
+        ):
+            with self.subTest(log=log):
+                report = closure.missing_dependencies(log, self.initial, self.manifest, hint_seed)
+                self.assertEqual(report["modules_observed"], ["libupdate"])
+                self.assertEqual(report["modules_without_verified_owner"], [])
+                self.assertEqual(report["proposed_project_additions"], ["system/update_engine"])
+                self.assertIsNotNone(closure.next_projects_after_diagnostic(self.initial, report, hint_seed))
+        report = closure.missing_dependencies(
+            'error: module "vold" missing dependencies: [libupdate, unknown_generator]',
+            self.initial, self.manifest, hint_seed,
+        )
+        self.assertEqual(report["modules_without_verified_owner"], ["unknown_generator"])
+        self.assertIsNone(closure.next_projects_after_diagnostic(self.initial, report, hint_seed))
+
+    def test_unmappable_errors_and_non_sony_vendor_inputs_remain_diagnostic(self):
+        report = closure.missing_dependencies(
+            'error: vendor/private/required.mk missing\n'
+            'error: module "vold" depends on undefined module "libbase"\n'
+            'error: product configuration could not be evaluated\n',
+            self.initial, self.manifest, self.seed,
+        )
+        self.assertEqual(report["unpinned_missing_paths"], ["vendor/private/required.mk"])
+        self.assertEqual(report["modules_with_selected_owner"], ["libbase"])
+        self.assertIn('error: product configuration could not be evaluated', report["unmapped_error_lines"])
+        self.assertIsNone(closure.next_projects_after_diagnostic(self.initial, report, self.seed))
 
     def test_expand_only_when_all_missing_inputs_have_pinned_owners(self):
         good = {
@@ -105,6 +146,67 @@ class VoldSourceClosureTest(unittest.TestCase):
             self.assertTrue({"libcrypto", "libbase", "libdm"}.issubset(report["unresolved_module_names"]))
             self.assertNotIn("vold_aidl", report["unresolved_module_names"])
 
+    def test_static_index_preserves_generated_dependencies_and_ignores_comments_and_file_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bp = root / "system/vold/Android.bp"
+            bp.parent.mkdir(parents=True)
+            bp.write_text(
+                '/* cc_binary { name: "vold", static_libs: ["commented"], } */\n'
+                'cc_binary {\n name: "vold",\n generated_sources: ["generated_cpp"],\n'
+                'srcs: [":tagged_sources{.cpp}", "literal.cpp"],\n'
+                'tools: ["compiler"], tool_files: ["script.py", ":tool_sources"],\n'
+                'static_libs: ["flags", "rust_bridge"], // closing brace in a comment }\n'
+                '}\n'
+                'cc_aconfig_library { name: "flags", aconfig_declarations: "flag_declarations", }\n'
+                'rust_ffi_static { name: "rust_bridge", rustlibs: ["librust"], proc_macros: ["libmacro"], }\n'
+                'filegroup { name: "tagged_sources", srcs: ["source.cpp"], }\n'
+                'filegroup { name: "tool_sources", srcs: ["tool.py"], }\n'
+            )
+            report = closure.blueprint_module_graph(root, ["system", "system/vold"])
+            self.assertEqual(report["scanned_android_bp_files"], 1, "overlapping projects must not duplicate modules")
+            self.assertEqual(report["ambiguous_module_names"], [])
+            self.assertEqual(report["unresolved_module_names"], ["compiler", "flag_declarations", "generated_cpp", "libmacro", "librust"])
+            self.assertEqual(
+                closure.without_blueprint_comments('url: "https://example/path", // erased\n'),
+                'url: "https://example/path",          \n',
+            )
+
+    def test_static_expansion_uses_only_reviewed_hints_and_retains_unknown_names(self):
+        hint_seed = {**self.seed, "direct_module_to_project_hints": {
+            "known_generator": "system/update_engine", "libvold": "system/vold",
+        }}
+        report = {"unresolved_module_names": ["known_generator", "unknown_conditional", "libvold"]}
+        expansion = closure.next_projects_after_index(self.initial, report, hint_seed)
+        self.assertEqual(expansion["selected_projects"], sorted(self.initial + ["system/update_engine"]))
+        self.assertEqual(report["proposed_project_additions"], ["system/update_engine"])
+        self.assertEqual(report["modules_without_verified_owner"], ["unknown_conditional"])
+        self.assertIsNone(closure.next_projects_after_index(expansion["selected_projects"], report, hint_seed))
+        too_many = {**hint_seed, "direct_module_to_project_hints": {f"m{i}": f"project{i}" for i in range(31)}}
+        with self.assertRaises(closure.ClosureError):
+            closure.next_projects_after_index([], {"unresolved_module_names": list(too_many["direct_module_to_project_hints"])}, too_many)
+
+    def test_index_cli_emits_reviewed_next_selection_before_build(self):
+        hint_seed = {**self.seed, "direct_module_to_project_hints": {"known_generator": "system/update_engine"}}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            bp = source / "system/vold/Android.bp"
+            bp.parent.mkdir(parents=True)
+            bp.write_text('cc_binary { name: "vold", generated_sources: ["known_generator", "unknown"], }\n')
+            selection, output, next_selection = (root / name for name in ("selection.json", "index.json", "next.json"))
+            selection.write_text(json.dumps(closure.selection_record(self.initial, hint_seed)))
+            with (
+                patch.object(closure, "verified_contract", return_value=(hint_seed, self.manifest, self.baseline)),
+                patch.object(sys, "argv", ["closure", "index", "--source-root", str(source),
+                                         "--selection", str(selection), "--output", str(output),
+                                         "--next-selection", str(next_selection)]),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(closure.main(), 0)
+            self.assertIn("system/update_engine", closure.validate_selection(json.loads(next_selection.read_text()), self.manifest, hint_seed))
+            self.assertEqual(json.loads(output.read_text())["modules_without_verified_owner"], ["unknown"])
+
     def test_incremental_sync_reuses_checkout_and_syncs_only_pinned_projects(self):
         manifest_bytes = (ROOT / self.baseline["manifest"]["path"]).read_bytes()
         source_ref = self.baseline["projects"]["manifest"]["revision"]
@@ -119,12 +221,11 @@ class VoldSourceClosureTest(unittest.TestCase):
                     (repo_dir / "manifests").mkdir(parents=True)
                     (repo_dir / "manifest.xml").write_text("prior default")
                 if argv[1] == "init" and "-m" in argv:
-                    (repo_dir / "manifest.xml").write_bytes(
-                        (repo_dir / "manifests" / argv[-1]).read_bytes()
-                    )
+                    (repo_dir / "manifest.xml").write_text(f'<manifest><include name="{argv[-1]}" /></manifest>')
                 if argv[1] == "sync":
                     for project in argv[4:]:
                         (cwd / project).mkdir(parents=True, exist_ok=True)
+                        (cwd / project / ".git").mkdir(exist_ok=True)
 
             with (
                 patch.object(original.shutil, "which", return_value="/usr/bin/repo"),
@@ -185,7 +286,8 @@ class VoldSourceClosureTest(unittest.TestCase):
         for source in (script, workflow, builder):
             self.assertNotIn("git apply", source)
             self.assertNotIn("force-publish", source)
-            self.assertNotIn("SOONG_ALLOW_MISSING_DEPENDENCIES", source)
+            self.assertNotIn("SOONG_ALLOW_MISSING_DEPENDENCIES=true", source)
+            self.assertNotIn("ALLOW_MISSING_DEPENDENCIES=true", source)
             self.assertNotIn("publish: true", source)
 
 

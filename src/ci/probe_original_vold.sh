@@ -7,7 +7,6 @@ set -euo pipefail
 
 : "${VOLD_WORK:?isolated scratch workspace is required}"
 : "${VOLD_PROBE_STAGE:?probe or compare stage is required}"
-: "${VOLD_SOURCE_REF:?absolute original vold path is required for compare}"
 
 [[ "${VOLD_PROBE_STAGE}" == probe || "${VOLD_PROBE_STAGE}" == compare ]] || {
   echo 'Error: unsupported unmodified vold dependency stage' >&2
@@ -17,7 +16,7 @@ set -euo pipefail
   echo 'Error: isolated scratch directory is missing or unsafe' >&2
   exit 1
 }
-[[ "${VOLD_PROBE_STAGE}" != compare || ( -s "${VOLD_SOURCE_REF}" && ! -L "${VOLD_SOURCE_REF}" ) ]] || {
+[[ "${VOLD_PROBE_STAGE}" != compare || ( "${VOLD_SOURCE_REF:-}" == /* && -s "${VOLD_SOURCE_REF}" && ! -L "${VOLD_SOURCE_REF}" ) ]] || {
   echo 'Error: authenticated original vold reference is required' >&2
   exit 1
 }
@@ -29,16 +28,36 @@ jobs="${VOLD_PROBE_JOBS:-4}"
 
 selection="${VOLD_WORK}/source-selection.json"
 python3 src/ci/vold_source_closure.py plan --output "${selection}"
-python3 src/ci/build_original_vold.py sync \
-  --source-root "${VOLD_WORK}/source" --projects-file "${selection}" --jobs "${jobs}"
-
-# The pinned Sony public device trees reference proprietary vendor-generated
-# mk files absent from the source manifest. Generate ONLY makefile declarations
-# using their reviewed --regenerate_makefiles option. This does not download,
-# synthesize or validate vendor blobs; absent binaries remain build blockers.
+# Check the three small pinned public vendor-input projects BEFORE fetching
+# toolchains. At these revisions --regenerate_makefiles still reads absent
+# proprietary ELF files. The preflight records that blocker without generating
+# misleading partial declarations or downloading the rest of the source seed.
+python3 src/ci/build_original_vold.py sync-vendor-sources \
+  --source-root "${VOLD_WORK}/source" --jobs "${jobs}"
 python3 src/ci/prepare_vold_vendor_makefiles.py \
   --source-root "${VOLD_WORK}/source" \
-  --report "${VOLD_WORK}/sony-generated-makefiles-report.json"
+  --report "${VOLD_WORK}/sony-vendor-input-report.json"
+
+python3 src/ci/build_original_vold.py sync --resume \
+  --source-root "${VOLD_WORK}/source" --projects-file "${selection}" --jobs "${jobs}"
+
+# Batch reviewed provider hints from the checked-out Blueprint graph before
+# compiling. Unknown or conditional modules remain diagnostics for real Soong;
+# they are never mapped to guessed repositories. Stop after three scans.
+for scan in 1 2 3; do
+  next="${VOLD_WORK}/selection-static-next.json"
+  rm -f -- "${next}"
+  python3 src/ci/vold_source_closure.py index \
+    --source-root "${VOLD_WORK}/source" --selection "${selection}" \
+    --output "${VOLD_WORK}/source-index-static-${scan}.json" \
+    --next-selection "${next}"
+  if [[ ! -f "${next}" ]]; then
+    break
+  fi
+  mv -- "${next}" "${selection}"
+  python3 src/ci/build_original_vold.py sync --resume \
+    --source-root "${VOLD_WORK}/source" --projects-file "${selection}" --jobs "${jobs}"
+done
 
 # Most missing dependencies are reported during Soong setup before the
 # expensive target compile. Resolve their exact pinned project paths once
@@ -46,12 +65,6 @@ python3 src/ci/prepare_vold_vendor_makefiles.py \
 # Unknown module providers must stop for review; never turn on missing
 # dependency flags or attempt an unverified project URL.
 for iteration in 1 2 3; do
-  python3 src/ci/vold_source_closure.py index \
-    --source-root "${VOLD_WORK}/source" \
-    --selection "${selection}" \
-    --output "${VOLD_WORK}/source-index-${iteration}.json" ||
-      echo "::warning::Partial Soong index could not be collected on pass ${iteration}"
-
   log="${VOLD_WORK}/vold-build-pass-${iteration}.log"
   if [[ "${VOLD_PROBE_STAGE}" == probe ]]; then
     build_cmd=(python3 src/ci/build_original_vold.py probe

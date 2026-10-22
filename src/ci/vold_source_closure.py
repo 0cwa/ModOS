@@ -32,9 +32,10 @@ MISSING_MODULE = re.compile(
     re.I,
 )
 QUOTED_MODULE = re.compile(
-    r'(?:module|dependency)\s+["\x27]([A-Za-z0-9_.+@-]+)["\x27].{0,140}'
-    r'(?:missing|undefined|not found)', re.I,
+    r'(?:module|dependency)\s+["\x27]([A-Za-z0-9_.+@-]+)["\x27]'
+    r'\s+(?:(?:is|was)\s+)?(?:missing(?!\s+dependenc(?:y|ies))|undefined|not found)\b', re.I,
 )
+MISSING_DEPENDENCIES = re.compile(r"\bmissing dependencies:\s*(.*)$", re.I)
 ERROR_MARKERS = ("error:", "not found", "no such file", "missing", "undefined", "cannot find")
 BLUEPRINT_BLOCK = re.compile(r"(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*\{")
 BLUEPRINT_NAME = re.compile(r'\bname\s*:\s*"([^"]+)"')
@@ -44,8 +45,13 @@ BP_DEP_FIELDS = {
     "defaults", "static_libs", "shared_libs", "whole_static_libs",
     "header_libs", "export_header_lib_headers", "export_shared_lib_headers",
     "export_static_lib_headers", "required", "vintf_fragment_modules",
-    "generated_headers", "tools", "tool_files",
+    "generated_headers", "generated_sources", "export_generated_headers",
+    "tools", "runtime_libs", "host_required", "target_required",
+    "rustlibs", "rlibs", "dylibs", "proc_macros",
 }
+BP_MODULE_REFERENCE_FIELDS = {"srcs", "exclude_srcs", "tool_files", "data"}
+BP_SINGLE_MODULE_FIELDS = {"aconfig_declarations"}
+BP_STRING = re.compile(r'\b([a-z_]+)\s*:\s*"((?:[^"\\]|\\.)*)"')
 
 
 class ClosureError(ValueError):
@@ -75,6 +81,7 @@ def verified_contract() -> tuple[dict, dict[str, str], dict]:
         if (
             not path
             or not re.fullmatch(r"[A-Za-z0-9_.+-]+(?:/[A-Za-z0-9_.+-]+)*", path)
+            or any(part in (".", "..") for part in path.split("/"))
             or not revision
             or not re.fullmatch(r"[0-9a-f]{40}", revision)
         ):
@@ -116,9 +123,7 @@ def validate_selection(selection: dict, projects: dict[str, str], seed: dict) ->
     paths = selection.get("selected_projects")
     if not isinstance(paths, list) or not paths or len(paths) > len(projects):
         raise ClosureError("dependency selection contains an invalid project list")
-    if len(paths) != len(set(paths)) or any(
-        not isinstance(path, str) or path not in projects for path in paths
-    ):
+    if any(not isinstance(path, str) or path not in projects for path in paths) or len(paths) != len(set(paths)):
         raise ClosureError("dependency selection contains unknown, unpinned or duplicate projects")
     if not set(initial_projects(seed)).issubset(paths):
         raise ClosureError("dependency selection may not omit reviewed seed projects")
@@ -149,20 +154,31 @@ def missing_dependencies(
     unpinned: set[str] = set()
     unresolved_modules: set[str] = set()
     modules: set[str] = set()
+    unmapped_errors: list[str] = []
     hints = seed["direct_module_to_project_hints"]
     for line in text.splitlines():
         low = line.lower()
         if not any(token in low for token in ERROR_MARKERS):
             continue
+        line_modules = set()
         for pattern in (MISSING_MODULE, QUOTED_MODULE):
-            modules.update(pattern.findall(line))
+            line_modules.update(pattern.findall(line))
+        missing_list = MISSING_DEPENDENCIES.search(line)
+        if missing_list:
+            line_modules.update(re.findall(r"[A-Za-z0-9_.+@-]+", missing_list[1]))
+        modules.update(line_modules)
+        actionable_path = False
         for match in PATH_IN_LOG.finditer(line):
             path = match[1]
             project = owner(path, projects)
             if project is not None and project not in selected:
                 pinned_missing.add(project)
-            elif project is None and path.startswith(("vendor/sony/", "device/sony/")):
+                actionable_path = True
+            elif project is None and path.startswith(("vendor/", "device/")):
                 unpinned.add(path)
+                actionable_path = True
+        if not line_modules and not actionable_path and len(unmapped_errors) < 100:
+            unmapped_errors.append(line[:1000])
     for module in modules:
         mapped = hints.get(module)
         if mapped is None:
@@ -174,12 +190,30 @@ def missing_dependencies(
         "unpinned_missing_paths": sorted(unpinned),
         "modules_without_verified_owner": sorted(unresolved_modules),
         "modules_observed": sorted(modules),
+        "modules_with_selected_owner": sorted(module for module in modules if hints.get(module) in selected),
+        "unmapped_error_lines": unmapped_errors,
         "statically_unpinned_vendor_inputs": seed["known_unpinned_vendor_inputs"],
     }
 
 
+def without_blueprint_comments(raw: str) -> str:
+    """Erase comments without interpreting comment markers inside quoted strings."""
+    return re.sub(
+        r'"(?:[^"\\]|\\.)*"|//[^\n]*|/\*.*?\*/',
+        lambda match: match[0] if match[0].startswith('"') else re.sub(r"[^\n]", " ", match[0]),
+        raw,
+        flags=re.S,
+    )
+
+
+def module_reference(value: str) -> str:
+    """Normalize an explicit :module{.output_tag}, not an arbitrary source path."""
+    return re.sub(r"\{[^{}]+\}$", "", value.removeprefix(":"))
+
+
 def iter_blueprint_blocks(raw: str):
     """Extract balanced module declarations, without assuming nested blocks are flat."""
+    raw = without_blueprint_comments(raw)
     for candidate in BLUEPRINT_BLOCK.finditer(raw):
         start = candidate.end()
         depth = 1
@@ -220,6 +254,7 @@ def blueprint_module_graph(source_root: Path, selected: list[str]) -> dict:
     source_root = source_root.resolve(strict=True)
     found: dict[str, list[dict]] = {}
     count_files = 0
+    scanned = set()
     for project in selected:
         directory = source_root / project
         if directory.is_symlink() or not directory.is_dir():
@@ -227,6 +262,9 @@ def blueprint_module_graph(source_root: Path, selected: list[str]) -> dict:
         for bp in directory.rglob("Android.bp"):
             if bp.is_symlink() or not bp.is_file() or bp.stat().st_size > 4_000_000:
                 continue
+            if bp in scanned:
+                continue
+            scanned.add(bp)
             count_files += 1
             if count_files > 12000:
                 raise ClosureError("source contains unexpectedly many Blueprint files")
@@ -238,9 +276,12 @@ def blueprint_module_graph(source_root: Path, selected: list[str]) -> dict:
                 deps = set()
                 for field, values in BP_ARRAY.findall(body):
                     if field in BP_DEP_FIELDS:
-                        deps.update(x.lstrip(":") for x in BP_ITEM.findall(values))
-                    if field in ("srcs", "generated_sources"):
-                        deps.update(x[1:] for x in BP_ITEM.findall(values) if x.startswith(":"))
+                        deps.update(module_reference(x) for x in BP_ITEM.findall(values))
+                    if field in BP_MODULE_REFERENCE_FIELDS:
+                        deps.update(module_reference(x) for x in BP_ITEM.findall(values) if x.startswith(":"))
+                for field, value in BP_STRING.findall(body):
+                    if field in BP_SINGLE_MODULE_FIELDS:
+                        deps.add(module_reference(value))
                 found.setdefault(name, []).append({
                     "path": bp.relative_to(source_root).as_posix(),
                     "deps": sorted(deps),
@@ -269,8 +310,26 @@ def blueprint_module_graph(source_root: Path, selected: list[str]) -> dict:
         "reachable_module_sample": sorted(reachable)[:160],
         "unresolved_module_names": sorted(unresolved),
         "ambiguous_module_names": sorted(ambiguous),
-        "warning": "Over-approximation: product-selected Soong modules, generated dependencies and missing unsynced module providers still need a real Soong evaluation.",
+        "warning": "Partial approximation with omissions and conditional false positives: variables, namespaces, product-selected modules and generated dependencies still need a real Soong evaluation.",
     }
+
+
+def next_projects_after_index(selected: list[str], report: dict, seed: dict) -> dict | None:
+    """Use reviewed provider hints only; unresolved static names are not build failures."""
+    hints = seed["direct_module_to_project_hints"]
+    additions = sorted({
+        hints[module] for module in report["unresolved_module_names"]
+        if module in hints and hints[module] not in selected
+    })
+    report["proposed_project_additions"] = additions
+    report["modules_without_verified_owner"] = sorted(
+        module for module in report["unresolved_module_names"] if module not in hints
+    )
+    if len(additions) > 30:
+        raise ClosureError("too many static additions: require independent review")
+    if not additions:
+        return None
+    return selection_record(sorted(set(selected + additions)), seed)
 
 
 def next_projects_after_diagnostic(
@@ -303,6 +362,7 @@ def main() -> int:
     cmd_index.add_argument("--selection", type=Path, required=True)
     cmd_index.add_argument("--source-root", type=Path, required=True)
     cmd_index.add_argument("--output", type=Path, required=True)
+    cmd_index.add_argument("--next-selection", type=Path)
     cmd_diag = sub.add_parser("diagnose", help="map build errors to additional pinned paths")
     cmd_diag.add_argument("--selection", type=Path, required=True)
     cmd_diag.add_argument("--log", type=Path, required=True)
@@ -325,6 +385,11 @@ def main() -> int:
             selected = validate_selection(json.loads(args.selection.read_text()), projects, seed)
             if args.action == "index":
                 report = blueprint_module_graph(args.source_root, selected)
+                expansion = next_projects_after_index(selected, report, seed)
+                if args.next_selection is not None:
+                    if expansion is not None:
+                        write_json(args.next_selection, expansion)
+                    report["next_selection"] = str(args.next_selection) if expansion is not None else None
             else:
                 report = missing_dependencies(args.log.read_text(errors="replace"), selected, projects, seed)
                 if args.next_selection is not None:
