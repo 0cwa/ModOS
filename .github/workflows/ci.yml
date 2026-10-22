@@ -99,6 +99,9 @@ jobs:
       - name: Test exfatprogs image metadata diagnostics
         run: python3 tests/exfat_adapter_metadata_test.py
 
+      - name: Test unmodified original vold CI-only baseline
+        run: python3 tests/vold_baseline_ci_test.py
+
       - name: Test pdx235 Custota metadata preparation
         run: bash tests/pdx235_custota_metadata_test.sh
 
