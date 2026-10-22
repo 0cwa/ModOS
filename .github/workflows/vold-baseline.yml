@@ -154,10 +154,10 @@ jobs:
         shell: bash
         env:
           VOLD_PROBE_STAGE: ${{ inputs.mode }}
-          VOLD_SOURCE_REF: ${{ env.VOLD_WORK }}/reference/original-vold
           VOLD_PROBE_JOBS: '4'
         run: |
           set -euo pipefail
+          export VOLD_SOURCE_REF="${VOLD_WORK}/reference/original-vold"
           bash src/ci/probe_original_vold.sh
 
       - name: Upload only small dependency diagnostics or comparison receipt
