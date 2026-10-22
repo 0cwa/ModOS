@@ -21,9 +21,9 @@ class VoldSourceClosureTest(unittest.TestCase):
         self.seed, self.manifest, self.baseline = closure.verified_contract()
         self.initial = closure.initial_projects(self.seed)
 
-    def test_pinned_67_project_bootstrap_is_strictly_smaller_than_full_manifest(self):
+    def test_pinned_70_project_bootstrap_is_strictly_smaller_than_full_manifest(self):
         self.assertEqual(len(self.manifest), 1243)
-        self.assertEqual(len(self.initial), 67)
+        self.assertEqual(len(self.initial), 70)
         self.assertEqual(len(self.initial), len(set(self.initial)))
         self.assertTrue({"system/vold", "build/soong", "frameworks/base", "device/sony/pdx235"}.issubset(self.initial))
         self.assertTrue(set(self.initial).issubset(self.manifest))
@@ -48,12 +48,12 @@ class VoldSourceClosureTest(unittest.TestCase):
     def test_diagnostics_identify_pinned_source_vs_unpinned_vendor(self):
         log = (
             'error: module "vold" depends on undefined module "fuseMedia.bpf"\n'
-            'error: source file system/bpf/fuse_media.c: No such file or directory\n'
+            'error: source file system/update_engine/Android.bp: No such file or directory\n'
             'error: vendor/sony/pdx235/pdx235-vendor.mk missing\n'
             'error: module "vold" depends on undefined module "unsupported_vendor_blob"\n'
         )
         report = closure.missing_dependencies(log, self.initial, self.manifest, self.seed)
-        self.assertIn("system/bpf", report["proposed_project_additions"])
+        self.assertIn("system/update_engine", report["proposed_project_additions"])
         self.assertIn("vendor/sony/pdx235/pdx235-vendor.mk", report["unpinned_missing_paths"])
         self.assertIn("unsupported_vendor_blob", report["modules_without_verified_owner"])
         self.assertNotIn("vendor/sony/pdx235", report["proposed_project_additions"])
@@ -107,11 +107,11 @@ class VoldSourceClosureTest(unittest.TestCase):
                 self.assertEqual(log[-1][-len(self.initial):], self.initial)
                 self.assertIn(source_ref, log[0])
                 log.clear()
-                more = sorted(set(self.initial) | {"system/bpf"})
+                more = sorted(set(self.initial) | {"system/update_engine"})
                 original.sync(source, self.baseline, manifest_bytes, 2, more, resume=True)
                 self.assertEqual(len(log), 1)
                 self.assertEqual(log[0][1], "sync")
-                self.assertIn("system/bpf", log[0])
+                self.assertIn("system/update_engine", log[0])
 
     def test_selections_are_checked_against_unchanged_manifest(self):
         raw = (ROOT / self.baseline["manifest"]["path"]).read_bytes()
@@ -143,7 +143,7 @@ class VoldSourceClosureTest(unittest.TestCase):
         script = (ROOT / "src/ci/probe_original_vold.sh").read_text()
         workflow = (ROOT / ".github/workflows/vold-baseline.yml").read_text()
         builder = (ROOT / "src/ci/build_original_vold.py").read_text()
-        self.assertIn("repo" if False else "sync --resume", script)
+        self.assertIn("sync --resume", script)
         self.assertIn("for iteration in 1 2 3", script)
         self.assertIn("vold_source_closure.py diagnose", script)
         self.assertIn("dependency_plan:", workflow)
