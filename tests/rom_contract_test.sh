@@ -163,7 +163,11 @@ test_selection_fingerprint() (
 
   fingerprint_input="${TEST_ROOT}/fingerprint-input-${BASHPID}"
   sha256sum() {
-    tee "${fingerprint_input}" | command sha256sum
+    if (($#)); then
+      command sha256sum "$@"
+    else
+      tee "${fingerprint_input}" | command sha256sum
+    fi
   }
   module_selection_fingerprint >/dev/null
   unset -f sha256sum
@@ -268,6 +272,115 @@ PY
     fail "dark boot-animation payload did not change the fingerprint"
 )
 
+test_executable_lock_is_required_and_fingerprinted() (
+  local fixture_repo="${TEST_ROOT}/executable-lock-contract"
+  local baseline updated
+
+  load_contract
+  set_selection_fixture
+  mkdir -p "${fixture_repo}/locks"
+  cp locks/executable-tools-v1.json "${fixture_repo}/locks/"
+  git -C "${fixture_repo}" init -q
+  git -C "${fixture_repo}" config user.email fixture@example.invalid
+  git -C "${fixture_repo}" config user.name fixture
+  git -C "${fixture_repo}" add locks/executable-tools-v1.json
+  git -C "${fixture_repo}" commit -q -m 'Original executable lock'
+  cd "${fixture_repo}"
+
+  baseline="$(fingerprint)"
+  assert_equals "${baseline}" "$(fingerprint)" \
+    "unchanged committed executable lock"
+  module_selection_fingerprint >/dev/null
+  SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256=disabled
+  if selection_variant_fingerprint >/dev/null 2>&1; then
+    fail "executable lock digest was unexpectedly optional"
+  fi
+
+  # Model an executable payload update without changing modules or helper.
+  python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("locks/executable-tools-v1.json")
+lock = json.loads(path.read_text())
+lock["tools"][0]["sha256"] = "0" * 64
+path.write_text(json.dumps(lock, indent=2, sort_keys=True) + "\n")
+PY
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "dirty executable lock unexpectedly produced a fingerprint"
+  fi
+  git add locks/executable-tools-v1.json
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "staged executable lock unexpectedly produced a fingerprint"
+  fi
+  git commit -q -m 'Updated executable payload'
+  updated="$(fingerprint)"
+  [[ "${updated}" != "${baseline}" ]] ||
+    fail "committed executable lock update did not change the fingerprint"
+  module_selection_fingerprint >/dev/null
+  assert_equals "${updated}" "$(selection_variant_fingerprint)" \
+    "updated executable lock preserves build/preflight identity parity"
+
+  mv locks/executable-tools-v1.json "${TEST_ROOT}/saved-executable-lock.json"
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "missing executable lock unexpectedly produced a fingerprint"
+  fi
+  ln -s "${TEST_ROOT}/saved-executable-lock.json" locks/executable-tools-v1.json
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "symlink executable lock unexpectedly produced a fingerprint"
+  fi
+  rm locks/executable-tools-v1.json
+  mv "${TEST_ROOT}/saved-executable-lock.json" locks/executable-tools-v1.json
+  git rm -q --cached locks/executable-tools-v1.json
+  git commit -q -m 'Remove executable lock from fixture index'
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "untracked executable lock unexpectedly produced a fingerprint"
+  fi
+)
+
+test_selected_legacy_module_versions_are_fingerprinted() (
+  local module original baseline changed disabled invalid
+  local -a modules=(ALTERINSTALLER BCR CUSTOTA MSD OEMUNLOCKONBOOT)
+
+  load_contract
+  set_selection_fixture
+  baseline="$(fingerprint)"
+  for module in "${modules[@]}"; do
+    original="${VERSION[${module}]}"
+    VERSION[${module}]="${original}.1"
+    changed="$(fingerprint)"
+    [[ "${changed}" != "${baseline}" ]] ||
+      fail "enabled ${module} version update did not change the fingerprint"
+
+    unset 'VERSION['"${module}"']'
+    if module_selection_fingerprint >/dev/null 2>&1; then
+      fail "enabled ${module} accepted a missing version"
+    fi
+    for invalid in '' disabled '3/11' '3 11' $'3.11\ninjected=true'; do
+      VERSION[${module}]="${invalid}"
+      if module_selection_fingerprint >/dev/null 2>&1; then
+        fail "enabled ${module} accepted an invalid version"
+      fi
+    done
+
+    ADDITIONALS[${module}]=false
+    unset 'VERSION['"${module}"']'
+    disabled="$(fingerprint)"
+    VERSION[${module}]="${original}.1"
+    assert_equals "${disabled}" "$(fingerprint)" \
+      "disabled ${module} version must not affect selection"
+    module_selection_fingerprint >/dev/null
+    local version_field="SELECTION_MODULE_${module}_VERSION"
+    assert_equals disabled "${!version_field}" \
+      "disabled ${module} canonical version"
+
+    VERSION[${module}]="${original}"
+    ADDITIONALS[${module}]=true
+    assert_equals "${baseline}" "$(fingerprint)" \
+      "restored ${module} version must restore selection"
+  done
+)
+
 test_shizuku_selection_follows_supported_rom_profiles() (
   local profile family device
   local -a cases=(
@@ -280,7 +393,8 @@ test_shizuku_selection_follows_supported_rom_profiles() (
   load_contract
   set_selection_fixture
   _locked_input_digest() {
-    [[ "${1}" == "locks/shizuku-v13.6.0.json" ]] || return 1
+    [[ "${1}" == "locks/shizuku-v13.6.0.json" ||
+      "${1}" == "locks/executable-tools-v1.json" ]] || return 1
     printf '%064d\n' 0
   }
   ADDITIONALS[SHIZUKU]="true"
@@ -366,7 +480,7 @@ test_output_filename_contains_fingerprint() (
   full="$(fingerprint)"
 
   git() {
-    if [[ "${1:-}" == "rev-parse" ]]; then
+    if [[ "${1:-}" == "rev-parse" && "${2:-}" == "--short" ]]; then
       printf '%s\n' deadbee
     else
       command git "$@"
@@ -480,6 +594,8 @@ test_magisk_compatibility_defaults
 test_unknown_rom_fails_closed
 test_invalid_compatible_sepolicy_fails_closed
 test_selection_fingerprint
+test_executable_lock_is_required_and_fingerprinted
+test_selected_legacy_module_versions_are_fingerprinted
 test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted
 test_grapheneos_rejects_pdx235_fsck_modules
 test_output_filename_contains_fingerprint

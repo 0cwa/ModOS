@@ -188,10 +188,10 @@ expected = {
         ),
     },
     "avbroot": {
-        "version": "3.35.0",
-        "artifact": "avbroot-3.35.0-x86_64-unknown-linux-gnu.zip",
-        "archive_size": 4250535,
-        "archive_sha256": "bbc7f8b4df8d9e6d2162bf354ac9f06643b2f64247a6f345d71e963f645f58c5",
+        "version": "3.37.1",
+        "artifact": "avbroot-3.37.1-x86_64-unknown-linux-gnu.zip",
+        "archive_size": 4293699,
+        "archive_sha256": "ca8e1e02bc33f5569d5228f312ce1351d0244fecd2d2163cb5a3c1a283a6e4a3",
         "layout": {
             "LICENSE": "0644",
             "README.md": "0644",
@@ -207,22 +207,30 @@ expected = {
                 "sha256": "398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6",
             },
             "avbroot": {
-                "size": 10916976,
-                "sha256": "2539724e0add2b8f6d855b8311897d01a4c28e851d387551f130325f006fa614",
+                "size": 10974384,
+                "sha256": "6233bd83e9a3c85012cdb4c406ec72750dd51c26829369a1abe29ca2a99e6315",
             },
         },
         "url": (
             "https://github.com/chenxiaolong/avbroot/releases/download/"
-            "v3.35.0/avbroot-3.35.0-x86_64-unknown-linux-gnu.zip"
+            "v3.37.1/avbroot-3.37.1-x86_64-unknown-linux-gnu.zip"
         ),
     },
     "custota-tool": {
-        "version": "6.6",
-        "artifact": "custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
+        "version": "6.8",
+        "artifact": "custota-tool-6.8-x86_64-unknown-linux-gnu.zip",
+        "archive_size": 2421143,
+        "archive_sha256": "7c7e6cb64f3fe0993969813d26b4a66b7ea1689af47579e6543391a55ca40ecb",
         "layout": {"custota-tool": "0755"},
+        "members": {
+            "custota-tool": {
+                "size": 5644336,
+                "sha256": "2ec3f2f23cafd21137f380e1aaac120a08495f640d26cdffe90e17d43a75a49f",
+            },
+        },
         "url": (
             "https://github.com/chenxiaolong/Custota/releases/download/"
-            "v6.6/custota-tool-6.6-x86_64-unknown-linux-gnu.zip"
+            "v6.8/custota-tool-6.8-x86_64-unknown-linux-gnu.zip"
         ),
     },
 }
@@ -258,7 +266,7 @@ for tool in tools:
         raise SystemExit(f"{tool_id}: wrong architecture")
     if tool["artifact_name"] != pin["artifact"] or tool["url"] != pin["url"]:
         raise SystemExit(f"{tool_id}: wrong canonical artifact identity")
-    if tool_id == "avbroot":
+    if "archive_size" in pin:
         if tool["size"] != pin["archive_size"]:
             raise SystemExit(f"{tool_id}: wrong archive size")
         if tool["sha256"] != pin["archive_sha256"]:
@@ -301,7 +309,7 @@ for tool in tools:
             raise SystemExit(f"{tool_id}: member size must be positive")
         if not hash_re.fullmatch(member["sha256"]):
             raise SystemExit(f"{tool_id}: member SHA-256 is not canonical")
-        if tool_id == "avbroot":
+        if "members" in pin:
             expected_member = pin["members"].get(member["path"])
             if expected_member is None or member["size"] != expected_member["size"] or member["sha256"] != expected_member["sha256"]:
                 raise SystemExit(f"{tool_id}: wrong locked member integrity for {member['path']}")

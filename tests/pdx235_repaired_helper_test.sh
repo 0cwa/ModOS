@@ -4,7 +4,7 @@ set -euo pipefail
 source src/declarations.sh
 source src/rom_profiles.sh
 reject() { if "$@"; then echo "Unexpected acceptance: $*" >&2; exit 1; fi; }
-repair=d6eccab076ba48889c2279ce7c88e43261cbd1f0
+repair=b553f46a9b94fff3960617830b6072b0f8b054b5
 previous_repair=abdede21c1b048e11700ec2789d0fb96ace0b0e4
 for mode in rootless both; do
   require_pdx235_repaired_helper lineageos pdx235 "${mode}" "${repair}"

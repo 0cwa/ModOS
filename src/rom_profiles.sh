@@ -220,6 +220,7 @@ function _boot_animation_payload_digest() {
 }
 
 function module_selection_fingerprint() {
+  local executable_tools_lock_digest
   local lock_digest="disabled"
   local profile_digest="disabled"
   local magisk_preinit="disabled"
@@ -233,7 +234,14 @@ function module_selection_fingerprint() {
   local exfatprogs_fsck_payload_digest="disabled"
   local exfatprogs_fsck_provenance_digest="disabled"
   local fsck_sysfs_sepolicy_adapter_digest="disabled"
-  local entry
+  local entry module
+  local -A legacy_module_versions=(
+    [ALTERINSTALLER]=disabled
+    [BCR]=disabled
+    [CUSTOTA]=disabled
+    [MSD]=disabled
+    [OEMUNLOCKONBOOT]=disabled
+  )
   local -a module_entries=(
     "afsr:AFSR"
     "alterinstaller:ALTERINSTALLER"
@@ -260,6 +268,16 @@ function module_selection_fingerprint() {
     _require_profile_boolean \
       "ADDITIONALS_${entry#*:}" \
       "${ADDITIONALS[${entry#*:}]}" || return 1
+  done
+
+  executable_tools_lock_digest="$(_locked_input_digest locks/executable-tools-v1.json)" || {
+    echo "Error: the executable-tools lock is not clean and checked in." >&2
+    return 1
+  }
+  for module in ALTERINSTALLER BCR CUSTOTA MSD OEMUNLOCKONBOOT; do
+    if [[ "${ADDITIONALS[${module}]}" == true ]]; then
+      legacy_module_versions[${module}]="${VERSION[${module}]:-}"
+    fi
   done
 
   if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]]; then
@@ -373,16 +391,22 @@ function module_selection_fingerprint() {
   SELECTION_COMPATIBLE_SEPOLICY="${ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]}"
   SELECTION_CLEAR_VBMETA_FLAGS="${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}"
   SELECTION_HELPER_COMMIT="${VERSION[AVBROOT_SETUP]}"
+  SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256="${executable_tools_lock_digest}"
   SELECTION_LOCK_SHA256="${lock_digest}"
   SELECTION_PROFILE_SHA256="${profile_digest}"
   SELECTION_MODULE_AFSR="${ADDITIONALS[AFSR]}"
   SELECTION_MODULE_ALTERINSTALLER="${ADDITIONALS[ALTERINSTALLER]}"
+  SELECTION_MODULE_ALTERINSTALLER_VERSION="${legacy_module_versions[ALTERINSTALLER]}"
   SELECTION_MODULE_BCR="${ADDITIONALS[BCR]}"
+  SELECTION_MODULE_BCR_VERSION="${legacy_module_versions[BCR]}"
   SELECTION_MODULE_CUSTOTA="${ADDITIONALS[CUSTOTA]}"
+  SELECTION_MODULE_CUSTOTA_VERSION="${legacy_module_versions[CUSTOTA]}"
   SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION="${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}"
   SELECTION_MODULE_MICROG="${ADDITIONALS[MICROG]}"
   SELECTION_MODULE_MSD="${ADDITIONALS[MSD]}"
+  SELECTION_MODULE_MSD_VERSION="${legacy_module_versions[MSD]}"
   SELECTION_MODULE_OEMUNLOCKONBOOT="${ADDITIONALS[OEMUNLOCKONBOOT]}"
+  SELECTION_MODULE_OEMUNLOCKONBOOT_VERSION="${legacy_module_versions[OEMUNLOCKONBOOT]}"
   SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
   SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
   SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"
