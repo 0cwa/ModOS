@@ -210,7 +210,7 @@ function selection_variant_manifest() {
     done
     policy_patcher_digest="$(
       {
-        printf '%s\n' 'build-host=ubuntu-24.04' 'rust-toolchain=1.99.1'
+        printf '%s\n' 'build-host=ubuntu-26.04' 'rust-toolchain=1.99.1'
         printf '%s\n' "${libclang_identity}"
         for value in "${policy_patcher_inputs[@]}"; do
           printf '%s ' "${value#"${policy_patcher_root}"/}"

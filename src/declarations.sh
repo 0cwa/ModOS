@@ -108,9 +108,9 @@ PIXENEOS_DEVELOPMENT_PROFILE="${PIXENEOS_DEVELOPMENT_PROFILE:-}"
 # Application version variables
 VERSION[ALTERINSTALLER]="${VERSION[ALTERINSTALLER]:-2.4}"
 VERSION[MICROG]="v0.3.17.252432" # reviewed helper lock; Renovate proposes releases
-VERSION[AVBROOT_SETUP]="d6eccab076ba48889c2279ce7c88e43261cbd1f0" # qualified source 3.35 with guarded DUMP access and microG native libraries
-VERSION[BCR]="${VERSION[BCR]:-3.9}"
-VERSION[CUSTOTA]="${VERSION[CUSTOTA]:-6.6}"
+VERSION[AVBROOT_SETUP]="ced3d5245d6a039cd72632cdf1c12aff30733ddf" # qualified source 3.37.1 with guarded DUMP access and microG native libraries
+VERSION[BCR]="${VERSION[BCR]:-3.11}"
+VERSION[CUSTOTA]="${VERSION[CUSTOTA]:-6.8}"
 VERSION[GRAPHENEOS]="${VERSION[GRAPHENEOS]:-}"
 VERSION[MAGISK]="${VERSION[MAGISK]:-}"
 VERSION[MSD]="${VERSION[MSD]:-2.5}"

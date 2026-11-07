@@ -350,3 +350,35 @@ expected-care-map verifier in the pdx235 development path. At the time of this
 October 15 qualification, publication review remained outstanding. Current
 policy permits verified official LineageOS 24.0 pdx235 nightlies; physical
 Android 17 acceptance remains a separate task.
+
+
+## Upstream tool and module qualification — November 7, 2026
+
+The official avbroot **3.37.1**, Custota module/host tool **6.8**, and BCR
+**3.11** artifacts adopted by PixeneOS upstream were downloaded from their
+exact release URLs and authenticated against the existing chenxiaolong SSH
+signer. The executable lock, validator policy, and independent archive/member
+regression fixture advance together. AFSR stays at 2.0.0 and the trust root is
+unchanged.
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| avbroot 3.37.1 Linux ZIP | 4,293,699 | `ca8e1e02bc33f5569d5228f312ce1351d0244fecd2d2163cb5a3c1a283a6e4a3` |
+| custota-tool 6.8 Linux ZIP | 2,421,143 | `7c7e6cb64f3fe0993969813d26b4a66b7ea1689af47579e6543391a55ca40ecb` |
+| Custota 6.8 module ZIP | 3,527,255 | `b583dce3e3dddb7535ba848e9806d2fababdbff63b1512b5da179999583a8e3f` |
+| BCR 3.11 module ZIP | 2,787,358 | `a5c8c2cf611891992c072d28cf85ec275da27a77b5dbf2408c6398d5bccee918` |
+
+The production bootstrap verified both host archives and executed the sealed
+binaries as `avbroot 3.37.1` and `custota-tool v6.8`. All 21 archive tests and
+13 bootstrap tests passed under the system Python, alongside the lock and tool
+routing tests. Custota metadata generation preserved the version-2 format and
+rejected malformed metadata. avbroot's required patch and verification CLI
+options remain available.
+
+The [qualification receipt](evidence/upstream-tools-20261107.json) records
+release URLs, detached-signature hashes, complete host layouts, helper-consumed
+module members, source comparison commits, and the test scope. Custota and BCR
+retain the helper's input paths and policy contracts. These checks qualify
+source/archive/host compatibility; they do not claim a full OTA build or physical
+device acceptance. The official avbroot executable continues to coexist with
+the separately qualified guarded source verifier.

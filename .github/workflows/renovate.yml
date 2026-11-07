@@ -29,8 +29,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Self-hosted Renovate
-        # Upstream currently names v46.2.6, but this fork keeps its reviewed
-        # immutable pin until the corresponding action artifact is verified.
+        # Match the upstream release while retaining an immutable action revision.
         uses: renovatebot/github-action@1c0cf989c02653fba0efe7ca5772338860ca71dc # v46.3.12
         with:
           configurationFile: .github/renovate.json5

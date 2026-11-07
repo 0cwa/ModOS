@@ -1772,7 +1772,7 @@ function extract_official_keys() {
   mkdir -p -- "${WORKDIR}/extracted" "${WORKDIR}/extracted/extracts" || return 1
   rm -f -- "${public_key}" || return 1
 
-  # The pinned avbroot 3.34.1 extracts only the root vbmeta header's key;
+  # avbroot's structured extractor returns only the root vbmeta header's key;
   # chained descriptors are never included. Retain the existing --all image
   # extraction for compatibility with downstream consumers.
   run_executable_tool avbroot ota extract \

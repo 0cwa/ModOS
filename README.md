@@ -187,7 +187,7 @@ Root changes the device security model and can introduce compatibility breakage 
 
 ModOS defaults to the official `topjohnwu/Magisk` repository. The source remains configurable through `MAGISK[REPOSITORY]` in `env.toml`, but alternate Magisk forks are opt-in rather than part of the GrapheneOS build contract. If you use Zygisk Next for GrapheneOS compatibility, install and manage it separately from the OTA build. Magisk/Zygisk behavior can change across releases, so rooted builds should be revalidated after ROM, Magisk, or Zygisk changes.
 
-ModOS currently pins **official Magisk v30.7** as its avbroot compatibility baseline. This mirrors the current rooted-GrapheneOS reference pairing with avbroot 3.34.1. avbroot 3.34.0 and newer explicitly recognize Magisk 31000, but parser/patch-format support is not the same as target-device runtime validation, so ModOS does not automatically advance to the highest Magisk tag. Override `MAGISK_VERSION` only for an intentional compatibility test.
+ModOS retains **official Magisk v30.7** as its reviewed runtime baseline. The avbroot executable is pinned separately in `locks/executable-tools-v1.json`. Advancing avbroot and its supported Magisk patch formats does not establish target-device runtime compatibility, so ModOS does not automatically advance to the highest Magisk tag. Override `MAGISK_VERSION` only for an intentional compatibility test.
 
 With avbroot, Magisk is not updated using the app's normal **Direct install** path. Magisk version changes must be made by repatching/re-signing the OTA and installing that OTA. The manager's **Additional setup / Environment fix** is a separate runtime-environment step and does not replace OTA repatching.
 
