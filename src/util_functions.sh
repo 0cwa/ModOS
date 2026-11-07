@@ -529,8 +529,8 @@ function build_exfatprogs_policy_patcher() {
   }
   rustc_version_number="${rustc_version#rustc }"
   rustc_version_number="${rustc_version_number%% *}"
-  if [[ "${rustc_version_number}" != '1.97.1' ]]; then
-    echo "Error: the exfatprogs policy patcher requires rustc 1.97.1; selected ${rustc_version_number:-unknown}." >&2
+  if [[ "${rustc_version_number}" != '1.99.1' ]]; then
+    echo "Error: the exfatprogs policy patcher requires rustc 1.99.1; selected ${rustc_version_number:-unknown}." >&2
     return 1
   fi
 

@@ -62,7 +62,7 @@ jobs:
         run: python3 src/ci/check_exfatprogs_artifact.py
 
       - name: Setup Rust for compiled SELinux policy patcher
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.97.1
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.99.1
         with:
           toolchain: 1.99.1
 
@@ -74,6 +74,13 @@ jobs:
 
       - name: Test compiled SELinux policy patcher
         run: cargo test --locked --manifest-path src/exfatprogs_sepolicy/Cargo.toml
+
+      - name: Build policy patcher through production toolchain guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          source src/util_functions.sh
+          build_exfatprogs_policy_patcher "${GITHUB_WORKSPACE}"
 
       - name: Verify exfatprogs lock with pinned module-tool
         shell: bash
