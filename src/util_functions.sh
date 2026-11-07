@@ -776,6 +776,12 @@ function prepare_fdroid_privileged_extension() {
 function write_microg_resolution_profile() {
   local profile_path="${1}"
   local root_mode='rootless'
+  local api_level="${ROM_OTA_API_LEVEL:-}"
+
+  if [[ ! "${api_level}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: microG resolution requires the selected source OTA's positive integer SDK level." >&2
+    return 1
+  fi
 
   resolve_root_mode >/dev/null || return 1
   [[ "${RESOLVED_ROOT_MODE}" != 'magisk' ]] || root_mode='rooted'
@@ -787,7 +793,7 @@ id = 'lineageos-microg-${root_mode}'
 rom_family = 'lineageos'
 root_mode = '${root_mode}'
 abi = 'arm64-v8a'
-api_level = 36
+api_level = ${api_level}
 output_scope = '${OUTPUT_SCOPE}'
 enabled_modules = ['microg']
 acknowledgements = []

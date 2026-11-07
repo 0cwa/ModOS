@@ -27,16 +27,22 @@ function selection_variant_manifest() {
     SELECTION_COMPATIBLE_SEPOLICY
     SELECTION_CLEAR_VBMETA_FLAGS
     SELECTION_HELPER_COMMIT
+    SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256
     SELECTION_LOCK_SHA256
     SELECTION_PROFILE_SHA256
     SELECTION_MODULE_AFSR
     SELECTION_MODULE_ALTERINSTALLER
+    SELECTION_MODULE_ALTERINSTALLER_VERSION
     SELECTION_MODULE_BCR
+    SELECTION_MODULE_BCR_VERSION
     SELECTION_MODULE_CUSTOTA
+    SELECTION_MODULE_CUSTOTA_VERSION
     SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION
     SELECTION_MODULE_MICROG
     SELECTION_MODULE_MSD
+    SELECTION_MODULE_MSD_VERSION
     SELECTION_MODULE_OEMUNLOCKONBOOT
+    SELECTION_MODULE_OEMUNLOCKONBOOT_VERSION
     SELECTION_DISABLE_SYSTEM_UPDATER
     SELECTION_MODULE_SHIZUKU
     SELECTION_SHIZUKU_LOCK_SHA256
@@ -80,6 +86,26 @@ function selection_variant_manifest() {
     value="${!field}"
     if [[ "${value}" != 'true' && "${value}" != 'false' ]]; then
       echo "Error: selection identity field ${field} must be true or false." >&2
+      return 1
+    fi
+  done
+
+  if [[ ! "${SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Error: the executable-tools selection identity is not a SHA-256 digest." >&2
+    return 1
+  fi
+
+  local module enabled_field version_field
+  for module in ALTERINSTALLER BCR CUSTOTA MSD OEMUNLOCKONBOOT; do
+    enabled_field="SELECTION_MODULE_${module}"
+    version_field="SELECTION_MODULE_${module}_VERSION"
+    if [[ "${!enabled_field}" == true ]]; then
+      if [[ ! "${!version_field}" =~ ^[0-9]+([.][0-9A-Za-z_-]+)*$ ]]; then
+        echo "Error: enabled ${module} selection has an invalid module version." >&2
+        return 1
+      fi
+    elif [[ "${!version_field}" != disabled ]]; then
+      echo "Error: disabled ${module} selection has an unexpected module version." >&2
       return 1
     fi
   done
@@ -155,16 +181,22 @@ function selection_variant_manifest() {
     "compatible_sepolicy=${SELECTION_COMPATIBLE_SEPOLICY}" \
     "clear_vbmeta_flags=${SELECTION_CLEAR_VBMETA_FLAGS}" \
     "helper_commit=${SELECTION_HELPER_COMMIT}" \
+    "executable_tools_lock_sha256=${SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256}" \
     "lock_sha256=${SELECTION_LOCK_SHA256}" \
     "profile_sha256=${SELECTION_PROFILE_SHA256}" \
     "module.afsr=${SELECTION_MODULE_AFSR}" \
     "module.alterinstaller=${SELECTION_MODULE_ALTERINSTALLER}" \
+    "module.alterinstaller.version=${SELECTION_MODULE_ALTERINSTALLER_VERSION}" \
     "module.bcr=${SELECTION_MODULE_BCR}" \
+    "module.bcr.version=${SELECTION_MODULE_BCR_VERSION}" \
     "module.custota=${SELECTION_MODULE_CUSTOTA}" \
+    "module.custota.version=${SELECTION_MODULE_CUSTOTA_VERSION}" \
     "module.fdroid-privileged-extension=${SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION}" \
     "module.microg=${SELECTION_MODULE_MICROG}" \
     "module.msd=${SELECTION_MODULE_MSD}" \
+    "module.msd.version=${SELECTION_MODULE_MSD_VERSION}" \
     "module.oemunlockonboot=${SELECTION_MODULE_OEMUNLOCKONBOOT}" \
+    "module.oemunlockonboot.version=${SELECTION_MODULE_OEMUNLOCKONBOOT_VERSION}" \
     "disable_system_updater=${SELECTION_DISABLE_SYSTEM_UPDATER}" \
     "module.shizuku=${SELECTION_MODULE_SHIZUKU}" \
     "shizuku_lock_sha256=${SELECTION_SHIZUKU_LOCK_SHA256}" \

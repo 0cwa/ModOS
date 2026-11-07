@@ -176,6 +176,7 @@ reset_fixture() {
   ROM_FAMILY="grapheneos"
   DEVICE_NAME="shiba"
   GRAPHENEOS[OTA_TARGET]="fixture-ota"
+  ROM_OTA_API_LEVEL=""
   OUTPUTS[PATCHED_OTA]="${WORKDIR}/patched.zip"
   KEYS[AVB]="${WORKDIR}/keys/avb.key"
   KEYS[OTA]="${WORKDIR}/keys/ota.key"
@@ -381,6 +382,7 @@ enable_microg_fixture() {
   ADDITIONALS[MICROG]="true"
   ROM_FAMILY="lineageos"
   DEVICE_NAME="pdx235"
+  ROM_OTA_API_LEVEL=36
   OUTPUT_SCOPE="local-unpublished"
   ROOT_MODE=""
   RESOLVED_ROOT_MODE=""
@@ -408,6 +410,60 @@ test_microg_locked_preparation_and_arguments() {
     fail "microG profile lacks restricted spoofing capability"
   grep -Fxq "product_priv_app = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
     fail "microG profile lacks product priv-app capability"
+  grep -Fxq "api_level = 36" "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile lost the fixture's source SDK"
+}
+
+test_microg_profile_uses_selected_source_sdk() (
+  reset_fixture microg-source-sdk
+  enable_microg_fixture
+  curl() {
+    printf '%s\n' '[{"type":"nightly","files":[{
+      "filename":"lineage-24.0-20261106-nightly-pdx235-signed.zip",
+      "url":"https://mirrorbits.lineageos.org/full/pdx235/20261106/lineage-24.0-20261106-nightly-pdx235-signed.zip",
+      "type":"nightly","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "os_sdk_level":37}]}]'
+  }
+
+  resolve_rom_profile
+  fetch_rom_ota_metadata
+  run_patch
+  assert_prepare_stages 'microG selected SDK preparation' artifacts-fetch
+  assert_pair --module-profile "${WORKDIR}/locked-profiles/microg.toml" 'microG selected SDK'
+  python3 - "${WORKDIR}/locked-profiles/microg.toml" <<'PY'
+from pathlib import Path
+import sys
+import tomllib
+
+profile = tomllib.loads(Path(sys.argv[1]).read_text())
+assert type(profile['api_level']) is int and profile['api_level'] == 37, profile
+assert profile['rom_family'] == 'lineageos', profile
+assert profile['root_mode'] == 'rootless', profile
+PY
+)
+
+test_microg_rejects_missing_or_invalid_source_sdk() {
+  local api_level index=0
+  for api_level in '' 0 -1 true false 37.0 ' 37' '37 ' 037 '+37' $'37\n'; do
+    reset_fixture "microg-invalid-source-sdk-${index}"
+    enable_microg_fixture
+    ROM_OTA_API_LEVEL="${api_level}"
+    assert_patch_fails_before_execution "invalid microG source SDK: ${api_level}"
+    assert_prepare_stages 'invalid SDK prevents locked artifact acquisition'
+    [[ ! -e "${WORKDIR}/locked-profiles/microg.toml" ]] ||
+      fail 'invalid source SDK produced a microG profile'
+    index=$((index + 1))
+  done
+}
+
+test_disabled_microg_does_not_require_source_sdk() {
+  reset_fixture no-microg-source-sdk
+  unset ROM_OTA_API_LEVEL
+  local -a args=()
+  prepare_microg args "${WORKDIR}/tools/my-avbroot-setup"
+  assert_prepare_stages 'disabled microG does not acquire artifacts'
+  [[ "${#args[@]}" -eq 0 && ! -e "${WORKDIR}/locked-profiles" ]] ||
+    fail 'disabled microG created a profile or changed patch arguments'
 }
 
 enable_shizuku_fixture() {
@@ -835,6 +891,9 @@ test_special_cases_remain_available
 test_disable_system_updater_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
+test_microg_profile_uses_selected_source_sdk
+test_microg_rejects_missing_or_invalid_source_sdk
+test_disabled_microg_does_not_require_source_sdk
 test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices
 test_shizuku_rejects_shared_rootless_magisk_product_image
 test_lineage_both_modes_clear_vbmeta_flags
