@@ -53,7 +53,11 @@ check_definition() {
     [[ "$(toml_resolve_value microg false)" == "${expected_microg}" ]] ||
       fail "${file}: wrong scheduled microG selection"
 
-    for key in afsr alterinstaller bcr custota msd oemunlockonboot disable_system_updater; do
+    local expected_msd=true
+    [[ "${expected_family}" != lineageos ]] || expected_msd=false
+    [[ "$(toml_resolve_value msd '')" == "${expected_msd}" ]] ||
+      fail "${file}: wrong MSD selection for the qualified device profile"
+    for key in afsr alterinstaller bcr custota oemunlockonboot disable_system_updater; do
       [[ "$(toml_resolve_value "${key}" '')" == true ]] ||
         fail "${file}: ${key} must be enabled"
     done
@@ -113,6 +117,12 @@ check_loader() {
     fail "${file}: loader emitted wrong microG selection"
   grep -Fxq "ADDITIONALS_MICROG=${expected_microg}" "${env_file}" ||
     fail "${file}: loader exported wrong microG selection"
+  local expected_msd=true
+  [[ "${expected_family}" != lineageos ]] || expected_msd=false
+  grep -Fxq "msd=${expected_msd}" "${output_file}" ||
+    fail "${file}: loader emitted wrong MSD selection"
+  grep -Fxq "ADDITIONALS_MSD=${expected_msd}" "${env_file}" ||
+    fail "${file}: loader exported wrong MSD selection"
 
   rm -f "${output_file}" "${env_file}"
 }

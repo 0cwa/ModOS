@@ -211,13 +211,15 @@ separate and unobserved.
 The manual LineageOS workflow may select `development-profile=care-map-pdx235`
 for `build-only`. This profile requires LineageOS/pdx235 and
 `local-unpublished` output scope. It uses the common acquisition, module,
-root-mode, signing, and output-verification pipeline, with one checked-in
-candidate helper contract at
-`tools/compat/avbroot_setup_care_map_pdx235.json`. Missing or modified candidate
-metadata rejects activation. Production helper and executable pins remain
-unchanged; ordinary build-only signing remains disposable.
+root-mode, signing, and output-verification pipeline. Production and development
+share the canonical reviewed helper contract at
+[`tools/compat/avbroot_setup_compat.json`](../tools/compat/avbroot_setup_compat.json).
+Missing, uncommitted, or modified metadata rejects activation. The profile
+selects the source-built verifier and output scope without maintaining a separate
+helper pin; executable trust pins remain unchanged. Ordinary build-only signing
+remains disposable.
 
-The prepared candidate helper's `tools/care-map/build_and_run.py` reads tracked,
+The pinned helper's `tools/care-map/build_and_run.py` reads tracked,
 clean source inputs from the captured helper commit, verifies its fixed patch
 and Cargo.lock hashes, obtains a fresh exact upstream checkout and builds with
 `cargo build --release --locked`. Signing secrets and GitHub credentials are

@@ -407,14 +407,17 @@ with tempfile.TemporaryDirectory() as scratch:
                  module: 'true'},
             capture_output=True)
         assert allowed.returncode == 0, (module, allowed.stderr)
-# The one artifact destination is the export script's fresh allowlisted stage,
-# after normal patch/postflight and metadata steps; no working-directory glob.
+# Device-candidate uploads use only the export script's allowlisted stage,
+# after normal patch/postflight and metadata steps. The independent diagnostic
+# upload is restricted to its own report directory, including failed builds.
 upload = workflow.split('      - name: Upload device candidate\n', 1)[1].split('      - name:', 1)[0]
-assert workflow.count('uses: actions/upload-artifact@') == 1
 assert 'name: ${{ steps.candidate_export.outputs.artifact-name }}' in upload
 assert 'if: inputs.export-device-candidate' in upload
 assert re.search(r'^          path: \$\{\{ steps.candidate_export.outputs.stage \}\}$', upload, re.M)
 assert workflow.index('      - name: Record build metadata') < workflow.index('      - name: Stage device candidate')
+diagnostics = workflow.split('      - name: Retain build diagnostics\n', 1)[1].split('      - name:', 1)[0]
+assert 'if: always()' in diagnostics
+assert re.search(r'^          path: \$\{\{ runner.temp \}\}/modos-build-diagnostics/$', diagnostics, re.M)
 PYTEST
   python3 tests/encrypted_device_candidate_test.py
 }
@@ -452,12 +455,17 @@ test_development_profile_activation() (
 import json, pathlib, sys
 manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
 manifest["revision"] = "a" * 40
-pathlib.Path("tools/compat/avbroot_setup_care_map_pdx235.json").write_text(json.dumps(manifest))
+pathlib.Path("tools/compat/avbroot_setup_compat.json").write_text(json.dumps(manifest))
 PYTEST
+  if activate_development_profile 2>/dev/null; then fail 'Uncommitted reviewed metadata accepted'; fi
   git add tools/compat
   git -c user.name=Fixture -c user.email=fixture@example.invalid -c core.hooksPath=/dev/null commit -qm fixture
   activate_development_profile
   [[ "${VERSION[AVBROOT_SETUP]}" == aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ]] || fail 'Reviewed development helper not selected'
+  [[ "${PIXENEOS_DEVELOPMENT_COMPAT_MANIFEST}" == "${fixture}/tools/compat/avbroot_setup_compat.json" ]] ||
+    fail 'Development profile did not select the shared helper contract'
+  printf '\n' >>tools/compat/avbroot_setup_compat.json
+  if activate_development_profile 2>/dev/null; then fail 'Modified reviewed metadata accepted'; fi
 )
 
 # Guarded semantics are automatically selected only for the reviewed 24.0

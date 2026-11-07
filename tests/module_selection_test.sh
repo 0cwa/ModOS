@@ -17,9 +17,22 @@ declare -a PREPARE_STAGES=()
 PREPARE_FAILURE=""
 PREPARE_CACHE_SENTINEL=""
 LOCKED_INPUTS_VALID="true"
+DIAGNOSTICS_FAILURE=false
+declare -a DIAGNOSTIC_ARGS=()
 
 python() {
   local stage
+
+  if [[ "${1}" == src/build_diagnostics.py ]]; then
+    DIAGNOSTIC_ARGS=("$@")
+    while [[ "${1}" != -- ]]; do shift; done
+    shift
+    [[ "${1}" == python ]] || fail "unexpected helper interpreter"
+    shift
+    CAPTURED_ARGS=("$@")
+    [[ "${DIAGNOSTICS_FAILURE}" != true ]]
+    return
+  fi
 
   if [[ "${1}" == */module-tool.py ]]; then
     if [[ "${2}" == "artifacts" ]]; then
@@ -199,6 +212,8 @@ reset_fixture() {
   ADDITIONALS[DEBUG]="false"
   ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]="false"
   ADDITIONALS[ROOT]="false"
+  ROOT_MODE=""
+  RESOLVED_ROOT_MODE=""
 
   FDROID_PRIVILEGED_EXTENSION_LOCK=""
   FDROID_PRIVILEGED_EXTENSION_PROFILE=""
@@ -212,6 +227,8 @@ reset_fixture() {
   PREPARE_STAGES=()
   PUBLISHER_CHECKS=()
   PUBLISHER_CHECK_FAILURE=false
+  DIAGNOSTICS_FAILURE=false
+  DIAGNOSTIC_ARGS=()
 }
 
 set_default_expected_args() {
@@ -640,10 +657,38 @@ test_pdx235_secondary_verification_failure_blocks_sidecars() (
     fail "sidecar generated after secondary verification failure"
 )
 
+test_diagnostic_failure_blocks_postflight_and_sidecars() (
+  reset_fixture diagnostic-failure
+  ROOT_MODE=both
+  MAGISK[PREINIT]=sda10
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  DIAGNOSTICS_FAILURE=true
+  verify_requested_root_outputs() { touch "${WORKDIR}/unexpected-postflight"; }
+  generate_custota_variant_sidecars() { touch "${WORKDIR}/unexpected-sidecar"; }
+  if patch_ota >/dev/null 2>&1; then
+    fail 'Rejected helper diagnostics allowed patch completion'
+  fi
+  [[ "${#DIAGNOSTIC_ARGS[@]}" -gt 0 ]] || fail 'Diagnostic guard was not invoked'
+  [[ ! -e "${WORKDIR}/unexpected-postflight" && ! -e "${WORKDIR}/unexpected-sidecar" ]] ||
+    fail 'Postprocessing ran after diagnostic failure'
+  local diagnostic_argv="${WORKDIR}/diagnostic-argv"
+  printf '%s\n' "${DIAGNOSTIC_ARGS[@]}" >"${diagnostic_argv}"
+  grep -Fxq "${WORKDIR}/fixture-ota.zip" "${diagnostic_argv}" || fail 'Source diagnostic path missing'
+  grep -Fxq "${OUTPUTS[PATCHED_OTA_MAGISK]}" "${diagnostic_argv}" || fail 'Secondary diagnostic path missing'
+  grep -Fxq -- '--msd-selected' "${diagnostic_argv}" || fail 'Selected MSD coverage was not required'
+)
+
+test_existing_grapheneos_output_cannot_bypass_diagnostics() (
+  reset_fixture grapheneos-stale-diagnostic-output
+  touch -- "${OUTPUTS[PATCHED_OTA]}"
+  assert_patch_fails_before_execution 'GrapheneOS output from a failed guard cannot be reused'
+)
+
 # Exercise an actual Python child: its temporary directory must live below
 # WORKDIR and the caller's temporary-directory preference must remain intact.
 test_helper_uses_build_filesystem_scratch() (
   reset_fixture 'helper scratch environment'
+  ADDITIONALS[MSD]=false
   local caller_tmpdir="${TEST_ROOT}/caller-tmp"
   mkdir -p "${caller_tmpdir}"
   export TMPDIR="${caller_tmpdir}"
@@ -655,6 +700,9 @@ with tempfile.TemporaryDirectory() as child:
     receipt = {'scratch': str(scratch), 'child': child,
                'mode': stat.S_IMODE(scratch.stat().st_mode)}
 output.with_suffix('.scratch.json').write_text(json.dumps(receipt))
+for option in ('--input', '--output'):
+    print('[INFO] Verifying OTA: ' + sys.argv[sys.argv.index(option) + 1])
+    print(' 1.000s  INFO OK!')
 PYTHON
   python() { command python3 "$@"; }
   patch_ota >/dev/null
@@ -901,6 +949,8 @@ test_care_map_compatibility_scope
 test_pdx235_publisher_preflight
 test_pdx235_existing_output_prevents_patch_skip
 test_pdx235_secondary_verification_failure_blocks_sidecars
+test_diagnostic_failure_blocks_postflight_and_sidecars
+test_existing_grapheneos_output_cannot_bypass_diagnostics
 test_helper_uses_build_filesystem_scratch
 test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments

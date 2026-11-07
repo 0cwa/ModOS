@@ -1,5 +1,17 @@
 # Remaining work and execution order
 
+## November 7 build-diagnostic follow-up
+
+The successful production jobs still contained source LineageOS AVB warnings
+and MSD's emulator `su` fallback. The common build now reports source/output
+warnings separately and rejects the MSD fallback before publication. MSD is
+temporarily disabled in the pdx235 preset while its actual gadget HAL domain
+and export/unexport behavior remain unqualified. See [build diagnostics and
+the remaining device checks](build-diagnostics.md). The historical evidence
+below describes the module selections used at the time of those runs.
+
+## Historical integration record
+
 Updated 2026-10-19 for the goal integration branch. This follows the initial audit
 of ModOS main `6572a6e`, feature PRs #96/#97, quarantine #121 and helper research
 #7/#10/#11/#12. Implemented branch work, measured local artifact evidence, main

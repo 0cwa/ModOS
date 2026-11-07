@@ -151,6 +151,7 @@ jobs:
           bash tests/typed_config_resolver_test.sh
           bash tests/helper_preflight_test.sh
           bash tests/upstream_integration_test.sh
+          python3 tests/build_diagnostics_test.py
           bash tests/scheduled_build_definitions_test.sh
           bash tests/root_mode_both_test.sh
           bash tests/magisk_output_verification_test.sh
@@ -209,6 +210,8 @@ jobs:
       compatible-sepolicy-patching: true
       allow-unauthorized-adb: false
       microg: true
+      # MSD v2.5's physical-device HAL mapping is not yet qualified on pdx235.
+      msd: false
       exfatprogs-fsck: true
       fsck-sysfs-sepolicy: true
       disable-system-updater: true

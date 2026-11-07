@@ -221,6 +221,7 @@ function _boot_animation_payload_digest() {
 
 function module_selection_fingerprint() {
   local executable_tools_lock_digest
+  local build_diagnostics_digest
   local lock_digest="disabled"
   local profile_digest="disabled"
   local magisk_preinit="disabled"
@@ -272,6 +273,10 @@ function module_selection_fingerprint() {
 
   executable_tools_lock_digest="$(_locked_input_digest locks/executable-tools-v1.json)" || {
     echo "Error: the executable-tools lock is not clean and checked in." >&2
+    return 1
+  }
+  build_diagnostics_digest="$(_locked_input_digest src/build_diagnostics.py)" || {
+    echo "Error: the build diagnostic guard is not clean and checked in." >&2
     return 1
   }
   for module in ALTERINSTALLER BCR CUSTOTA MSD OEMUNLOCKONBOOT; do
@@ -392,6 +397,7 @@ function module_selection_fingerprint() {
   SELECTION_CLEAR_VBMETA_FLAGS="${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}"
   SELECTION_HELPER_COMMIT="${VERSION[AVBROOT_SETUP]}"
   SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256="${executable_tools_lock_digest}"
+  SELECTION_BUILD_DIAGNOSTICS_SHA256="${build_diagnostics_digest}"
   SELECTION_LOCK_SHA256="${lock_digest}"
   SELECTION_PROFILE_SHA256="${profile_digest}"
   SELECTION_MODULE_AFSR="${ADDITIONALS[AFSR]}"

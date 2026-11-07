@@ -278,12 +278,13 @@ test_executable_lock_is_required_and_fingerprinted() (
 
   load_contract
   set_selection_fixture
-  mkdir -p "${fixture_repo}/locks"
+  mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
   cp locks/executable-tools-v1.json "${fixture_repo}/locks/"
+  cp src/build_diagnostics.py "${fixture_repo}/src/"
   git -C "${fixture_repo}" init -q
   git -C "${fixture_repo}" config user.email fixture@example.invalid
   git -C "${fixture_repo}" config user.name fixture
-  git -C "${fixture_repo}" add locks/executable-tools-v1.json
+  git -C "${fixture_repo}" add locks/executable-tools-v1.json src/build_diagnostics.py
   git -C "${fixture_repo}" commit -q -m 'Original executable lock'
   cd "${fixture_repo}"
 
@@ -320,6 +321,22 @@ PY
   module_selection_fingerprint >/dev/null
   assert_equals "${updated}" "$(selection_variant_fingerprint)" \
     "updated executable lock preserves build/preflight identity parity"
+
+  baseline="${updated}"
+  printf '\n# Reviewed diagnostic-contract fixture change.\n' >> src/build_diagnostics.py
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail 'Dirty diagnostic guard unexpectedly produced a fingerprint'
+  fi
+  git add src/build_diagnostics.py
+  git commit -q -m 'Updated diagnostic contract'
+  updated="$(fingerprint)"
+  [[ "${updated}" != "${baseline}" ]] ||
+    fail 'Diagnostic guard update did not change the build selection identity'
+  module_selection_fingerprint >/dev/null
+  SELECTION_BUILD_DIAGNOSTICS_SHA256=disabled
+  if selection_variant_fingerprint >/dev/null 2>&1; then
+    fail 'Diagnostic guard digest was unexpectedly optional'
+  fi
 
   mv locks/executable-tools-v1.json "${TEST_ROOT}/saved-executable-lock.json"
   if module_selection_fingerprint >/dev/null 2>&1; then
@@ -394,7 +411,8 @@ test_shizuku_selection_follows_supported_rom_profiles() (
   set_selection_fixture
   _locked_input_digest() {
     [[ "${1}" == "locks/shizuku-v13.6.0.json" ||
-      "${1}" == "locks/executable-tools-v1.json" ]] || return 1
+      "${1}" == "locks/executable-tools-v1.json" ||
+      "${1}" == "src/build_diagnostics.py" ]] || return 1
     printf '%064d\n' 0
   }
   ADDITIONALS[SHIZUKU]="true"
