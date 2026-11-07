@@ -1,7 +1,7 @@
 {
   "version": 2,
   "full": {
-    "location_ota": "https://github.com/0cwa/ModOS/releases/download/20261106/pdx235-20261106-magisk-v30.7-988457e8e17933e74fdca192c5be93457d2fb99a257147dbeed9ddffdc3c9d43-d3d3c0b.zip",
-    "location_csig": "https://github.com/0cwa/ModOS/releases/download/20261106/pdx235-20261106-magisk-v30.7-988457e8e17933e74fdca192c5be93457d2fb99a257147dbeed9ddffdc3c9d43-d3d3c0b.zip.csig"
+    "location_ota": "https://github.com/0cwa/ModOS/releases/download/20261106/pdx235-20261106-magisk-v30.7-0aec564d01af41432d5d4512df8417887dedda6b8b1253f35f77e5f0b60e9339-ec612f4.zip",
+    "location_csig": "https://github.com/0cwa/ModOS/releases/download/20261106/pdx235-20261106-magisk-v30.7-0aec564d01af41432d5d4512df8417887dedda6b8b1253f35f77e5f0b60e9339-ec612f4.zip.csig"
   }
 }
