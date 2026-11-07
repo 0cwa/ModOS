@@ -4,5 +4,10 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+# Keep updates from the vendored manifest on the production Cargo.lock.
+[workspace]
+members = ["vendor/sepatch"]
+resolver = "3"
+
 [dependencies]
 sepatch = { path = "vendor/sepatch" }
