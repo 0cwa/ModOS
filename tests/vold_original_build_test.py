@@ -90,6 +90,36 @@ class OriginalVoldBuildTest(unittest.TestCase):
             with self.assertRaisesRegex(builder.BuildError, "link does not select"):
                 builder.verify_active_manifest(source, self.manifest)
 
+    def test_hidden_worktree_edits_cannot_pass_source_cleanliness_gate(self):
+        for flag in ("--assume-unchanged", "--skip-worktree"):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as tmp:
+                source = Path(tmp)
+                project = source / "system/vold"
+                project.mkdir(parents=True)
+                subprocess.run(["git", "init", "--quiet", str(project)], check=True)
+                tracked = project / "Utils.h"
+                tracked.write_text("reviewed source\n")
+                subprocess.run(["git", "add", "Utils.h"], cwd=project, check=True)
+                subprocess.run([
+                    "git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                    "commit", "--quiet", "-m", "pinned source",
+                ], cwd=project, check=True)
+                revision = subprocess.run([
+                    "git", "rev-parse", "HEAD",
+                ], cwd=project, check=True, capture_output=True, text=True).stdout.strip()
+                manifest = f'<manifest><project name="system/vold" revision="{revision}" /></manifest>'.encode()
+                self.selected_manifest(source, manifest)
+                with patch.object(builder.shutil, "which", return_value="/trusted/repo"):
+                    builder.verify_checkout(source, manifest, clean=True, selected=["system/vold"])
+                    subprocess.run(["git", "update-index", flag, "Utils.h"], cwd=project, check=True)
+                    tracked.write_text("unreviewed hidden source\n")
+                    status = subprocess.run([
+                        "git", "status", "--porcelain", "--untracked-files=all", "--ignored",
+                    ], cwd=project, check=True, capture_output=True, text=True).stdout
+                    self.assertEqual(status, "", "fixture must reproduce hidden edits")
+                    with self.assertRaisesRegex(builder.BuildError, "assume-unchanged or skip-worktree"):
+                        builder.verify_checkout(source, manifest, clean=True, selected=["system/vold"])
+
     def test_omitted_manifest_path_checks_real_git_revision_and_local_content(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp)
