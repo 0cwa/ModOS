@@ -5,6 +5,7 @@ from pathlib import Path
 import importlib.util
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -14,8 +15,8 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src" / "device"))
-from modos_health.common import Context, STATUSES
-from modos_health.checks import microg
+from modos_health.common import Context, MAX_PROBE_OUTPUT, STATUSES
+from modos_health.checks import microg, msd
 
 spec = importlib.util.spec_from_file_location(
     "check_pdx235_modules", ROOT / "src/device/check_pdx235_modules.py"
@@ -28,6 +29,8 @@ GOOD_XML = """<permissions>
 <deny-permission name="android.permission.DUMP"/>
 <permission name="android.permission.FAKE_PACKAGE_SIGNATURE"/>
 </privapp-permissions></permissions>"""
+GADGET = "/vendor/bin/hw/android.hardware.usb.gadget-service.qti"
+QTI_PROCESS = f"LABEL COMMAND\nu:r:hal_usb_qti:s0 {GADGET}\n"
 
 class FakeADB:
     def __init__(self):
@@ -40,8 +43,11 @@ class FakeADB:
         if args[-1] == "get-state":
             return subprocess.CompletedProcess(args, 0, "device\n", "")
         assert args[0] == "adb"
-        assert args[1] == "shell"
-        cmd = args[2]
+        rest = args[1:]
+        if rest[0] == "-s":
+            rest = rest[2:]
+        assert len(rest) == 2 and rest[0] == "shell"
+        cmd = rest[1]
         if cmd in self.overrides:
             code, out = self.overrides[cmd]
         elif cmd == "cat /proc/sys/kernel/random/boot_id":
@@ -56,6 +62,10 @@ class FakeADB:
             code, out = 0, "1\n"
         elif cmd == "getprop ro.boot.verifiedbootstate":
             code, out = 0, "yellow\n"
+        elif cmd == "getprop init.svc.vendor.usbgadget-hal":
+            code, out = 0, "running\n"
+        elif cmd == "ps -A -o LABEL,ARGS":
+            code, out = 0, QTI_PROCESS
         elif cmd == "bootctl get-current-slot":
             code, out = 0, "0\n"
         elif cmd == "bootctl is-slot-marked-successful 0":
@@ -89,6 +99,8 @@ class HealthAuditTests(unittest.TestCase):
     def test_every_enabled_module_owns_results_and_disabled_is_not_failure(self):
         ctx, fake = fake_ctx()
         selected = audit.load_config(ROOT / ".github/schedules/lineageos-pdx235.toml")
+        # Exercise MSD explicitly even when scheduled pdx235 builds disable it.
+        selected["msd"] = True
         checks = audit.inspect(ctx, selected, "rootless")
         modules = {c["module"] for c in checks}
         self.assertEqual(modules,
@@ -114,6 +126,128 @@ class HealthAuditTests(unittest.TestCase):
                              " shell pm grant " in c or "install " in c
                              for c in calls))
         self.assertEqual(calls.count("adb shell cat /proc/sys/kernel/random/boot_id"), 2)
+
+    def test_msd_qti_observation_does_not_qualify_a_replacement_domain(self):
+        ctx, fake = fake_ctx()
+        checks = {c["check"]: c for c in msd.check(ctx)}
+        self.assertEqual(checks["binary"]["status"], "PASS")
+        self.assertEqual(checks["usb-gadget-service"]["status"], "PASS")
+        self.assertEqual(checks["usb-gadget-domain"]["status"], "WARNING")
+        self.assertIn("hal_usb_qti", checks["usb-gadget-domain"]["detail"])
+        self.assertIn("requires policy and device qualification",
+                      checks["usb-gadget-domain"]["detail"])
+        self.assertEqual(checks["daemon"]["status"], "NOT_TESTED")
+        self.assertEqual([call[-1] for call in fake.calls], [
+            "test -f /system/bin/msd-tool", "getprop init.svc.vendor.usbgadget-hal",
+            "ps -A -o LABEL,ARGS",
+        ])
+
+    def test_msd_target_domain_matches_for_known_aidl_and_hidl_service_names(self):
+        for executable in (GADGET, "android.hardware.usb.gadget-service",
+                           "/vendor/bin/hw/android.hardware.usb.gadget@1.2-service",
+                           "/system/vendor/bin/hw/android.hardware.usb.gadget@1.1-service-qti"):
+            with self.subTest(executable=executable):
+                ctx, fake = fake_ctx()
+                fake.overrides[msd._PROCESSES] = (
+                    0, f"LABEL CMDLINE\nu:r:hal_usb_gadget_impl:s0 {executable}\n")
+                checks = {c["check"]: c for c in msd.check(ctx)}
+                self.assertEqual(checks["usb-gadget-domain"]["status"], "PASS")
+                self.assertIn("process-label observation only",
+                              checks["usb-gadget-domain"]["detail"])
+                self.assertEqual(checks["daemon"]["status"], "NOT_TESTED")
+
+    def test_msd_su_domain_is_a_failure(self):
+        ctx, fake = fake_ctx()
+        fake.overrides[msd._PROCESSES] = (0, f"LABEL COMMAND\nu:r:su:s0 {GADGET}\n")
+        checks = {c["check"]: c for c in msd.check(ctx)}
+        self.assertEqual(checks["usb-gadget-domain"]["status"], "FAIL")
+        self.assertIn("su debug domain", checks["usb-gadget-domain"]["detail"])
+        self.assertEqual(checks["daemon"]["status"], "NOT_TESTED")
+
+    def test_msd_absent_unknown_or_unrelated_process_does_not_pass(self):
+        for output in ("", "LABEL COMMAND\n",
+                       "u:r:su:s0 /vendor/bin/hw/android.hardware.usb-service.qti\n",
+                       "u:r:hal_usb_gadget_impl:s0 /vendor/bin/hw/android.hardware.usb.gadget-service.unknown\n",
+                       "u:r:su:s0 /data/local/tmp/android.hardware.usb.gadget-service.qti\n",
+                       "u:r:untrusted_app:s0 com.example.app android.hardware.usb.gadget-service.qti\n"):
+            with self.subTest(output=output):
+                ctx, fake = fake_ctx()
+                fake.overrides[msd._PROCESSES] = (0, output)
+                result = msd._gadget_domain(ctx)
+                self.assertEqual(result["status"], "WARNING")
+                self.assertIn("No recognized", result["detail"])
+
+    def test_msd_multiple_and_duplicate_process_rows_are_ambiguous(self):
+        for second in (f"u:r:hal_usb_qti:s0 {GADGET}\n",
+                       "u:r:hal_usb_gadget_impl:s0 /vendor/bin/hw/android.hardware.usb.gadget-service\n"):
+            with self.subTest(second=second):
+                ctx, fake = fake_ctx()
+                fake.overrides[msd._PROCESSES] = (0, QTI_PROCESS + second)
+                result = msd._gadget_domain(ctx)
+                self.assertEqual(result["status"], "WARNING")
+                self.assertIn("ambiguous", result["detail"])
+
+    def test_msd_unreadable_or_malformed_label_does_not_pass(self):
+        for label in ("?", "u:object_r:hal_usb_gadget_impl:s0", "u:r:hal_usb_gadget_impl"):
+            with self.subTest(label=label):
+                ctx, fake = fake_ctx()
+                fake.overrides[msd._PROCESSES] = (0, f"LABEL COMMAND\n{label} {GADGET}\n")
+                result = msd._gadget_domain(ctx)
+                self.assertEqual(result["status"], "WARNING")
+                self.assertIn("unavailable or malformed", result["detail"])
+
+    def test_msd_truncated_capture_never_establishes_unique_target(self):
+        ctx, fake = fake_ctx()
+        fake.overrides[msd._PROCESSES] = (
+            0, f"LABEL COMMAND\nu:r:hal_usb_gadget_impl:s0 {GADGET}\n"
+               + "u:r:untrusted_app:s0 private.app --secret=PRIVATE\n" * 1000)
+        result = msd._gadget_domain(ctx)
+        self.assertEqual(result["status"], "WARNING")
+        self.assertIn("truncated", result["detail"])
+        self.assertNotIn("PRIVATE", result["detail"])
+        probe = ctx.probe(msd._PROCESSES)
+        self.assertTrue(probe.truncated)
+        self.assertEqual(len(probe.output), MAX_PROBE_OUTPUT)
+
+    def test_msd_incomplete_final_process_row_is_not_accepted(self):
+        ctx, fake = fake_ctx()
+        fake.overrides[msd._PROCESSES] = (
+            0, f"LABEL COMMAND\nu:r:hal_usb_gadget_impl:s0 {GADGET}")
+        result = msd._gadget_domain(ctx)
+        self.assertEqual(result["status"], "WARNING")
+        self.assertIn("truncated", result["detail"])
+        self.assertNotIn("Complete matching rows:", result["detail"])
+
+    def test_msd_complete_su_observation_is_failure_even_when_later_rows_are_truncated(self):
+        ctx, fake = fake_ctx()
+        fake.overrides[msd._PROCESSES] = (
+            0, f"LABEL COMMAND\nu:r:su:s0 {GADGET}\n" + "X" * MAX_PROBE_OUTPUT)
+        self.assertEqual(msd._gadget_domain(ctx)["status"], "FAIL")
+
+    def test_msd_unavailable_process_query_is_warning(self):
+        for error in (OSError("private detail"),
+                      subprocess.TimeoutExpired("ps", 20, output="private detail")):
+            with self.subTest(error=type(error).__name__):
+                ctx = Context(["adb"], runner=unittest.mock.Mock(side_effect=error))
+                result = msd._gadget_domain(ctx)
+                self.assertEqual(result["status"], "WARNING")
+                self.assertNotIn("private detail", result["detail"])
+        ctx, fake = fake_ctx()
+        fake.overrides[msd._PROCESSES] = (1, "private permission-error output")
+        result = msd._gadget_domain(ctx)
+        self.assertEqual(result["status"], "WARNING")
+        self.assertNotIn("permission-error", result["detail"])
+
+    def test_msd_init_state_unavailable_or_not_running_is_warning(self):
+        for code, output in ((0, "stopped\n"), (0, "restarting\n"), (0, ""),
+                             (1, "private error"), (0, "running\nprivate detail"),
+                             (0, "running" + " " * MAX_PROBE_OUTPUT)):
+            with self.subTest(code=code, size=len(output)):
+                ctx, fake = fake_ctx()
+                fake.overrides[msd._SERVICE] = (code, output)
+                result = msd._gadget_service(ctx)
+                self.assertEqual(result["status"], "WARNING")
+                self.assertNotIn("private", result["detail"])
 
     def test_microg_missing_deny_is_a_failure(self):
         fake = FakeADB()
@@ -169,22 +303,32 @@ class HealthAuditTests(unittest.TestCase):
         self.assertEqual(sum(c["check"] == "disabled-in-build-config"
                              for c in checks), len(selections))
         self.assertFalse(any("pm path" in " ".join(x) for x in fake.calls))
+        self.assertFalse(any(x[-1] in (msd._PROCESSES, msd._SERVICE) for x in fake.calls))
 
     def test_reject_commands_other_than_static_read_only_probes(self):
         ctx, _ = fake_ctx()
         for cmd in ("su -c id", "pm grant com.google.android.gms android.permission.DUMP",
                     "reboot", "rm -rf /data", "cat /data/system/accounts.db",
-                    "getprop ro.x; reboot"):
+                    "getprop ro.x; reboot", "ps -A -o ARGS",
+                    "ps -A -o LABEL,ARGS; reboot", "ps -A -o LABEL,ARGS -w"):
             with self.assertRaises(ValueError):
                 ctx.probe(cmd)
 
     def test_report_contains_only_summaries_and_not_raw_xml(self):
         fake = FakeADB()
+        fake.overrides[msd._PROCESSES] = (
+            0, f"LABEL COMMAND\nu:r:hal_usb_qti:s0 {GADGET} --secret=PRIVATE_ARG\n"
+               "u:r:untrusted_app:s0:c123,c456 private.account.app --token=PRIVATE_TOKEN\n")
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / "private"
+            config = Path(temp) / "msd-enabled.toml"
+            original = (ROOT / ".github/schedules/lineageos-pdx235.toml").read_text()
+            explicit, count = re.subn(r"('ADDITIONALS\[MSD\]'\s*=\s*)(?:true|false)\b",
+                                      r"\g<1>true", original)
+            self.assertEqual(count, 1)
+            config.write_text(explicit)
             with patch("subprocess.run", side_effect=fake):
-                rc = audit.main(["--config",
-                                 str(ROOT / ".github/schedules/lineageos-pdx235.toml"),
+                rc = audit.main(["--config", str(config), "--serial", "PRIVATE_SERIAL",
                                  "--output", str(dest)])
             self.assertEqual(rc, 0)
             report = json.loads((dest / "report.json").read_text())
@@ -194,6 +338,14 @@ class HealthAuditTests(unittest.TestCase):
             self.assertEqual(report["counts"]["FAIL"], 0)
             self.assertNotIn("serial", report)
             self.assertNotIn("android.permission.DUMP", (dest / "report.json").read_text())
+            self.assertEqual(next(c["status"] for c in report["checks"]
+                                  if c["check"] == "usb-gadget-domain"), "WARNING")
+            for filename in ("report.json", "summary.txt"):
+                saved = (dest / filename).read_text()
+                for private in ("PRIVATE_SERIAL", "PRIVATE_ARG", "PRIVATE_TOKEN",
+                                "private.account.app", "LABEL COMMAND", "c123,c456"):
+                    self.assertNotIn(private, saved)
+                self.assertIn("hal_usb_qti", saved)
             self.assertIn("Device acceptance: NOT ESTABLISHED",
                           (dest / "summary.txt").read_text())
             if os.name == "posix":

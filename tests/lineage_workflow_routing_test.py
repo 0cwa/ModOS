@@ -69,6 +69,14 @@ def main():
     assert "      shizuku: ${{ inputs.shizuku }}" in job("manual_build")
     assert "      shizuku: false" in job("scheduled_build")
 
+    msd_input = re.search(
+        r"^      msd:\n(.*?)(?=^      \w|\Z)", workflow, re.M | re.S
+    )
+    assert msd_input, "LineageOS workflow lacks an explicit MSD selection"
+    assert re.search(r"^        default: false$", msd_input[1], re.M)
+    assert "      msd: ${{ inputs.msd }}" in job("manual_build")
+    assert "      msd: ${{ needs.schedule_config.outputs.msd == 'true' }}" in job("scheduled_build")
+
     scheduled = job("scheduled_build")
     assert "    needs: schedule_config\n" in scheduled
     assert "    uses: ./.github/workflows/build-rom.yml\n" in scheduled
