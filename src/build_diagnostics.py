@@ -37,6 +37,11 @@ WARNING = re.compile(
     r'^\s*(?:\[(?:WARN|WARNING)\]|(?:\d+(?:\.\d+)?s\s+)?(?:WARN|WARNING):?'
     r'|warning(?:\[[^\]\r\n]{1,80}\])?:)\s+(.+)$'
 )
+# MSD's Rust policy tool emits these diagnostics without a WARN prefix.
+SEPOLICY_WARNING_HEADER = re.compile(r'^Warnings when (loading|saving) sepolicy:$')
+SEPOLICY_COMPATIBILITY_FALLBACK = re.compile(
+    r'^Type not found: [A-Za-z_][A-Za-z0-9_]*; assuming old version of Android$'
+)
 AVB_WARNING = re.compile(r'\b(?:is signed with public AOSP test key|has insecure flags:)')
 DIRECT_CIL_FALLBACK = 'No precompiled sepolicy found, patching CIL files directly'
 MSD_FALLBACK = (
@@ -84,6 +89,7 @@ class BuildDiagnostics:
         self._msd_injection_failed = False
         self._msd_coverage_error = False
         self._active = None
+        self._sepolicy_warning_operation = None
         self._line = 0
         self._buffer = bytearray()
         self._overflow = False
@@ -103,6 +109,15 @@ class BuildDiagnostics:
             'message': message[:MAX_MESSAGE_CHARACTERS],
             'message_truncated': len(message) > MAX_MESSAGE_CHARACTERS,
         })
+
+    def _observe_warning(self, message: str, code: str = 'helper_warning') -> None:
+        phase = self._active['phase'] if self._active else 'unclassified'
+        self.warning_counts[phase] += 1
+        avb = AVB_WARNING.search(message) is not None
+        severity = 'error' if avb and phase != 'source' else 'warning'
+        if avb:
+            code = 'source_avb_warning' if phase == 'source' else 'unsafe_avb_warning'
+        self._record(severity, code, message, entry=self._active)
 
     def _msd_policy_missing(self, message: str) -> None:
         self._msd_coverage_error = True
@@ -125,12 +140,21 @@ class BuildDiagnostics:
             raise RuntimeError('diagnostics are already finished')
         self._line += 1
         if len(raw) > MAX_LINE_BYTES:
+            self._sepolicy_warning_operation = None
             self._coverage_error = True
             self._record('error', 'oversized_log_line',
                          'A helper log line exceeded the diagnostic limit; coverage is incomplete.')
             return
         line = raw.decode('utf-8', errors='replace') if isinstance(raw, bytes) else raw
         line = ANSI_SGR.sub('', GITHUB_TIMESTAMP.sub('', line.rstrip('\r\n')))
+        policy_header = SEPOLICY_WARNING_HEADER.fullmatch(line)
+        if policy_header:
+            self._sepolicy_warning_operation = policy_header[1]
+        elif not line.startswith('- '):
+            # Only consecutive bullet lines belong to the policy-tool warning.
+            # In particular, module/verification markers end the block before
+            # their own handlers return. Do not retain unrelated log details.
+            self._sepolicy_warning_operation = None
         if line.startswith('[INFO] Injecting '):
             # The helper's direct-CIL message is shared by MSD and Custota.
             # Attribute it only inside the current MSD injection scope.
@@ -186,14 +210,19 @@ class BuildDiagnostics:
             self.msd_fallback_count += 1
             self._record('error', 'msd_debug_fallback', MSD_ACTION)
             return
+        if policy_header:
+            self._observe_warning(line, 'sepolicy_warning')
+            return
+        if self._sepolicy_warning_operation is not None:
+            self._observe_warning(
+                f'While {self._sepolicy_warning_operation} sepolicy: {line[2:]}', 'sepolicy_warning')
+            return
+        if SEPOLICY_COMPATIBILITY_FALLBACK.fullmatch(line):
+            self._observe_warning(line, 'sepolicy_compatibility_fallback')
+            return
         warning = WARNING.fullmatch(line)
         if warning:
-            phase = self._active['phase'] if self._active else 'unclassified'
-            self.warning_counts[phase] += 1
-            avb = AVB_WARNING.search(warning[1]) is not None
-            severity = 'error' if avb and phase != 'source' else 'warning'
-            code = ('source_avb_warning' if phase == 'source' else 'unsafe_avb_warning') if avb else 'helper_warning'
-            self._record(severity, code, warning[1], entry=self._active)
+            self._observe_warning(warning[1])
 
     def feed(self, chunk: bytes) -> None:
         """Incrementally parse a byte stream with a bounded partial-line buffer."""
@@ -270,7 +299,8 @@ def render_summary(report: dict) -> str:
         f"| Downloaded source OTA | {counts['source']} |",
         f"| Final output OTAs | {counts['output']} |",
         f"| Outside a recognized verification phase | {counts['unclassified']} |", '',
-        'Counts cover recognized helper, avbroot, and Rust warning headers.', '',
+        'Counts cover recognized helper, avbroot, and Rust warning headers, '
+        'SELinux policy warning headers/details, and older-Android type fallbacks.', '',
         'Source AVB warnings describe the unmodified input and remain visible; '
         'they grant no verification waiver.', '',
         '### Verification log coverage', '',
