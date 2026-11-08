@@ -257,7 +257,17 @@ class VoldSourceClosureTest(unittest.TestCase):
             revisions = original.project_map(raw)
 
             def mocked_command(argv, cwd, **kwargs):
-                result = revisions[cwd.relative_to(source).as_posix()][1] if argv[1] == "rev-parse" else ""
+                self.assertEqual(argv[0], "git")
+                if argv[1:] == ["rev-parse", "--show-toplevel"]:
+                    result = str(cwd)
+                elif argv[1:] == ["rev-parse", "HEAD"]:
+                    result = revisions[cwd.relative_to(source).as_posix()][1]
+                elif argv[1:] == ["ls-files", "-v", "-z"]:
+                    result = "H Android.bp\0"
+                elif argv[1:] == ["status", "--porcelain", "--untracked-files=all", "--ignored"]:
+                    result = ""
+                else:
+                    self.fail(f"unexpected source verification command: {argv}")
                 return type("Result", (), {"stdout": result})()
 
             for project in first:
