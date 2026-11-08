@@ -55,6 +55,11 @@ on:
         required: false
         type: boolean
         default: false
+      bcr:
+        description: Include the signed Basic Call Recorder module
+        required: false
+        type: boolean
+        default: true
       msd:
         description: Include MSD (pdx235 HAL compatibility is unqualified; debug fallback fails the build)
         required: false
@@ -238,6 +243,7 @@ jobs:
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
       microg: ${{ inputs.microg }}
+      bcr: ${{ inputs.bcr }}
       msd: ${{ inputs.msd }}
       shizuku: ${{ inputs.shizuku }}
       exfatprogs-fsck: ${{ inputs.exfatprogs-fsck }}

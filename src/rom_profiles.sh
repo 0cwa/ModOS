@@ -30,6 +30,21 @@ function validate_device_name() {
   fi
 }
 
+# BCR remains a signed, selectable module for LineageOS. GrapheneOS excludes
+# it even when a legacy caller requests the old shared default. Validate before
+# applying the family policy so malformed values cannot be silently accepted.
+function apply_rom_module_policy() {
+  _require_profile_boolean ADDITIONALS_BCR "${ADDITIONALS[BCR]}" || return 1
+  case "${ROM_FAMILY}" in
+    grapheneos) ADDITIONALS[BCR]=false ;;
+    lineageos) ;;
+    *)
+      echo "Error: unsupported ROM_FAMILY: ${ROM_FAMILY}" >&2
+      return 1
+      ;;
+  esac
+}
+
 function resolve_rom_profile() {
   case "${ROM_FAMILY}" in
   grapheneos)
@@ -53,6 +68,8 @@ function resolve_rom_profile() {
     return 1
     ;;
   esac
+
+  apply_rom_module_policy || return 1
 
   GRAPHENEOS[OTA_BASE_URL]="${ROM_PROFILE[OTA_BASE_URL]}"
   GRAPHENEOS[UPDATE_CHANNEL]="${GRAPHENEOS_UPDATE_CHANNEL:-${ROM_PROFILE[DEFAULT_UPDATE_CHANNEL]}}"

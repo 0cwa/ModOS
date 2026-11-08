@@ -77,6 +77,18 @@ def main():
     assert "      msd: ${{ inputs.msd }}" in job("manual_build")
     assert "      msd: ${{ needs.schedule_config.outputs.msd == 'true' }}" in job("scheduled_build")
 
+    bcr_input = re.search(
+        r"^      bcr:\n(.*?)(?=^      \w|\Z)", workflow, re.M | re.S
+    )
+    assert bcr_input, "LineageOS workflow lacks an explicit BCR selection"
+    assert re.search(r"^        type: boolean$", bcr_input[1], re.M)
+    assert re.search(r"^        default: true$", bcr_input[1], re.M)
+    assert "      bcr: ${{ inputs.bcr }}" in job("manual_build")
+    assert "    with: &lineage-build-inputs" in job("manual_build")
+    for name in ("manual_build_only", "manual_device_candidate"):
+        assert "    with: *lineage-build-inputs" in job(name), name
+    assert "      bcr: ${{ needs.schedule_config.outputs.bcr == 'true' }}" in job("scheduled_build")
+
     scheduled = job("scheduled_build")
     assert "    needs: schedule_config\n" in scheduled
     assert "    uses: ./.github/workflows/build-rom.yml\n" in scheduled

@@ -246,12 +246,10 @@ set_default_expected_args() {
     "--pass-ota-env-var" "PASSPHRASE_OTA"
     "--module-custota" "${WORKDIR}/modules/custota.zip"
     "--module-msd" "${WORKDIR}/modules/msd.zip"
-    "--module-bcr" "${WORKDIR}/modules/bcr.zip"
     "--module-oemunlockonboot" "${WORKDIR}/modules/oemunlockonboot.zip"
     "--module-alterinstaller" "${WORKDIR}/modules/alterinstaller.zip"
     "--module-custota-sig" "${WORKDIR}/signatures/custota.zip.sig"
     "--module-msd-sig" "${WORKDIR}/signatures/msd.zip.sig"
-    "--module-bcr-sig" "${WORKDIR}/signatures/bcr.zip.sig"
     "--module-oemunlockonboot-sig" "${WORKDIR}/signatures/oemunlockonboot.zip.sig"
     "--module-alterinstaller-sig" "${WORKDIR}/signatures/alterinstaller.zip.sig"
     "--patch-arg=--rootless"
@@ -333,6 +331,101 @@ test_all_modules_can_be_disabled() {
   assert_array_equals EXPECTED_ARGS CAPTURED_ARGS "disable all modules"
 }
 
+test_bcr_selection_follows_rom_family() (
+  local family selected
+  for family in grapheneos lineageos; do
+    for selected in true false; do
+      reset_fixture "bcr-${family}-${selected}"
+      ROM_FAMILY="${family}"
+      ADDITIONALS[BCR]="${selected}"
+      run_patch
+      if [[ "${family}" == lineageos && "${selected}" == true ]]; then
+        assert_pair --module-bcr "${WORKDIR}/modules/bcr.zip" 'LineageOS BCR archive'
+        assert_pair --module-bcr-sig "${WORKDIR}/signatures/bcr.zip.sig" 'LineageOS BCR signature'
+      else
+        assert_not_contains --module-bcr "${family} BCR exclusion"
+        assert_not_contains --module-bcr-sig "${family} BCR signature exclusion"
+        [[ "${ADDITIONALS[BCR]}" == false ]] || fail "${family} BCR selection was not disabled"
+      fi
+    done
+  done
+
+  # Also cover callers that use the argument builder directly, without first
+  # resolving a ROM profile or invoking patch_ota.
+  reset_fixture bcr-direct-arguments
+  CAPTURED_ARGS=()
+  append_enabled_module_arguments CAPTURED_ARGS
+  assert_not_contains --module-bcr 'direct GrapheneOS argument builder'
+  assert_not_contains --module-bcr-sig 'direct GrapheneOS signature builder'
+)
+
+test_bcr_dependency_acquisition_uses_effective_selection() (
+  local family selected expected
+  local -a events=()
+  supported_tools() { printf 'bcr\n'; }
+  is_locked_executable_tool() { return 1; }
+  root_mode_includes_magisk() { return 1; }
+  make_directories() { events+=(directories); }
+  download_dependencies() { events+=("download:${1}"); }
+  verify_downloads() { events+=("verify:${1}"); }
+
+  for family in grapheneos lineageos; do
+    for selected in true false; do
+      reset_fixture "bcr-download-${family}-${selected}"
+      ROM_FAMILY="${family}"
+      ADDITIONALS[BCR]="${selected}"
+      ADDITIONALS[RETRY]=false
+      events=()
+      check_and_download_dependencies >/dev/null
+      expected=directories
+      if [[ "${family}" == lineageos && "${selected}" == true ]]; then
+        expected+=' download:bcr verify:bcr'
+      fi
+      [[ "${events[*]}" == "${expected}" ]] ||
+        fail "${family}/${selected} BCR download events: ${events[*]}"
+    done
+  done
+)
+
+test_invalid_bcr_fails_before_build_side_effects() (
+  local family invalid
+  local -a events=()
+  make_directories() { events+=(directories); }
+  base64_decode() { events+=(signing-keys); }
+  for family in grapheneos lineageos; do
+    for invalid in '' yes 1; do
+      reset_fixture "bcr-invalid-${family}-${invalid:-empty}"
+      ROM_FAMILY="${family}"
+      ROM_PROFILE[PROVIDER]="${family}" # Cached profile must not bypass revalidation.
+      ADDITIONALS[BCR]="${invalid}"
+      INTERACTIVE_MODE=false
+      events=()
+      if check_and_download_dependencies >/dev/null 2>&1; then
+        fail "${family} accepted invalid BCR before downloads"
+      fi
+      [[ "${#events[@]}" == 0 ]] || fail 'invalid BCR created dependency directories'
+      if run_patch >/dev/null 2>&1; then
+        fail "${family} accepted invalid BCR before patching"
+      fi
+      [[ "${#events[@]}" == 0 ]] || fail 'invalid BCR accessed signing keys'
+      [[ "${#CAPTURED_ARGS[@]}" == 0 ]] || fail 'invalid BCR invoked the helper'
+      if append_enabled_module_arguments CAPTURED_ARGS >/dev/null 2>&1; then
+        fail "${family} direct argument builder accepted invalid BCR"
+      fi
+      [[ "${#CAPTURED_ARGS[@]}" == 0 ]] || fail 'invalid BCR appended module arguments'
+    done
+  done
+)
+
+test_module_argument_failure_prevents_helper_execution() (
+  reset_fixture module-argument-failure
+  append_enabled_module_arguments() { return 1; }
+  if run_patch >/dev/null 2>&1; then
+    fail 'module argument failure did not stop patch_ota'
+  fi
+  [[ "${#CAPTURED_ARGS[@]}" == 0 ]] || fail 'helper ran after module argument failure'
+)
+
 test_special_cases_remain_available() {
   reset_fixture compatible-sepolicy
   ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]="true"
@@ -377,9 +470,9 @@ test_boot_animation_module_is_optional_and_ordered() {
   prepare_boot_animation_module() { :; }
   set_default_expected_args
   EXPECTED_ARGS=(
-    "${EXPECTED_ARGS[@]:0:31}"
+    "${EXPECTED_ARGS[@]:0:29}"
     "--module-boot-animation" "${WORKDIR}/modules/boot-animation.zip"
-    "${EXPECTED_ARGS[@]:31}"
+    "${EXPECTED_ARGS[@]:29}"
   )
   for value in "${EXPECTED_ARGS[@]}"; do
     if [[ "${value}" == "--patch-arg=--rootless" ]]; then
@@ -935,6 +1028,10 @@ test_fdroid_enabled_does_not_reuse_legacy_output_marker() {
 test_default_arguments
 test_each_module_can_be_disabled
 test_all_modules_can_be_disabled
+test_bcr_selection_follows_rom_family
+test_bcr_dependency_acquisition_uses_effective_selection
+test_invalid_bcr_fails_before_build_side_effects
+test_module_argument_failure_prevents_helper_execution
 test_special_cases_remain_available
 test_disable_system_updater_module_is_optional
 test_boot_animation_module_is_optional_and_ordered

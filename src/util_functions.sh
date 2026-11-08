@@ -68,6 +68,7 @@ function root_mode_includes_magisk() {
 # Function to check and download the dependencies
 # This function checks for the required tools and downloads them if not found depending on the configuration done in the declarations file
 function check_and_download_dependencies() {
+  apply_rom_module_policy || return 1
   make_directories
 
   # Check for Python requirements
@@ -222,6 +223,7 @@ function flag_check() {
 # Append enabled my-avbroot-setup modules while preserving the historical
 # argument order: all module archives first, followed by their signatures.
 function append_enabled_module_arguments() {
+  apply_rom_module_policy || return 1
   local args_name="${1}"
   local -n args_ref="${args_name}"
   local entry module flag
@@ -934,6 +936,7 @@ function generate_keys() {
 # Leverages `my-avbroot-setup` to patch the OTA
 # This function does a lot of things before patching the OTA
 function patch_ota() {
+  apply_rom_module_policy || return 1
   resolve_root_mode || return 1
 
   if [[ -z "${ROM_PROFILE[PROVIDER]:-}" ]]; then
@@ -1094,7 +1097,7 @@ function patch_ota() {
       ! prepare_exfatprogs_fsck_module "${my_avbroot_setup}"; then
       return 1
     fi
-    append_enabled_module_arguments args
+    append_enabled_module_arguments args || return 1
     if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
       args+=("${locked_module_args[@]}")
     elif [[ "${ADDITIONALS[MICROG]}" == 'true' ]]; then
