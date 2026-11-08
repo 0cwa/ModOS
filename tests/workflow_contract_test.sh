@@ -529,7 +529,9 @@ test_release_triggers() {
   assert_dispatch_default "${RELEASE}" device-id shiba
   assert_dispatch_default "${RELEASE}" root true
   assert_dispatch_default "${RELEASE}" alterinstaller true
-  assert_dispatch_default "${RELEASE}" bcr true
+  assert_dispatch_default "${RELEASE}" bcr false
+  assert_dispatch_default "${RELEASE}" bcr false workflow_call
+  assert_dispatch_default "${WORKFLOW_DIR}/multi-release.yml" bcr false
   assert_dispatch_default "${RELEASE}" custota true
   assert_dispatch_default "${RELEASE}" msd true
   assert_dispatch_default "${RELEASE}" oemunlockonboot true
@@ -542,12 +544,43 @@ test_release_triggers() {
   assert_dispatch_default "${lineage}" root true
   assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
   assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" bcr true
   assert_dispatch_default "${lineage}" shizuku false
   assert_dispatch_default "${lineage}" disable-system-updater false
   assert_dispatch_default "${lineage}" boot-animation true
   assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
   assert_contains "${lineage}" 'shizuku:[[:space:]]*\$\{\{ inputs\.shizuku \}\}' "LineageOS manual Shizuku selection must be forwarded"
   assert_contains "${lineage}" 'shizuku:[[:space:]]*false' "LineageOS scheduled Shizuku selection must remain disabled"
+}
+
+test_bcr_reusable_workflow_family_policy() {
+  python3 - <<'PY'
+from pathlib import Path
+import itertools
+import re
+import subprocess
+
+workflow = Path('.github/workflows/build-rom.yml').read_text()
+expression = re.search(r'^  ADDITIONALS_BCR: \$\{\{ (.+?) \}\}$', workflow, re.M)[1]
+for family, selected in itertools.product(('grapheneos', 'lineageos'), (False, True)):
+    expression_case = expression.replace('inputs.rom-family', repr(family)).replace('inputs.bcr', repr(selected))
+    actual = eval(expression_case.replace('&&', ' and ').replace('||', ' or '), {'__builtins__': {}})
+    assert actual is (family == 'lineageos' and selected), (family, selected, actual)
+
+ci = Path('.github/workflows/ci.yml').read_text()
+for job, expected in (('lineage24_qualification', 'true'), ('grapheneos_qualification', 'false')):
+    body = re.search(r'^  ' + job + r':\n(.*?)(?=^  \w|\Z)', ci, re.M | re.S)[1]
+    assert re.search(r'^      bcr: ' + expected + '$', body, re.M), (job, expected)
+
+# Actions starts a new shell for each run step. The changelog must consume the
+# exported scalar, not the associative array that existed in profile resolution.
+line = re.search(r'^            (echo "BCR enabled: .+")$', workflow, re.M)[1]
+for selected in ('true', 'false'):
+    result = subprocess.run(['bash', '-uc', line], env={'ADDITIONALS_BCR': selected},
+                            text=True, capture_output=True, check=True)
+    assert result.stdout == f'BCR enabled: {selected}\n'
+print('BCR reusable workflow family and fresh-shell reporting tests passed')
+PY
 }
 
 test_config_loading_isolated_to_scheduled_releases() {
@@ -701,6 +734,7 @@ test_encrypted_device_candidate_request_gate
 test_development_profile_activation
 test_guarded_lineage24_routing
 test_release_triggers
+test_bcr_reusable_workflow_family_policy
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding
 test_microg_lineage_forwarding

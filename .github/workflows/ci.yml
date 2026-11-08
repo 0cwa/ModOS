@@ -210,6 +210,7 @@ jobs:
       compatible-sepolicy-patching: true
       allow-unauthorized-adb: false
       microg: true
+      bcr: true
       # MSD v2.5's physical-device HAL mapping is not yet qualified on pdx235.
       msd: false
       exfatprogs-fsck: true
@@ -241,6 +242,7 @@ jobs:
       compatible-sepolicy-patching: false
       allow-unauthorized-adb: false
       microg: false
+      bcr: false
       exfatprogs-fsck: false
       fsck-sysfs-sepolicy: false
       disable-system-updater: true

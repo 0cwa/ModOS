@@ -15,7 +15,7 @@ compatibility boundaries and the upstream changes that would let us remove them.
 
 ## Features
 
-- [BCR](https://github.com/chenxiaolong/BCR)
+- [BCR](https://github.com/chenxiaolong/BCR) (LineageOS builds)
 - [Custota](https://github.com/chenxiaolong/Custota)
 - [MSD](https://github.com/chenxiaolong/MSD) (disabled by default for LineageOS pdx235 pending USB HAL qualification)
 - [OEMUnlockOnBoot](https://github.com/chenxiaolong/OEMUnlockOnBoot)
@@ -54,6 +54,21 @@ MSD selections still undergo the fallback guard; an alternative HAL domain is
 never guessed from its name. The read-only pdx235 module audit can observe the
 running gadget HAL label when MSD is selected, while export/unexport and USB
 recovery remain on-device acceptance checks.
+
+## BCR selection
+
+BCR 3.11 remains enabled by default for LineageOS, including the scheduled
+pdx235 builds and both rootless and Magisk outputs. Manual LineageOS builds
+can turn it off with the `bcr` workflow input or
+`'ADDITIONALS[BCR]' = false` in `env.toml`. Its signed archive, verification
+path, and helper version remain pinned as before.
+
+GrapheneOS builds exclude BCR. The shared ROM policy resolves BCR to `false`
+before acquisition, helper arguments, and build-selection fingerprinting,
+including for older configurations that still request `true`. GrapheneOS
+release defaults and its scheduled preset also select `false`. Selection
+metadata records `module.bcr=false` and `module.bcr.version=disabled`, so
+previous BCR-enabled GrapheneOS builds cannot satisfy the new selection.
 
 ## Working
 
