@@ -28,7 +28,7 @@
     },
     {
       "arch": "x86_64-unknown-linux-gnu",
-      "artifact_name": "avbroot-3.35.0-x86_64-unknown-linux-gnu.zip",
+      "artifact_name": "avbroot-3.37.1-x86_64-unknown-linux-gnu.zip",
       "id": "avbroot",
       "layout": [
         {
@@ -48,47 +48,47 @@
         {
           "mode": "0755",
           "path": "avbroot",
-          "sha256": "2539724e0add2b8f6d855b8311897d01a4c28e851d387551f130325f006fa614",
-          "size": 10916976,
+          "sha256": "6233bd83e9a3c85012cdb4c406ec72750dd51c26829369a1abe29ca2a99e6315",
+          "size": 10974384,
           "type": "file"
         }
       ],
-      "sha256": "bbc7f8b4df8d9e6d2162bf354ac9f06643b2f64247a6f345d71e963f645f58c5",
+      "sha256": "ca8e1e02bc33f5569d5228f312ce1351d0244fecd2d2163cb5a3c1a283a6e4a3",
       "signature": {
         "identity": "chenxiaolong",
         "namespace": "file",
         "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
         "type": "ssh",
-        "url": "https://github.com/chenxiaolong/avbroot/releases/download/v3.35.0/avbroot-3.35.0-x86_64-unknown-linux-gnu.zip.sig"
+        "url": "https://github.com/chenxiaolong/avbroot/releases/download/v3.37.1/avbroot-3.37.1-x86_64-unknown-linux-gnu.zip.sig"
       },
-      "size": 4250535,
-      "url": "https://github.com/chenxiaolong/avbroot/releases/download/v3.35.0/avbroot-3.35.0-x86_64-unknown-linux-gnu.zip",
-      "version": "3.35.0"
+      "size": 4293699,
+      "url": "https://github.com/chenxiaolong/avbroot/releases/download/v3.37.1/avbroot-3.37.1-x86_64-unknown-linux-gnu.zip",
+      "version": "3.37.1"
     },
     {
       "arch": "x86_64-unknown-linux-gnu",
-      "artifact_name": "custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
+      "artifact_name": "custota-tool-6.8-x86_64-unknown-linux-gnu.zip",
       "id": "custota-tool",
       "layout": [
         {
           "mode": "0755",
           "path": "custota-tool",
-          "sha256": "a967123bbcb5424ea0faf588103bfff191c296e0b8df118b03efef9415f4c8aa",
-          "size": 5629680,
+          "sha256": "2ec3f2f23cafd21137f380e1aaac120a08495f640d26cdffe90e17d43a75a49f",
+          "size": 5644336,
           "type": "file"
         }
       ],
-      "sha256": "c556e5e72b7671914d7c772728abb0d2f602ff53d8873a1e6efdf202df654d73",
+      "sha256": "7c7e6cb64f3fe0993969813d26b4a66b7ea1689af47579e6543391a55ca40ecb",
       "signature": {
         "identity": "chenxiaolong",
         "namespace": "file",
         "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
         "type": "ssh",
-        "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.6/custota-tool-6.6-x86_64-unknown-linux-gnu.zip.sig"
+        "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.8/custota-tool-6.8-x86_64-unknown-linux-gnu.zip.sig"
       },
-      "size": 2389309,
-      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.6/custota-tool-6.6-x86_64-unknown-linux-gnu.zip",
-      "version": "6.6"
+      "size": 2421143,
+      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.8/custota-tool-6.8-x86_64-unknown-linux-gnu.zip",
+      "version": "6.8"
     }
   ]
 }

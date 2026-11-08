@@ -27,10 +27,10 @@ on:
         type: boolean
         default: true
       bcr:
-        description: Include BCR
+        description: BCR is retained for LineageOS; GrapheneOS excludes it
         required: false
         type: boolean
-        default: true
+        default: false
       custota:
         description: Include Custota
         required: false

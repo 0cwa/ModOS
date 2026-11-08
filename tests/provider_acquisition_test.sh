@@ -40,6 +40,7 @@ reset_acquisition_fixture() {
   GRAPHENEOS[OTA_URL]=""
   GRAPHENEOS[OTA_TARGET]=""
   ROM_OTA_SHA256=""
+  ROM_OTA_API_LEVEL=""
   ADDITIONALS_MAS_COMPATIBLE_SEPOLICY=""
 }
 
@@ -65,6 +66,7 @@ test_grapheneos_text_metadata() (
   reset_acquisition_fixture
   ROM_FAMILY="grapheneos"
   DEVICE_NAME="shiba"
+  ROM_OTA_API_LEVEL=37
 
   git() { mock_magisk_tags "$@"; }
   curl() {
@@ -85,6 +87,7 @@ test_grapheneos_text_metadata() (
     "${GRAPHENEOS[OTA_URL]}" "GrapheneOS OTA URL"
   assert_equals "v29.0" "${VERSION[MAGISK]}" "Magisk version"
   assert_equals "" "${ROM_OTA_SHA256}" "GrapheneOS digest availability"
+  assert_equals "" "${ROM_OTA_API_LEVEL}" "GrapheneOS clears prior source SDK"
 )
 
 test_lineageos_v2_metadata() (
@@ -105,6 +108,7 @@ test_lineageos_v2_metadata() (
         "files": [
           {
             "filename": "lineage-23.2-20260716-nightly-pdx235-signed.zip",
+            "os_sdk_level": 36,
             "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "type": "nightly",
             "url": "https://mirrorbits.lineageos.org/full/pdx235/20260716/lineage-23.2-20260716-nightly-pdx235-signed.zip"
@@ -119,6 +123,7 @@ test_lineageos_v2_metadata() (
         "files": [
           {
             "filename": "lineage-23.2-20260717-nightly-pdx235-signed.zip",
+            "os_sdk_level": 36,
             "sha256": "df27d06052a79f0acc24e8862b70a0c32f188e4a6f107964c93bdb54ade7accc",
             "type": "nightly",
             "url": "https://mirrorbits.lineageos.org/full/pdx235/20260717/lineage-23.2-20260717-nightly-pdx235-signed.zip"
@@ -146,6 +151,61 @@ test_lineageos_v2_metadata() (
   assert_equals \
     "df27d06052a79f0acc24e8862b70a0c32f188e4a6f107964c93bdb54ade7accc" \
     "${ROM_OTA_SHA256}" "LineageOS OTA SHA-256"
+  assert_equals 36 "${ROM_OTA_API_LEVEL}" "LineageOS source SDK"
+)
+
+test_lineageos_source_sdk_requires_positive_json_integer() (
+  reset_acquisition_fixture
+  ROM_FAMILY=lineageos
+  DEVICE_NAME=pdx235
+  local sdk_json
+
+  git() { mock_magisk_tags "$@"; }
+  curl() {
+    python3 - "${sdk_json}" <<'PY'
+import json
+import sys
+
+older = {
+    "filename": "lineage-23.2-20261009-nightly-pdx235-signed.zip",
+    "url": "https://mirrorbits.lineageos.org/full/pdx235/20261009/lineage-23.2-20261009-nightly-pdx235-signed.zip",
+    "type": "nightly", "sha256": "a" * 64, "os_sdk_level": 36,
+}
+selected = {
+    "filename": "lineage-24.0-20261106-nightly-pdx235-signed.zip",
+    "url": "https://mirrorbits.lineageos.org/full/pdx235/20261106/lineage-24.0-20261106-nightly-pdx235-signed.zip",
+    "type": "nightly", "sha256": "b" * 64,
+}
+if sys.argv[1] != "missing":
+    selected["os_sdk_level"] = json.loads(sys.argv[1])
+print(json.dumps([
+    {"type": "nightly", "datetime": 1, "files": [older]},
+    # Neither a build-level value nor another file can supply a missing SDK.
+    {"type": "nightly", "datetime": 2, "os_sdk_level": 99, "files": [
+        {"filename": "boot.img", "os_sdk_level": 98}, selected,
+    ]},
+]))
+PY
+  }
+
+  for sdk_json in 36 37 38; do
+    get_latest_version >/dev/null
+    assert_equals "${sdk_json}" "${ROM_OTA_API_LEVEL}" 'selected file SDK is preserved'
+    assert_equals lineage-24.0-20261106-nightly-pdx235-signed \
+      "${GRAPHENEOS[OTA_TARGET]}" 'SDK comes from the selected OTA'
+  done
+  # Re-sourcing declarations during setup must preserve the selected metadata.
+  source src/declarations.sh
+  assert_equals 38 "${ROM_OTA_API_LEVEL}" 'selected SDK survives setup declarations'
+
+  for sdk_json in missing null true false '"37"' 37.0 0 -1 '[]' '{}'; do
+    ROM_OTA_API_LEVEL=36
+    if get_latest_version >/dev/null 2>&1; then
+      fail "invalid selected source SDK unexpectedly succeeded: ${sdk_json}"
+    fi
+    assert_equals "" "${ROM_OTA_API_LEVEL}" \
+      "invalid SDK ${sdk_json} must not retain or fall back to API 36"
+  done
 )
 
 test_lineageos_digest_verification() (
@@ -173,6 +233,7 @@ test_invalid_grapheneos_metadata_fails_closed() (
   reset_acquisition_fixture
   ROM_FAMILY="grapheneos"
   DEVICE_NAME="shiba"
+  ROM_OTA_API_LEVEL=37
 
   git() { mock_magisk_tags "$@"; }
   curl() { printf '%s\n' '<html>not release metadata</html>'; }
@@ -180,12 +241,14 @@ test_invalid_grapheneos_metadata_fails_closed() (
   if get_latest_version >/dev/null 2>&1; then
     fail "invalid GrapheneOS metadata unexpectedly succeeded"
   fi
+  assert_equals "" "${ROM_OTA_API_LEVEL}" 'failed provider selection clears prior SDK'
 )
 
 test_unsafe_grapheneos_device_fails_closed() (
   reset_acquisition_fixture
   ROM_FAMILY="grapheneos"
   DEVICE_NAME="../shiba"
+  ROM_OTA_API_LEVEL=37
 
   git() { mock_magisk_tags "$@"; }
   curl() { fail "unsafe GrapheneOS device reached the network"; }
@@ -193,6 +256,7 @@ test_unsafe_grapheneos_device_fails_closed() (
   if get_latest_version >/dev/null 2>&1; then
     fail "unsafe GrapheneOS device unexpectedly succeeded"
   fi
+  assert_equals "" "${ROM_OTA_API_LEVEL}" 'rejected source identity clears prior SDK'
 )
 
 test_unsafe_lineageos_metadata_fails_closed() (
@@ -206,6 +270,9 @@ test_unsafe_lineageos_metadata_fails_closed() (
       "date": "2026-07-17",
       "files": [{
         "filename": "lineage-23.2-20260717-nightly-pdx235-signed.zip",
+        "os_sdk_level": 36,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "nightly",
         "url": "http://mirror.example/lineage-23.2-20260717-nightly-pdx235-signed.zip"
       }],
       "type": "nightly",
@@ -228,19 +295,23 @@ test_development_source_does_not_follow_major_upgrade() (
     printf '%s\n' '[
       {"type":"nightly","datetime":1791814447,"files":[{
         "filename":"lineage-24.0-20261012-nightly-pdx235-signed.zip",
+        "os_sdk_level":37,
         "type":"nightly","sha256":"29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820",
         "url":"https://mirrorbits.lineageos.org/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip"}]},
       {"type":"nightly","datetime":1791520682,"files":[{
         "filename":"lineage-23.2-20261009-nightly-pdx235-signed.zip",
+        "os_sdk_level":36,
         "type":"nightly","sha256":"b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8",
         "url":"https://mirrorbits.lineageos.org/full/pdx235/20261009/lineage-23.2-20261009-nightly-pdx235-signed.zip"}]}]'
   }
   get_latest_version >/dev/null
   assert_equals 20261009 "${VERSION[GRAPHENEOS]}" 'reviewed development source'
   assert_equals lineage-23.2-20261009-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" 'development target'
+  assert_equals 36 "${ROM_OTA_API_LEVEL}" 'frozen development source SDK'
   unset PIXENEOS_DEVELOPMENT_PROFILE
   get_latest_version >/dev/null
   assert_equals 20261012 "${VERSION[GRAPHENEOS]}" 'ordinary provider still selects latest'
+  assert_equals 37 "${ROM_OTA_API_LEVEL}" 'ordinary provider updates SDK with selected source'
 )
 
 test_missing_development_source_fails_closed() (
@@ -264,6 +335,7 @@ test_changed_development_source_digest_fails_closed() (
   curl() {
     printf '%s\n' '[{"type":"nightly","files":[{
       "filename":"lineage-23.2-20261009-nightly-pdx235-signed.zip",
+      "os_sdk_level":36,
       "type":"nightly","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "url":"https://mirrorbits.lineageos.org/full/pdx235/20261009/lineage-23.2-20261009-nightly-pdx235-signed.zip"}]}]'
   }
@@ -282,18 +354,22 @@ test_lineage24_development_selects_latest_24_0_not_unreviewed_series() (
     printf '%s\n' '[
       {"type":"nightly","datetime":1792137600,"files":[{
         "filename":"lineage-24.1-20261016-nightly-pdx235-signed.zip",
+        "os_sdk_level":37,
         "type":"nightly","sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "url":"https://mirrorbits.lineageos.org/full/pdx235/20261016/lineage-24.1-20261016-nightly-pdx235-signed.zip"}]},
       {"type":"nightly","datetime":1792051200,"files":[{
         "filename":"lineage-24.0-20261015-nightly-pdx235-signed.zip",
+        "os_sdk_level":37,
         "type":"nightly","sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "url":"https://mirrorbits.lineageos.org/full/pdx235/20261015/lineage-24.0-20261015-nightly-pdx235-signed.zip"}]},
       {"type":"nightly","datetime":1791814447,"files":[{
         "filename":"lineage-24.0-20261012-nightly-pdx235-signed.zip",
+        "os_sdk_level":37,
         "type":"nightly","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "url":"https://mirrorbits.lineageos.org/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip"}]},
       {"type":"nightly","datetime":1791520682,"files":[{
         "filename":"lineage-23.2-20261009-nightly-pdx235-signed.zip",
+        "os_sdk_level":36,
         "type":"nightly","sha256":"b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8",
         "url":"https://mirrorbits.lineageos.org/full/pdx235/20261009/lineage-23.2-20261009-nightly-pdx235-signed.zip"}]}]'
   }
@@ -301,6 +377,7 @@ test_lineage24_development_selects_latest_24_0_not_unreviewed_series() (
   assert_equals 20261015 "${VERSION[GRAPHENEOS]}" 'LineageOS 24.0 source date'
   assert_equals lineage-24.0-20261015-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" 'LineageOS 24.0 target'
   assert_equals cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc "${ROM_OTA_SHA256}" 'LineageOS 24.0 source digest'
+  assert_equals 37 "${ROM_OTA_API_LEVEL}" 'LineageOS 24.0 development source SDK'
 )
 
 test_lineage24_development_refuses_wrong_series_and_channel() (
@@ -312,6 +389,7 @@ test_lineage24_development_refuses_wrong_series_and_channel() (
   curl() {
     printf '%s\n' '[{"type":"nightly","files":[{
       "filename":"lineage-24.1-20261016-nightly-pdx235-signed.zip",
+      "os_sdk_level":37,
       "type":"nightly","sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "url":"https://mirrorbits.lineageos.org/full/pdx235/20261016/lineage-24.1-20261016-nightly-pdx235-signed.zip"}]}]'
   }
@@ -334,14 +412,17 @@ test_published_source_uses_current_official_24_0_nightly() (
     printf '%s\n' '[
       {"type":"nightly","datetime":1792425600,"files":[{
         "filename":"lineage-24.0-20261019-nightly-pdx235-signed.zip",
+        "os_sdk_level":37,
         "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "type":"nightly","url":"https://mirrorbits.lineageos.org/full/pdx235/20261019/lineage-24.0-20261019-nightly-pdx235-signed.zip"}]},
       {"type":"nightly","datetime":1791814447,"files":[{
         "filename":"lineage-24.0-20261012-nightly-pdx235-signed.zip",
+        "os_sdk_level":37,
         "sha256":"29cb72bbdf808807d27f834a889df7a96ad85cdeed42b45dfb6748cdf05c3820",
         "type":"nightly","url":"https://mirrorbits.lineageos.org/full/pdx235/20261012/lineage-24.0-20261012-nightly-pdx235-signed.zip"}]},
       {"type":"nightly","datetime":1792512000,"files":[{
         "filename":"lineage-24.1-20261020-nightly-pdx235-signed.zip",
+        "os_sdk_level":37,
         "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "type":"nightly","url":"https://mirrorbits.lineageos.org/full/pdx235/20261020/lineage-24.1-20261020-nightly-pdx235-signed.zip"}]}]'
   }
@@ -349,6 +430,7 @@ test_published_source_uses_current_official_24_0_nightly() (
   assert_equals 20261019 "${VERSION[GRAPHENEOS]}" 'newest approved 24.0 nightly'
   assert_equals lineage-24.0-20261019-nightly-pdx235-signed "${GRAPHENEOS[OTA_TARGET]}" '24.0 source target'
   assert_equals aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "${ROM_OTA_SHA256}" 'official source digest'
+  assert_equals 37 "${ROM_OTA_API_LEVEL}" 'published source SDK'
   enforce_pdx235_supported_source || fail 'newest 24.0 nightly unexpectedly rejected'
 )
 
@@ -368,6 +450,7 @@ test_published_scope_rejects_non_nightly() (
 test_pinned_magisk_version_skips_tag_discovery
 test_grapheneos_text_metadata
 test_lineageos_v2_metadata
+test_lineageos_source_sdk_requires_positive_json_integer
 test_lineageos_digest_verification
 test_invalid_grapheneos_metadata_fails_closed
 test_unsafe_grapheneos_device_fails_closed

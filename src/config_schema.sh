@@ -84,6 +84,8 @@ _config_schema_define afsr 'ADDITIONALS[AFSR]' build boolean \
   ADDITIONALS array AFSR ADDITIONALS_AFSR true true caller-or-existing-or-default
 _config_schema_define alterinstaller 'ADDITIONALS[ALTERINSTALLER]' build boolean \
   ADDITIONALS array ALTERINSTALLER ADDITIONALS_ALTERINSTALLER true true caller-or-existing-or-default
+# The requested default retains BCR on LineageOS; the resolved ROM policy
+# excludes it from GrapheneOS before acquisition, patching and fingerprinting.
 _config_schema_define bcr 'ADDITIONALS[BCR]' build boolean \
   ADDITIONALS array BCR ADDITIONALS_BCR true true caller-or-existing-or-default
 _config_schema_define custota 'ADDITIONALS[CUSTOTA]' build boolean \

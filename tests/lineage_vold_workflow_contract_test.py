@@ -79,6 +79,10 @@ class VoldWorkflowContractTest(unittest.TestCase):
         self.assertIn("src/ci/build_lineage_vold.py sync", job)
         self.assertIn("src/ci/build_lineage_vold.py baseline", job)
         self.assertLess(
+            job.index("src/ci/prepare_vold_vendor_makefiles.py"),
+            job.index("src/ci/build_lineage_vold.py baseline"),
+        )
+        self.assertLess(
             job.index("src/ci/prepare_lineage_vold_reference.sh"),
             job.index("src/ci/build_lineage_vold.py baseline"),
         )

@@ -1,0 +1,194 @@
+name: Qualify original LineageOS pdx235 vold (no patch)
+
+# Intentionally manual and nonpublishing. workflow_dispatch is available
+# once this *baseline-only* workflow is merged to the default branch.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Static plan, source-only compile probe (not proof), or authenticated byte comparison
+        type: choice
+        required: true
+        default: plan
+        options:
+          - plan
+          - probe
+          - compare
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unmodified-pdx235-vold-baseline
+  cancel-in-progress: false
+
+jobs:
+  dependency_plan:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout immutable manifest and source probe
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Trace the initial pinned source selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 src/ci/vold_source_closure.py plan --output "${RUNNER_TEMP}/vold-source-plan.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          info = json.loads((Path(os.environ["RUNNER_TEMP"]) / "vold-source-plan.json").read_text())
+          assert info["schema_version"] == 1
+          count = len(info["selected_projects"])
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
+              summary.write(f"### Provisional vold source graph: {count}/1243 manifest projects\n")
+              summary.write("This is a source probe, **not** a complete Soong closure or a reproduced binary.\n")
+              summary.write("Sony proprietary inputs use separately locked TheMuppets candidate trees, verified before fetching toolchains.\n")
+              summary.write("Local builds need no Actions runner: see docs/vold-baseline-ci.md and src/ci/vold_local.py.\n")
+          PY
+      - name: Upload static source dependency selection
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vold-source-provisional-plan
+          path: ${{ runner.temp }}/vold-source-plan.json
+          retention-days: 14
+
+  prerequisites:
+    needs: dependency_plan
+    if: inputs.mode != 'plan'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      - name: Require a trusted dedicated large build runner
+        shell: bash
+        env:
+          BASELINE_READY: ${{ vars.MODOS_VOLD_BASELINE_RUNNER_READY }}
+          SCRATCH: ${{ vars.MODOS_LINEAGE_LARGE_SCRATCH }}
+          SOURCE_REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$REPOSITORY" == '0cwa/ModOS' && "$SOURCE_REF" == refs/heads/main ]] || {
+            echo '::error::Unmodified vold source build is restricted to the repository main branch'
+            exit 1
+          }
+          [[ "$BASELINE_READY" == 'true' && "$SCRATCH" == /* ]] || {
+            echo '::error::Configure MODOS_VOLD_BASELINE_RUNNER_READY=true and MODOS_LINEAGE_LARGE_SCRATCH with an absolute private scratch path'
+            exit 1
+          }
+
+  unmodified_vold:
+    name: ${{ inputs.mode == 'probe' && 'Source compile probe — NOT QUALIFIED' || 'Authentic byte-for-byte original vold check' }}
+    needs: prerequisites
+    runs-on: [self-hosted, linux, x64, modos-lineage-large]
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    env:
+      MODOS_LINEAGE_LARGE_SCRATCH: ${{ vars.MODOS_LINEAGE_LARGE_SCRATCH }}
+    steps:
+      - name: Checkout pinned source and tests
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Validate isolated host and reserve scratch workspace
+        shell: bash
+        env:
+          BASELINE_MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          binaries=(repo git python3 realpath)
+          if [[ "$BASELINE_MODE" == compare ]]; then
+            binaries+=(avbroot curl unzip openssl sha256sum debugfs)
+          fi
+          for binary in "${binaries[@]}"; do
+            command -v "$binary" >/dev/null || {
+              echo "::error::Missing required executable: $binary"
+              exit 1
+            }
+          done
+          path="$MODOS_LINEAGE_LARGE_SCRATCH"
+          [[ "$path" == /* && -d "$path" && ! -L "$path" ]] || {
+            echo '::error::Scratch must be an existing real absolute directory'
+            exit 1
+          }
+          path="$(realpath -e -- "$path")"
+          free="$(df -PB1 "$path" | awk 'END {print $4}')"
+          (( free >= 100000000000 )) || {
+            echo '::error::The subset probe requires at least 100 GB as a conservative starting allowance (not a proven maximum)'
+            exit 1
+          }
+          workspace="$(mktemp -d "$path/modos-original-vold.XXXXXXXX")"
+          echo "VOLD_SCRATCH=$path" >> "$GITHUB_ENV"
+          echo "VOLD_WORK=$workspace" >> "$GITHUB_ENV"
+
+      - name: Fetch only the immutable official October 16 source OTA
+        if: inputs.mode == 'compare'
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          lock = json.loads(Path('locks/lineage-vold-baseline-20261016.json').read_text())
+          assert lock['source_ota_url'] == (
+              'https://mirrorbits.lineageos.org/full/pdx235/20261016/'
+              'lineage-24.0-20261016-nightly-pdx235-signed.zip'
+          )
+          print(lock['source_ota_url'])
+          PY
+          )"
+          curl --fail --location --retry 3 --connect-timeout 30 \
+            --proto '=https' --proto-redir '=https' \
+            --output "$VOLD_WORK/source.zip" "$url"
+
+      - name: Authenticate official publisher and extract original vold
+        if: inputs.mode == 'compare'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash src/ci/extract_original_vold.sh "$VOLD_WORK/source.zip" "$VOLD_WORK/reference"
+
+
+      - name: Probe missing project dependencies and compare original when selected
+        shell: bash
+        env:
+          VOLD_PROBE_STAGE: ${{ inputs.mode }}
+          VOLD_PROBE_JOBS: '4'
+        run: |
+          set -euo pipefail
+          export VOLD_SOURCE_REF="${VOLD_WORK}/reference/original-vold"
+          bash src/ci/probe_original_vold.sh
+
+      - name: Upload only small dependency diagnostics or comparison receipt
+        if: always() && env.VOLD_WORK != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vold-probe-${{ inputs.mode }}-diagnostics
+          path: |
+            ${{ env.VOLD_WORK }}/baseline-*/baseline-report.json
+            ${{ env.VOLD_WORK }}/source-selection.json
+            ${{ env.VOLD_WORK }}/sony-vendor-input-report.json
+            ${{ env.VOLD_WORK }}/source-index-*.json
+            ${{ env.VOLD_WORK }}/dependency-diagnosis-*.json
+            ${{ env.VOLD_WORK }}/probe-only.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove original OTA, complete tree, and binary from trusted runner
+        if: always() && env.VOLD_WORK != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VOLD_WORK" == "$VOLD_SCRATCH"/modos-original-vold.* ]] || {
+            echo '::error::Refusing scratch cleanup outside the isolated baseline workspace'
+            exit 1
+          }
+          rm -rf -- "$VOLD_WORK"

@@ -13,11 +13,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import stat
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+
+import build_original_vold as original
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -75,103 +76,26 @@ def project_map(xml_bytes: bytes) -> dict[str, tuple[str, str]]:
     return result
 
 
-def checked_source_manifest(source_root: Path, expected: dict) -> None:
-    repo = shutil.which("repo")
-    if not repo:
-        raise BuildError("repo tool is required to verify the synchronized LineageOS source tree")
-    completed = subprocess.run(
-        [repo, "manifest", "-r"],
-        cwd=source_root,
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    if completed.returncode:
-        raise BuildError("repo manifest -r failed: " + completed.stderr.decode("utf-8", "replace")[-2000:])
-    actual = project_map(completed.stdout)
-    if actual != expected:
-        missing = sorted(set(expected) - set(actual))
-        unexpected = sorted(set(actual) - set(expected))
-        changed = sorted(path for path in set(expected) & set(actual) if expected[path] != actual[path])
-        details = []
-        if missing:
-            details.append("missing=" + ",".join(missing[:8]))
-        if unexpected:
-            details.append("unexpected=" + ",".join(unexpected[:8]))
-        if changed:
-            details.append("revision-mismatch=" + ",".join(changed[:8]))
-        raise BuildError("synchronized source does not match the complete pinned manifest (" + "; ".join(details) + ")")
+def original_build_contract(lock: dict, manifest: bytes) -> dict:
+    """Share the independently reviewed original-build inputs and safeguards."""
+    baseline_lock, baseline_manifest = original.load_contract()
+    identity_fields = ("rom_family", "device", "base_build_id", "source_ota_sha256", "projects")
+    if baseline_manifest != manifest or any(
+        baseline_lock.get(key) != lock.get(key) for key in identity_fields
+    ):
+        raise BuildError("patched-vold and original-build source contracts disagree")
+    for key in ("target", "command", "artifact", "elf_class", "elf_machine", "interpreter"):
+        if baseline_lock["build"].get(key) != lock["build"].get(key):
+            raise BuildError(f"patched-vold and original-build contracts disagree for {key}")
+    return baseline_lock
 
 
 def command_sync(source_root: Path, jobs: int | None) -> None:
-    lock, manifest_bytes, _ = load_contract()
-    repo = shutil.which("repo")
-    if not repo:
-        raise BuildError("repo tool is required to synchronize LineageOS source")
-    source_root = source_root.expanduser().resolve()
-    if source_root.exists() and (not source_root.is_dir() or any(source_root.iterdir())):
-        raise BuildError("source root must be a new or empty directory")
-    source_root.mkdir(parents=True, exist_ok=True)
-    manifest_project = lock["projects"]["manifest"]
-    subprocess.run(
-        [
-            repo,
-            "init",
-            "-u",
-            "https://github.com/LineageOS/android.git",
-            "-b",
-            manifest_project["revision"],
-        ],
-        cwd=source_root,
-        check=True,
-    )
-    active_manifest = source_root / ".repo/manifest.xml"
-    if not active_manifest.exists() and not active_manifest.is_symlink():
-        raise BuildError("repo init did not create the active manifest path")
-    if active_manifest.is_dir():
-        raise BuildError("repo active manifest path unexpectedly resolves to a directory")
-    active_manifest.unlink()
-    active_manifest.write_bytes(manifest_bytes)
-    sync_args = [repo, "sync", "--no-clone-bundle"]
-    if jobs:
-        sync_args.append(f"-j{jobs}")
-    subprocess.run(sync_args, cwd=source_root, check=True)
-    expected = project_map(manifest_bytes)
-    checked_source_manifest(source_root, expected)
-
-
-def git(source: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(source), *args], check=False, text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    )
-    if result.returncode:
-        raise BuildError(f"git {' '.join(args)} failed: {result.stderr[-2000:]}")
-    return result.stdout.strip()
-
-
-def verify_source_checkouts_clean(source_root: Path, expected: dict) -> None:
-    """Ensure pinned revisions are not overridden by local edits or extra files.
-
-    A repo manifest pins Git HEADs; it does not certify the working-tree bytes.
-    An Android binary built with dirty dependencies must never be presented as
-    built from the exact official manifest.
-    """
-    source_root = source_root.resolve(strict=True)
-    for relative_path, (_name, revision) in sorted(expected.items()):
-        project_path = source_root / relative_path
-        if (
-            project_path.is_symlink()
-            or not project_path.is_dir()
-            or not project_path.resolve().is_relative_to(source_root)
-        ):
-            raise BuildError(f"pinned source project is missing or unsafe: {relative_path}")
-        if git(project_path, "rev-parse", "HEAD") != revision:
-            raise BuildError(f"pinned source revision differs at: {relative_path}")
-        # --ignored includes files hidden by .gitignore that could still be
-        # read by the Android compiler; require a virgin source workspace.
-        if git(project_path, "status", "--porcelain", "--ignored", "--untracked-files=all"):
-            raise BuildError(f"pinned source project is dirty: {relative_path}")
+    lock, manifest, _ = load_contract(verify_patch=False)
+    baseline_lock = original_build_contract(lock, manifest)
+    # Use Repo's supported -m selection and verified checkout path. Directly
+    # overwriting .repo/manifest.xml is not stable across Repo sync/init.
+    original.sync(source_root, baseline_lock, manifest, jobs or 4)
 
 
 def ensure_regular_executable(path: Path) -> bytes:
@@ -199,39 +123,20 @@ def command_baseline(
         BaselineMismatch, comparison_report, read_binary, require_exact_match, write_report,
     )
     lock, manifest_bytes, _patch_bytes = load_contract(verify_patch=False)
-    source_root = source_root.expanduser().resolve(strict=True)
-    if not (source_root / ".repo/manifest.xml").is_file():
-        raise BuildError("baseline source root is not a repo checkout")
-    expected = project_map(manifest_bytes)
-    for key in ("manifest", "vold", "device"):
-        project = lock["projects"][key]
-        if expected.get(project["path"]) != (project["name"], project["revision"]):
-            raise BuildError(f"baseline source contract disagrees for {key}")
-    checked_source_manifest(source_root, expected)
-    verify_source_checkouts_clean(source_root, expected)
+    baseline_lock = original_build_contract(lock, manifest_bytes)
+    if source_ota_sha256 != lock["source_ota_sha256"]:
+        raise BuildError("unmodified reference OTA differs from the pinned authenticated source SHA-256")
     reference = read_binary(reference_vold)
-
     if output_dir.is_symlink() or (output_dir.exists() and (
         not output_dir.is_dir() or any(output_dir.iterdir())
     )):
         raise BuildError("baseline output directory must be new or empty and not a symlink")
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_artifact = source_root / lock["build"]["artifact"]
-    if output_artifact.is_symlink():
-        raise BuildError("baseline build artifact is an unsafe symlink")
-    # Eliminate stale installed results from a previous, unrelated build.
-    if output_artifact.is_file():
-        output_artifact.unlink()
-
-    jobs_arg = f"-j{jobs}" if jobs else ""
-    command = (
-        "source build/envsetup.sh && "
-        f"lunch {lock['build']['target']} && "
-        f"m {jobs_arg} vold"
-    ).replace("  ", " ")
-    completed = subprocess.run(["bash", "-euc", command], cwd=source_root, check=False)
-    if completed.returncode:
-        raise BuildError("unmodified LineageOS vold build failed")
+    # This path verifies the vendor candidates, release configuration, complete
+    # source workspace, and fresh output before and after the original build.
+    output_artifact = original.compile_original_vold(
+        source_root, baseline_lock, manifest_bytes, jobs or 4
+    )
 
     built = ensure_regular_executable(output_artifact)
     try:
@@ -254,7 +159,7 @@ def command_build(
     source_root: Path, output_dir: Path, jobs: int | None,
     baseline_report: Path, baseline_binary: Path, reference_vold: Path,
 ) -> None:
-    lock, manifest_bytes, patch_bytes = load_contract()
+    lock, manifest_bytes, _patch_bytes = load_contract()
     # A patched binary must NOT be built before a byte-exact unmodified vold
     # has been reproduced and checked against the authenticated source OTA.
     from lineage_vold_baseline import verify_baseline_inputs
@@ -264,23 +169,15 @@ def command_build(
         )
     except (ValueError, OSError) as exc:
         raise BuildError(f"patched vold is gated on exact baseline reproduction: {exc}") from exc
-    source_root = source_root.resolve(strict=True)
-    if not (source_root / ".repo/manifest.xml").exists():
-        raise BuildError("source root is not a repo checkout")
-    expected = project_map(manifest_bytes)
-    for key in ("manifest", "vold", "device"):
-        project = lock["projects"][key]
-        if expected.get(project["path"]) != (project["name"], project["revision"]):
-            raise BuildError(f"lock and official manifest disagree for project {key}")
-    checked_source_manifest(source_root, expected)
-    verify_source_checkouts_clean(source_root, expected)
-
+    baseline_lock = original_build_contract(lock, manifest_bytes)
+    # Prepare and validate while every source project is still pristine. This
+    # refuses missing vendor inputs, mutable lunch/roomservice downloads,
+    # dependency bypasses, output overrides, and stale output binaries.
+    source_root, output_artifact, shell_command, environment = original.prepare_vold_build(
+        source_root, baseline_lock, manifest_bytes, jobs or 4
+    )
     vold_project = lock["projects"]["vold"]
     vold_root = source_root / vold_project["path"]
-    if git(vold_root, "rev-parse", "HEAD") != vold_project["revision"]:
-        raise BuildError("android_system_vold checkout is not the pinned revision")
-    if git(vold_root, "status", "--porcelain"):
-        raise BuildError("android_system_vold checkout is dirty; use an isolated source workspace")
 
     # Resolve only after checking the caller-provided path: resolve() erases
     # whether its final component was an unsafe symbolic link.
@@ -291,59 +188,18 @@ def command_build(
     if output_dir.exists() and (not output_dir.is_dir() or any(output_dir.iterdir())):
         raise BuildError("artifact output directory must be absent or empty")
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_artifact = source_root / lock["build"]["artifact"]
-
     patch_path = ROOT / lock["patch"]["path"]
     check = subprocess.run(["git", "-C", str(vold_root), "apply", "--check", str(patch_path)], check=False)
     if check.returncode:
         raise BuildError("timeout patch does not apply cleanly to the pinned vold source")
     subprocess.run(["git", "-C", str(vold_root), "apply", str(patch_path)], check=True)
     try:
-        jobs_arg = f"-j{jobs}" if jobs else ""
-        shell_command = (
-            "source build/envsetup.sh && "
-            f"lunch {lock['build']['target']} && "
-            f"m {jobs_arg} vold".replace("  ", " ")
-        )
         completed = subprocess.run(
-            ["bash", "-euc", shell_command], cwd=source_root, check=False
+            ["bash", "-ec", shell_command], cwd=source_root, env=environment, check=False
         )
         if completed.returncode:
             raise BuildError("LineageOS vold build failed")
         binary = ensure_regular_executable(output_artifact)
-        # Reuse the adapter's independent ELF parser for the artifact contract.
-        sys.path.insert(0, str(ROOT / "src"))
-        from lineage_vold import _elf_identity
-        identity = _elf_identity(binary)
-        if identity["machine"] != lock["build"]["elf_machine"] or identity["interpreter"] != lock["build"]["interpreter"]:
-            raise BuildError("built vold has an unexpected target ABI")
-        shutil.copyfile(output_artifact, output_dir / "vold")
-        os.chmod(output_dir / "vold", 0o755)
-        provenance = {
-            "schema_version": 1,
-            "module": lock["module"],
-            "base_build_id": lock["base_build_id"],
-            "manifest_sha256": lock["manifest"]["sha256"],
-            "vold_revision": vold_project["revision"],
-            "device_revision": lock["projects"]["device"]["revision"],
-            "patch_sha256": lock["patch"]["sha256"],
-            "build_target": lock["build"]["target"],
-            "build_command": lock["build"]["command"],
-            "artifact_path": lock["build"]["artifact"],
-            "binary_sha256": digest(binary),
-            "baseline_reference_sha256": baseline["reference_sha256"],
-            "baseline_source_ota_sha256": baseline["source_ota_sha256"],
-            "elf": {
-                "elf_class": identity["elf_class"],
-                "machine": identity["machine"],
-                "interpreter": identity["interpreter"],
-                "needed": list(identity["needed"]),
-            },
-        }
-        (output_dir / "provenance.json").write_text(
-            json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        print(json.dumps(provenance, sort_keys=True))
     finally:
         revert = subprocess.run(
             ["git", "-C", str(vold_root), "apply", "--reverse", str(patch_path)],
@@ -351,6 +207,42 @@ def command_build(
         )
         if revert.returncode:
             raise BuildError("failed to restore the pinned vold checkout after the build")
+
+    original.verify_checkout(source_root, manifest_bytes, clean=True)
+    original.verify_source_workspace(source_root, manifest_bytes, None, require_vendor=True)
+    # Reuse the adapter's independent ELF parser for the artifact contract.
+    sys.path.insert(0, str(ROOT / "src"))
+    from lineage_vold import _elf_identity
+    identity = _elf_identity(binary)
+    if identity["machine"] != lock["build"]["elf_machine"] or identity["interpreter"] != lock["build"]["interpreter"]:
+        raise BuildError("built vold has an unexpected target ABI")
+    (output_dir / "vold").write_bytes(binary)
+    os.chmod(output_dir / "vold", 0o755)
+    provenance = {
+        "schema_version": 1,
+        "module": lock["module"],
+        "base_build_id": lock["base_build_id"],
+        "manifest_sha256": lock["manifest"]["sha256"],
+        "vold_revision": vold_project["revision"],
+        "device_revision": lock["projects"]["device"]["revision"],
+        "patch_sha256": lock["patch"]["sha256"],
+        "build_target": lock["build"]["target"],
+        "build_command": lock["build"]["command"],
+        "artifact_path": lock["build"]["artifact"],
+        "binary_sha256": digest(binary),
+        "baseline_reference_sha256": baseline["reference_sha256"],
+        "baseline_source_ota_sha256": baseline["source_ota_sha256"],
+        "elf": {
+            "elf_class": identity["elf_class"],
+            "machine": identity["machine"],
+            "interpreter": identity["interpreter"],
+            "needed": list(identity["needed"]),
+        },
+    }
+    (output_dir / "provenance.json").write_text(
+        json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(json.dumps(provenance, sort_keys=True))
 
 
 def main() -> int:

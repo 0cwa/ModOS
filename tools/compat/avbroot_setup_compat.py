@@ -20,14 +20,10 @@ from urllib.parse import urlsplit
 
 COMPATIBILITY_VERSION = 1
 DEFAULT_MANIFEST = Path(__file__).with_suffix('.json')
-TARGETS = (
-    ('patch.py', 'patch'),
-)
-TARGET_PATHS = frozenset(relative for relative, _ in TARGETS)
+TARGETS = ('patch.py',)
+TARGET_PATHS = frozenset(TARGETS)
 SHA256 = re.compile(r'[0-9a-f]{64}\Z')
 REVISION = re.compile(r'[0-9a-f]{40}\Z')
-MODULE_FROM = 'from collections.abc import Iterable\n'
-MODULE_TO = MODULE_FROM + 'from pathlib import Path\n'
 PATCH_REPLACEMENT = {
     'kind': 'qualified_call_argument',
     'qualified_name': 'external.generate_update_info',
@@ -64,7 +60,7 @@ def load_manifest(path: Path) -> dict:
     targets = manifest.get('targets')
     if not isinstance(targets, dict) or set(targets) != TARGET_PATHS:
         fail(f'Compatibility manifest {path} has an unexpected target set')
-    for relative, kind in TARGETS:
+    for relative in TARGETS:
         entry = targets[relative]
         digest = entry.get('sha256') if isinstance(entry, dict) else None
         if not isinstance(digest, str) or SHA256.fullmatch(digest) is None:
@@ -72,15 +68,7 @@ def load_manifest(path: Path) -> dict:
         replacement = entry.get('replacement')
         if not isinstance(replacement, dict):
             fail(f'Compatibility manifest has no replacement for {relative}')
-        if kind == 'module':
-            if replacement != {
-                'kind': 'literal',
-                'count': 1,
-                'from': MODULE_FROM,
-                'to': MODULE_TO,
-            }:
-                fail(f'Compatibility manifest has an invalid module replacement for {relative}')
-        elif replacement != PATCH_REPLACEMENT:
+        if replacement != PATCH_REPLACEMENT:
             fail(f'Compatibility manifest has an invalid patch replacement for {relative}')
     return manifest
 
@@ -271,34 +259,6 @@ def parse_source(source: bytes, relative: str) -> ast.Module:
         fail(f'Could not parse {relative}: {error}')
 
 
-def validate_module_shape(source: bytes, relative: str) -> None:
-    tree = parse_source(source, relative)
-    imports = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.ImportFrom)
-        and node.level == 0
-        and node.module == 'collections.abc'
-        and [(alias.name, alias.asname) for alias in node.names] == [('Iterable', None)]
-    ]
-    annotations = [
-        node.annotation
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.arg, ast.AnnAssign)) and node.annotation is not None
-    ]
-    iterable_paths = [
-        annotation
-        for annotation in annotations
-        if isinstance(annotation, ast.Subscript)
-        and isinstance(annotation.value, ast.Name)
-        and annotation.value.id == 'Iterable'
-        and isinstance(annotation.slice, ast.Name)
-        and annotation.slice.id == 'Path'
-    ]
-    if len(imports) != 1 or len(iterable_paths) != 1:
-        fail(f'Unexpected Iterable[Path] source shape in {relative}')
-
-
 def rewrite_patch(source: bytes, relative: str, replacement: dict, release_url: str) -> bytes:
     tree = parse_source(source, relative)
 
@@ -349,20 +309,6 @@ def rewrite_patch(source: bytes, relative: str, replacement: dict, release_url: 
     return source[:call_start] + rewritten_call + source[call_end:]
 
 
-def transform(source: bytes, relative: str, kind: str, replacement: dict, release_url: str) -> bytes:
-    if kind == 'module':
-        validate_module_shape(source, relative)
-        old = replacement['from'].encode('utf-8')
-        new = replacement['to'].encode('utf-8')
-        if source.count(old) != replacement['count']:
-            fail(f'Expected one exact module replacement in {relative}')
-        result = source.replace(old, new, replacement['count'])
-        if result.count(new) != 1:
-            fail(f'Expected one inserted Path import in {relative}')
-        return result
-    return rewrite_patch(source, relative, replacement, release_url)
-
-
 def stage_file(path: Path, data: bytes, mode: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('wb') as staged:
@@ -388,7 +334,7 @@ def validate_before_replace(
     pinned_revision: str,
 ) -> None:
     checked_revision(helper_root, pinned_revision)
-    for relative in (relative for relative, _ in TARGETS):
+    for relative in TARGETS:
         current, mode = current_file(helper_root, relative)
         if current != originals[relative] or mode != modes[relative]:
             fail(f'{relative} changed after validation; refusing to write')
@@ -492,15 +438,14 @@ def run(
     originals: dict[str, bytes] = {}
     modes: dict[str, int] = {}
     prepared: dict[str, bytes] = {}
-    for relative, kind in TARGETS:
+    for relative in TARGETS:
         heads[relative] = head_blob(helper_root, relative)
         if hashlib.sha256(heads[relative]).hexdigest() != entries[relative]['sha256']:
             fail(f'Pinned blob hash does not match the manifest for {relative}')
         originals[relative], modes[relative] = current_file(helper_root, relative)
-        patched = transform(
+        patched = rewrite_patch(
             heads[relative],
             relative,
-            kind,
             entries[relative]['replacement'],
             release_url,
         )
@@ -513,7 +458,7 @@ def run(
         if relative in status_paths and originals[relative] == heads[relative]:
             fail(f'{relative} is modified but not in the recognized compatibility state')
 
-    changed = [relative for relative, _ in TARGETS if prepared[relative] != originals[relative]]
+    changed = [relative for relative in TARGETS if prepared[relative] != originals[relative]]
     if not changed:
         return
     apply_changes(helper_root, changed, originals, prepared, modes, heads, pinned_revision)

@@ -19,11 +19,36 @@ installed binary path.
 official LineageOS OTA, byte for byte.** Matching the ELF ABI, dependencies or
 source revision is not enough.
 
-The `lineage_vold_exact_baseline` job in [CI](../.github/workflows/ci.yml)
-implements this gate. It is nonpublishing, read-only on the GitHub repository,
-and restricted to this owned review PR. Because syncing the full 1,243-project
-LineageOS tree needs substantial space, ordinary GitHub-hosted CI cannot run
-this job. Provision an isolated **self-hosted Linux x64** runner with:
+### Local build options
+
+The independent [original-vold local/CI workflow](vold-baseline-ci.md)
+is already available on `main`. Its persistent local command acquires pinned
+vendor inputs, expands a bounded source selection, builds only `m vold`, and
+compares against the authenticated original OTA. A GitHub runner, repository
+variables, signing keys and a connected phone are unnecessary for this stage.
+Run the documented host setup, then:
+
+```sh
+python3 src/ci/vold_local.py doctor --for compare --work-dir /large/scratch/vold-local
+python3 src/ci/vold_local.py compare --work-dir /large/scratch/vold-local --jobs 4
+```
+
+A successful local subset comparison is useful original-binary evidence, but
+this draft's patched-build command currently accepts only its **full-manifest**
+baseline receipt and complete source checkout. Run the full-manifest commands
+below on a suitable local Linux x86_64 host to satisfy that current gate; do not
+rename or relabel a subset receipt. Supporting subset receipts in the patched
+builder would require a separate reviewed change that preserves the exact
+source and byte-comparison checks. Neither route has produced a real
+byte-identical result for this draft yet.
+
+### Dedicated Actions runner option
+
+The draft's `lineage_vold_exact_baseline` job in
+[CI](../.github/workflows/ci.yml) runs the same full-manifest commands and
+reviewed source/vendor/build guards. It is nonpublishing, has read-only
+repository access, and is restricted to this owned review PR. To use this
+optional CI route, provision an isolated **self-hosted Linux x64** runner with:
 
 - the runner label `modos-lineage-large`, Android/LineageOS build prerequisites
   and the `repo`, `avbroot`, `debugfs`, `unzip`, `curl`, `openssl`, `git` and
@@ -33,6 +58,8 @@ this job. Provision an isolated **self-hosted Linux x64** runner with:
 - repository variable `MODOS_VOLD_BASELINE_RUNNER_READY=true` when that
   trusted build runner is available. Until enabled, the heavy PR job is
   intentionally skipped.
+
+### Full-manifest baseline and authenticated reference
 
 The baseline job selects only the exact
 `lineage-24.0-20261016-nightly-pdx235-signed.zip`. Its immutable OTA SHA-256
@@ -51,11 +78,16 @@ and performs cryptographic whole-OTA verification with `avbroot ota verify`.
 It then extracts `system.img` and the original `/system/bin/vold` as
 **reference bytes only**. No keys for signing or publishing are accessible.
 
-Next, with a fresh empty source directory, the job executes:
+After authenticating and extracting the exact original OTA reference, run
+these commands on the local build host or dedicated runner with a fresh empty
+source directory:
 
 ```sh
 python3 src/ci/build_lineage_vold.py sync \
   --source-root /large/scratch/lineage-pdx235-20261016 --jobs 4
+python3 src/ci/prepare_vold_vendor_makefiles.py \
+  --source-root /large/scratch/lineage-pdx235-20261016 \
+  --report /large/scratch/sony-vendor-input-report.json
 python3 src/ci/build_lineage_vold.py baseline \
   --source-root /large/scratch/lineage-pdx235-20261016 \
   --reference-vold /large/scratch/reference/reference-vold \
@@ -64,8 +96,13 @@ python3 src/ci/build_lineage_vold.py baseline \
 ```
 
 `baseline` validates all manifest revisions and the clean working trees,
-runs the pinned `lineage_pdx235-userdebug` lunch target and `m vold` **without
-applying the timeout patch**, and compares the resulting installed executable
+verifies the pinned supplemental Sony vendor candidates and the `cp2a` release
+configuration, and invokes `_lunch_meat lineage_pdx235 cp2a userdebug` and
+`m vold` **without applying the timeout patch**. This uses the pinned
+configuration helper directly so `lunch` cannot fetch unreviewed sources through
+roomservice. Missing-dependency bypasses and inherited output overrides are
+rejected or cleared; stale output is removed before compilation. It compares
+the resulting installed executable
 against the source OTA reference **byte for byte**. It produces
 `baseline-report.json` containing the source OTA identity, full manifest
 digest, reference/build SHA-256s, ELF identities, sizes, exact equality flag
@@ -81,12 +118,13 @@ a successful real baseline reproduction.
 ## Second gate: compile the modified vold only after success
 
 After inspecting an actual **`byte_identical: true`** receipt from the
-full baseline CI run, a separately reviewed patched-build job may be developed.
-The baseline CI job intentionally deletes its source checkout, reference and
-binary after uploading the receipt. Therefore, the later patched-build job
-must re-authenticate the exact source OTA and reproduce its unmodified vold
-again, without trusting just the uploaded JSON. Only then can it build the
-patched artifact with these mandatory proof inputs:
+full-manifest baseline command on a local host or the dedicated CI runner, a
+separately reviewed patched build may proceed. Local runs can retain their
+verified source, reference and unmodified binary for that next command.
+The CI job deletes those files after uploading its receipt; a later CI job
+must therefore re-authenticate the exact source OTA and reproduce unmodified
+vold again. Uploaded JSON alone is insufficient. The patched artifact command
+requires all of these proof inputs:
 
 ```sh
 python3 src/ci/build_lineage_vold.py build \
@@ -100,8 +138,11 @@ python3 src/ci/build_lineage_vold.py build \
 
 `build` independently rechecks the receipt against both supplied real
 binary files, the pinned manifest and the SHA-256 digests **before** it applies
-the narrow exFAT-only timeout patch. It then restores the pristine vold
-checkout. A patched artifact directory contains `vold` and
+the narrow exFAT-only timeout patch. It restores the pristine vold checkout
+and revalidates the entire source workspace and vendor inputs before writing an
+artifact or provenance receipt. A failed build, missing fresh output,
+unexpected source change or failed patch rollback leaves no accepted artifact.
+A patched artifact directory contains `vold` and
 `provenance.json`, including the prior exact baseline's reference digest.
 The patch stage is NOT yet wired into the baseline CI job; it must only be
 activated after proving the baseline and separately reviewing the result.
@@ -139,9 +180,12 @@ dependencies as the original OTA binary. It overwrites the existing ExtFs
 entry, verifies all original filesystem metadata, and re-hashes the written
 binary. A failed check stops the build before a patched OTA is emitted.
 
-This module is kept separate from scheduled selections and the SELinux force
-release. The current workspace does not have Repo installed and has only about
-41 GB free, so the full source sync and Android build have not been run here.
+This module remains default-off. No actual unmodified Android build or
+byte-identical comparison has qualified this draft. Source and vendor fixture
+tests, including real shell orchestration and patch rollback, do not replace
+that proof. The full-manifest draft receipt is deliberately separate from the
+standalone subset probe receipt; a subset result must not be relabeled as a
+complete-manifest baseline.
 
 ## Production promotion checklist (not yet complete)
 
@@ -149,7 +193,7 @@ release. The current workspace does not have Repo installed and has only about
 use synthetic ELF and filesystem fixtures; they do not establish an actual
 byte-identical result for the pinned LineageOS OTA.
 
-1. Provision the dedicated CI runner and complete the **unmodified,
+1. Prepare a suitable local host or dedicated CI runner and complete the **unmodified,
    byte-exact baseline** proof described above. Review a real successful
    `baseline-report.json`, not fixture output. If any byte differs, investigate
    compiler/toolchain/build flags and repeat the proof without weakening it.
@@ -174,3 +218,16 @@ complete baseline reproduction and patch qualification before it can be
 included in rolling scheduled builds. Do not reuse the older vold binary.
 
 GrapheneOS remains excluded by explicit workflow and schedule guards.
+
+## Review refresh (2026-11-08)
+
+The draft now includes current `main` and preserves its baseline dependency
+resolver, vendor verification and both ROM qualification routes. The draft
+builder shares the original-build preflight and compiler configuration rather
+than maintaining its older Repo manifest overwrite and `lunch` commands.
+Its enabled selection identity includes those shared helpers and source/vendor
+locks; disabled builds still omit the vold identity fields.
+
+The approved binary SHA-256, staging tag and provenance SHA-256 remain blank.
+The next acceptance evidence is a real authenticated original-OTA comparison,
+followed by patched-binary, nonpublishing OTA and physical-device qualification.

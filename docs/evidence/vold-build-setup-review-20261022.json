@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "kind": "pinned-lineage-build-setup-source-review",
+  "date_utc": "2026-10-22",
+  "source_evidence": [
+    "https://github.com/LineageOS/android_build/blob/73e37454cdac3892c961e554524ccc52b1bfcf00/envsetup.sh",
+    "https://github.com/LineageOS/android_vendor_lineage/blob/87daf527b0288b60c9cc07c05a5f5aad1660c234/build/envsetup.sh",
+    "https://github.com/LineageOS/android_vendor_lineage/blob/87daf527b0288b60c9cc07c05a5f5aad1660c234/build/tools/roomservice.py",
+    "https://github.com/LineageOS/android_vendor_lineage/blob/87daf527b0288b60c9cc07c05a5f5aad1660c234/vars/aosp_target_release"
+  ],
+  "findings": [
+    "The pinned lunch function requires product, release and variant; its legacy syntax rejects lineage_pdx235-userdebug because the release component is absent",
+    "The pinned LineageOS breakfast helper reads vars/aosp_target_release; that exact file selects cp2a",
+    "The pinned lunch function invokes roomservice for dependency discovery; roomservice can synchronize projects not selected by the bounded probe",
+    "The unchanged _lunch_meat function performs product/release/variant configuration without roomservice",
+    "The pinned envsetup reads optional unset variables, so bash nounset is incompatible with sourcing it unchanged"
+  ],
+  "reviewed_configuration": {
+    "product": "lineage_pdx235",
+    "release": "cp2a",
+    "variant": "userdebug",
+    "precheck": "check_product lineage_pdx235 cp2a",
+    "setup": "_lunch_meat lineage_pdx235 cp2a userdebug",
+    "build_target": "m vold",
+    "release_file_sha256": "258eaaeb1fc743ee5fd3a0ade38905be3bbfe3d2624d7fd477dd966a68d67eb6",
+    "automatic_kernel_builds": "fail before kernel synchronization or compilation",
+    "source_files_modified": false
+  },
+  "validation": {
+    "tests": "tests/vold_original_build_test.py",
+    "actual_bash_failure_guards_tested": ["upstream setup failure", "automatic kernel-build request"],
+    "source_workspace_checked_after_successful_build": true,
+    "android_compilation_attempted": false,
+    "byte_identity_established": false
+  }
+}

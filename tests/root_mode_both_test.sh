@@ -108,7 +108,7 @@ grep -Fq 'root-mode:' .github/workflows/release-lineage.yml ||
 grep -Fq 'root-mode:' .github/workflows/multi-release.yml ||
   fail "multi-device release workflow does not expose root-mode"
 
-expected_helper='d6eccab076ba48889c2279ce7c88e43261cbd1f0'
+expected_helper='b553f46a9b94fff3960617830b6072b0f8b054b5'
 grep -Fq "VERSION[AVBROOT_SETUP]=\"${expected_helper}\"" src/declarations.sh ||
   fail "PixeneOS is not pinned to the reviewed microG native-library helper"
 python3 - "${expected_helper}" <<'PY'
@@ -116,14 +116,11 @@ import json
 import sys
 
 expected = sys.argv[1]
-for path in (
-    'tools/compat/avbroot_setup_compat.json',
-    'tools/compat/avbroot_setup_care_map_pdx235.json',
-):
-    with open(path, encoding='utf-8') as f:
-        manifest = json.load(f)
-    if manifest['revision'] != expected:
-        raise SystemExit(f'{path}: helper revision mismatch')
+path = 'tools/compat/avbroot_setup_compat.json'
+with open(path, encoding='utf-8') as f:
+    manifest = json.load(f)
+if manifest['revision'] != expected:
+    raise SystemExit(f'{path}: helper revision mismatch')
 PY
 
 echo "root-mode both tests passed"

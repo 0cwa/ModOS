@@ -17,9 +17,22 @@ declare -a PREPARE_STAGES=()
 PREPARE_FAILURE=""
 PREPARE_CACHE_SENTINEL=""
 LOCKED_INPUTS_VALID="true"
+DIAGNOSTICS_FAILURE=false
+declare -a DIAGNOSTIC_ARGS=()
 
 python() {
   local stage
+
+  if [[ "${1}" == src/build_diagnostics.py ]]; then
+    DIAGNOSTIC_ARGS=("$@")
+    while [[ "${1}" != -- ]]; do shift; done
+    shift
+    [[ "${1}" == python ]] || fail "unexpected helper interpreter"
+    shift
+    CAPTURED_ARGS=("$@")
+    [[ "${DIAGNOSTICS_FAILURE}" != true ]]
+    return
+  fi
 
   if [[ "${1}" == */module-tool.py ]]; then
     if [[ "${2}" == "artifacts" ]]; then
@@ -176,6 +189,7 @@ reset_fixture() {
   ROM_FAMILY="grapheneos"
   DEVICE_NAME="shiba"
   GRAPHENEOS[OTA_TARGET]="fixture-ota"
+  ROM_OTA_API_LEVEL=""
   OUTPUTS[PATCHED_OTA]="${WORKDIR}/patched.zip"
   KEYS[AVB]="${WORKDIR}/keys/avb.key"
   KEYS[OTA]="${WORKDIR}/keys/ota.key"
@@ -198,6 +212,8 @@ reset_fixture() {
   ADDITIONALS[DEBUG]="false"
   ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]="false"
   ADDITIONALS[ROOT]="false"
+  ROOT_MODE=""
+  RESOLVED_ROOT_MODE=""
 
   FDROID_PRIVILEGED_EXTENSION_LOCK=""
   FDROID_PRIVILEGED_EXTENSION_PROFILE=""
@@ -211,6 +227,8 @@ reset_fixture() {
   PREPARE_STAGES=()
   PUBLISHER_CHECKS=()
   PUBLISHER_CHECK_FAILURE=false
+  DIAGNOSTICS_FAILURE=false
+  DIAGNOSTIC_ARGS=()
 }
 
 set_default_expected_args() {
@@ -228,12 +246,10 @@ set_default_expected_args() {
     "--pass-ota-env-var" "PASSPHRASE_OTA"
     "--module-custota" "${WORKDIR}/modules/custota.zip"
     "--module-msd" "${WORKDIR}/modules/msd.zip"
-    "--module-bcr" "${WORKDIR}/modules/bcr.zip"
     "--module-oemunlockonboot" "${WORKDIR}/modules/oemunlockonboot.zip"
     "--module-alterinstaller" "${WORKDIR}/modules/alterinstaller.zip"
     "--module-custota-sig" "${WORKDIR}/signatures/custota.zip.sig"
     "--module-msd-sig" "${WORKDIR}/signatures/msd.zip.sig"
-    "--module-bcr-sig" "${WORKDIR}/signatures/bcr.zip.sig"
     "--module-oemunlockonboot-sig" "${WORKDIR}/signatures/oemunlockonboot.zip.sig"
     "--module-alterinstaller-sig" "${WORKDIR}/signatures/alterinstaller.zip.sig"
     "--patch-arg=--rootless"
@@ -315,6 +331,101 @@ test_all_modules_can_be_disabled() {
   assert_array_equals EXPECTED_ARGS CAPTURED_ARGS "disable all modules"
 }
 
+test_bcr_selection_follows_rom_family() (
+  local family selected
+  for family in grapheneos lineageos; do
+    for selected in true false; do
+      reset_fixture "bcr-${family}-${selected}"
+      ROM_FAMILY="${family}"
+      ADDITIONALS[BCR]="${selected}"
+      run_patch
+      if [[ "${family}" == lineageos && "${selected}" == true ]]; then
+        assert_pair --module-bcr "${WORKDIR}/modules/bcr.zip" 'LineageOS BCR archive'
+        assert_pair --module-bcr-sig "${WORKDIR}/signatures/bcr.zip.sig" 'LineageOS BCR signature'
+      else
+        assert_not_contains --module-bcr "${family} BCR exclusion"
+        assert_not_contains --module-bcr-sig "${family} BCR signature exclusion"
+        [[ "${ADDITIONALS[BCR]}" == false ]] || fail "${family} BCR selection was not disabled"
+      fi
+    done
+  done
+
+  # Also cover callers that use the argument builder directly, without first
+  # resolving a ROM profile or invoking patch_ota.
+  reset_fixture bcr-direct-arguments
+  CAPTURED_ARGS=()
+  append_enabled_module_arguments CAPTURED_ARGS
+  assert_not_contains --module-bcr 'direct GrapheneOS argument builder'
+  assert_not_contains --module-bcr-sig 'direct GrapheneOS signature builder'
+)
+
+test_bcr_dependency_acquisition_uses_effective_selection() (
+  local family selected expected
+  local -a events=()
+  supported_tools() { printf 'bcr\n'; }
+  is_locked_executable_tool() { return 1; }
+  root_mode_includes_magisk() { return 1; }
+  make_directories() { events+=(directories); }
+  download_dependencies() { events+=("download:${1}"); }
+  verify_downloads() { events+=("verify:${1}"); }
+
+  for family in grapheneos lineageos; do
+    for selected in true false; do
+      reset_fixture "bcr-download-${family}-${selected}"
+      ROM_FAMILY="${family}"
+      ADDITIONALS[BCR]="${selected}"
+      ADDITIONALS[RETRY]=false
+      events=()
+      check_and_download_dependencies >/dev/null
+      expected=directories
+      if [[ "${family}" == lineageos && "${selected}" == true ]]; then
+        expected+=' download:bcr verify:bcr'
+      fi
+      [[ "${events[*]}" == "${expected}" ]] ||
+        fail "${family}/${selected} BCR download events: ${events[*]}"
+    done
+  done
+)
+
+test_invalid_bcr_fails_before_build_side_effects() (
+  local family invalid
+  local -a events=()
+  make_directories() { events+=(directories); }
+  base64_decode() { events+=(signing-keys); }
+  for family in grapheneos lineageos; do
+    for invalid in '' yes 1; do
+      reset_fixture "bcr-invalid-${family}-${invalid:-empty}"
+      ROM_FAMILY="${family}"
+      ROM_PROFILE[PROVIDER]="${family}" # Cached profile must not bypass revalidation.
+      ADDITIONALS[BCR]="${invalid}"
+      INTERACTIVE_MODE=false
+      events=()
+      if check_and_download_dependencies >/dev/null 2>&1; then
+        fail "${family} accepted invalid BCR before downloads"
+      fi
+      [[ "${#events[@]}" == 0 ]] || fail 'invalid BCR created dependency directories'
+      if run_patch >/dev/null 2>&1; then
+        fail "${family} accepted invalid BCR before patching"
+      fi
+      [[ "${#events[@]}" == 0 ]] || fail 'invalid BCR accessed signing keys'
+      [[ "${#CAPTURED_ARGS[@]}" == 0 ]] || fail 'invalid BCR invoked the helper'
+      if append_enabled_module_arguments CAPTURED_ARGS >/dev/null 2>&1; then
+        fail "${family} direct argument builder accepted invalid BCR"
+      fi
+      [[ "${#CAPTURED_ARGS[@]}" == 0 ]] || fail 'invalid BCR appended module arguments'
+    done
+  done
+)
+
+test_module_argument_failure_prevents_helper_execution() (
+  reset_fixture module-argument-failure
+  append_enabled_module_arguments() { return 1; }
+  if run_patch >/dev/null 2>&1; then
+    fail 'module argument failure did not stop patch_ota'
+  fi
+  [[ "${#CAPTURED_ARGS[@]}" == 0 ]] || fail 'helper ran after module argument failure'
+)
+
 test_special_cases_remain_available() {
   reset_fixture compatible-sepolicy
   ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]="true"
@@ -359,9 +470,9 @@ test_boot_animation_module_is_optional_and_ordered() {
   prepare_boot_animation_module() { :; }
   set_default_expected_args
   EXPECTED_ARGS=(
-    "${EXPECTED_ARGS[@]:0:31}"
+    "${EXPECTED_ARGS[@]:0:29}"
     "--module-boot-animation" "${WORKDIR}/modules/boot-animation.zip"
-    "${EXPECTED_ARGS[@]:31}"
+    "${EXPECTED_ARGS[@]:29}"
   )
   for value in "${EXPECTED_ARGS[@]}"; do
     if [[ "${value}" == "--patch-arg=--rootless" ]]; then
@@ -381,6 +492,7 @@ enable_microg_fixture() {
   ADDITIONALS[MICROG]="true"
   ROM_FAMILY="lineageos"
   DEVICE_NAME="pdx235"
+  ROM_OTA_API_LEVEL=36
   OUTPUT_SCOPE="local-unpublished"
   ROOT_MODE=""
   RESOLVED_ROOT_MODE=""
@@ -408,6 +520,60 @@ test_microg_locked_preparation_and_arguments() {
     fail "microG profile lacks restricted spoofing capability"
   grep -Fxq "product_priv_app = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
     fail "microG profile lacks product priv-app capability"
+  grep -Fxq "api_level = 36" "${WORKDIR}/locked-profiles/microg.toml" ||
+    fail "microG profile lost the fixture's source SDK"
+}
+
+test_microg_profile_uses_selected_source_sdk() (
+  reset_fixture microg-source-sdk
+  enable_microg_fixture
+  curl() {
+    printf '%s\n' '[{"type":"nightly","files":[{
+      "filename":"lineage-24.0-20261106-nightly-pdx235-signed.zip",
+      "url":"https://mirrorbits.lineageos.org/full/pdx235/20261106/lineage-24.0-20261106-nightly-pdx235-signed.zip",
+      "type":"nightly","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "os_sdk_level":37}]}]'
+  }
+
+  resolve_rom_profile
+  fetch_rom_ota_metadata
+  run_patch
+  assert_prepare_stages 'microG selected SDK preparation' artifacts-fetch
+  assert_pair --module-profile "${WORKDIR}/locked-profiles/microg.toml" 'microG selected SDK'
+  python3 - "${WORKDIR}/locked-profiles/microg.toml" <<'PY'
+from pathlib import Path
+import sys
+import tomllib
+
+profile = tomllib.loads(Path(sys.argv[1]).read_text())
+assert type(profile['api_level']) is int and profile['api_level'] == 37, profile
+assert profile['rom_family'] == 'lineageos', profile
+assert profile['root_mode'] == 'rootless', profile
+PY
+)
+
+test_microg_rejects_missing_or_invalid_source_sdk() {
+  local api_level index=0
+  for api_level in '' 0 -1 true false 37.0 ' 37' '37 ' 037 '+37' $'37\n'; do
+    reset_fixture "microg-invalid-source-sdk-${index}"
+    enable_microg_fixture
+    ROM_OTA_API_LEVEL="${api_level}"
+    assert_patch_fails_before_execution "invalid microG source SDK: ${api_level}"
+    assert_prepare_stages 'invalid SDK prevents locked artifact acquisition'
+    [[ ! -e "${WORKDIR}/locked-profiles/microg.toml" ]] ||
+      fail 'invalid source SDK produced a microG profile'
+    index=$((index + 1))
+  done
+}
+
+test_disabled_microg_does_not_require_source_sdk() {
+  reset_fixture no-microg-source-sdk
+  unset ROM_OTA_API_LEVEL
+  local -a args=()
+  prepare_microg args "${WORKDIR}/tools/my-avbroot-setup"
+  assert_prepare_stages 'disabled microG does not acquire artifacts'
+  [[ "${#args[@]}" -eq 0 && ! -e "${WORKDIR}/locked-profiles" ]] ||
+    fail 'disabled microG created a profile or changed patch arguments'
 }
 
 enable_shizuku_fixture() {
@@ -584,10 +750,38 @@ test_pdx235_secondary_verification_failure_blocks_sidecars() (
     fail "sidecar generated after secondary verification failure"
 )
 
+test_diagnostic_failure_blocks_postflight_and_sidecars() (
+  reset_fixture diagnostic-failure
+  ROOT_MODE=both
+  MAGISK[PREINIT]=sda10
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  DIAGNOSTICS_FAILURE=true
+  verify_requested_root_outputs() { touch "${WORKDIR}/unexpected-postflight"; }
+  generate_custota_variant_sidecars() { touch "${WORKDIR}/unexpected-sidecar"; }
+  if patch_ota >/dev/null 2>&1; then
+    fail 'Rejected helper diagnostics allowed patch completion'
+  fi
+  [[ "${#DIAGNOSTIC_ARGS[@]}" -gt 0 ]] || fail 'Diagnostic guard was not invoked'
+  [[ ! -e "${WORKDIR}/unexpected-postflight" && ! -e "${WORKDIR}/unexpected-sidecar" ]] ||
+    fail 'Postprocessing ran after diagnostic failure'
+  local diagnostic_argv="${WORKDIR}/diagnostic-argv"
+  printf '%s\n' "${DIAGNOSTIC_ARGS[@]}" >"${diagnostic_argv}"
+  grep -Fxq "${WORKDIR}/fixture-ota.zip" "${diagnostic_argv}" || fail 'Source diagnostic path missing'
+  grep -Fxq "${OUTPUTS[PATCHED_OTA_MAGISK]}" "${diagnostic_argv}" || fail 'Secondary diagnostic path missing'
+  grep -Fxq -- '--msd-selected' "${diagnostic_argv}" || fail 'Selected MSD coverage was not required'
+)
+
+test_existing_grapheneos_output_cannot_bypass_diagnostics() (
+  reset_fixture grapheneos-stale-diagnostic-output
+  touch -- "${OUTPUTS[PATCHED_OTA]}"
+  assert_patch_fails_before_execution 'GrapheneOS output from a failed guard cannot be reused'
+)
+
 # Exercise an actual Python child: its temporary directory must live below
 # WORKDIR and the caller's temporary-directory preference must remain intact.
 test_helper_uses_build_filesystem_scratch() (
   reset_fixture 'helper scratch environment'
+  ADDITIONALS[MSD]=false
   local caller_tmpdir="${TEST_ROOT}/caller-tmp"
   mkdir -p "${caller_tmpdir}"
   export TMPDIR="${caller_tmpdir}"
@@ -599,6 +793,9 @@ with tempfile.TemporaryDirectory() as child:
     receipt = {'scratch': str(scratch), 'child': child,
                'mode': stat.S_IMODE(scratch.stat().st_mode)}
 output.with_suffix('.scratch.json').write_text(json.dumps(receipt))
+for option in ('--input', '--output'):
+    print('[INFO] Verifying OTA: ' + sys.argv[sys.argv.index(option) + 1])
+    print(' 1.000s  INFO OK!')
 PYTHON
   python() { command python3 "$@"; }
   patch_ota >/dev/null
@@ -831,10 +1028,17 @@ test_fdroid_enabled_does_not_reuse_legacy_output_marker() {
 test_default_arguments
 test_each_module_can_be_disabled
 test_all_modules_can_be_disabled
+test_bcr_selection_follows_rom_family
+test_bcr_dependency_acquisition_uses_effective_selection
+test_invalid_bcr_fails_before_build_side_effects
+test_module_argument_failure_prevents_helper_execution
 test_special_cases_remain_available
 test_disable_system_updater_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
+test_microg_profile_uses_selected_source_sdk
+test_microg_rejects_missing_or_invalid_source_sdk
+test_disabled_microg_does_not_require_source_sdk
 test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices
 test_shizuku_rejects_shared_rootless_magisk_product_image
 test_lineage_both_modes_clear_vbmeta_flags
@@ -842,6 +1046,8 @@ test_care_map_compatibility_scope
 test_pdx235_publisher_preflight
 test_pdx235_existing_output_prevents_patch_skip
 test_pdx235_secondary_verification_failure_blocks_sidecars
+test_diagnostic_failure_blocks_postflight_and_sidecars
+test_existing_grapheneos_output_cannot_bypass_diagnostics
 test_helper_uses_build_filesystem_scratch
 test_microg_and_fdroid_locked_modes_conflict
 test_fdroid_locked_preparation_and_arguments

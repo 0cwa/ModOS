@@ -52,6 +52,12 @@ magisk_preinit="$(toml_resolve_value magisk_preinit '')"
 afsr="$(toml_resolve_value afsr '')"
 alterinstaller="$(toml_resolve_value alterinstaller '')"
 bcr="$(toml_resolve_value bcr '')"
+# Export the same effective selection used by patching and release identity,
+# including when an older schedule still requests BCR for GrapheneOS.
+ROM_FAMILY="${rom_family}"
+ADDITIONALS[BCR]="${bcr}"
+apply_rom_module_policy
+bcr="${ADDITIONALS[BCR]}"
 custota="$(toml_resolve_value custota '')"
 msd="$(toml_resolve_value msd '')"
 oemunlockonboot="$(toml_resolve_value oemunlockonboot '')"

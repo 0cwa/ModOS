@@ -55,6 +55,16 @@ on:
         required: false
         type: boolean
         default: false
+      bcr:
+        description: Include the signed Basic Call Recorder module
+        required: false
+        type: boolean
+        default: true
+      msd:
+        description: Include MSD (pdx235 HAL compatibility is unqualified; debug fallback fails the build)
+        required: false
+        type: boolean
+        default: false
       shizuku:
         description: Install official Shizuku manager (supported ROM profile; separate rootless/Magisk builds)
         required: false
@@ -127,7 +137,7 @@ permissions:
 jobs:
   schedule_config:
     if: "${{ github.event_name == 'schedule' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(pdx235): 24.0')) }}"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     outputs:
@@ -169,9 +179,9 @@ jobs:
 
       - name: Setup Rust for fsck sysfs selection identity
         if: steps.definition.outputs.fsck_sysfs_sepolicy == 'true'
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.97.1
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.99.1
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
 
       - name: Install libclang for fsck sysfs selection identity
         if: steps.definition.outputs.fsck_sysfs_sepolicy == 'true'
@@ -250,6 +260,8 @@ jobs:
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
       microg: ${{ inputs.microg }}
+      bcr: ${{ inputs.bcr }}
+      msd: ${{ inputs.msd }}
       shizuku: ${{ inputs.shizuku }}
       exfatprogs-fsck: ${{ inputs.exfatprogs-fsck }}
       fsck-sysfs-sepolicy: ${{ inputs.fsck-sysfs-sepolicy }}

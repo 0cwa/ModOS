@@ -68,6 +68,7 @@ function root_mode_includes_magisk() {
 # Function to check and download the dependencies
 # This function checks for the required tools and downloads them if not found depending on the configuration done in the declarations file
 function check_and_download_dependencies() {
+  apply_rom_module_policy || return 1
   make_directories
 
   # Check for Python requirements
@@ -222,6 +223,7 @@ function flag_check() {
 # Append enabled my-avbroot-setup modules while preserving the historical
 # argument order: all module archives first, followed by their signatures.
 function append_enabled_module_arguments() {
+  apply_rom_module_policy || return 1
   local args_name="${1}"
   local -n args_ref="${args_name}"
   local entry module flag
@@ -259,8 +261,7 @@ function append_enabled_module_arguments() {
 }
 
 # Validate and register the optional local boot-animation module before any
-# patch command runs. The helper's Module/ModuleRequirements API is the same
-# API used by src/debugmod.py at the pinned helper revision.
+# patch command runs, using the pinned helper's LegacyCliModule registry.
 function prepare_boot_animation_module() {
   local helper_root="${1}"
   local payload_path dark_payload_path init_file registry_file module_source
@@ -530,8 +531,8 @@ function build_exfatprogs_policy_patcher() {
   }
   rustc_version_number="${rustc_version#rustc }"
   rustc_version_number="${rustc_version_number%% *}"
-  if [[ "${rustc_version_number}" != '1.97.1' ]]; then
-    echo "Error: the exfatprogs policy patcher requires rustc 1.97.1; selected ${rustc_version_number:-unknown}." >&2
+  if [[ "${rustc_version_number}" != '1.99.1' ]]; then
+    echo "Error: the exfatprogs policy patcher requires rustc 1.99.1; selected ${rustc_version_number:-unknown}." >&2
     return 1
   fi
 
@@ -852,6 +853,12 @@ function prepare_fdroid_privileged_extension() {
 function write_microg_resolution_profile() {
   local profile_path="${1}"
   local root_mode='rootless'
+  local api_level="${ROM_OTA_API_LEVEL:-}"
+
+  if [[ ! "${api_level}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: microG resolution requires the selected source OTA's positive integer SDK level." >&2
+    return 1
+  fi
 
   resolve_root_mode >/dev/null || return 1
   [[ "${RESOLVED_ROOT_MODE}" != 'magisk' ]] || root_mode='rooted'
@@ -863,7 +870,7 @@ id = 'lineageos-microg-${root_mode}'
 rom_family = 'lineageos'
 root_mode = '${root_mode}'
 abi = 'arm64-v8a'
-api_level = 36
+api_level = ${api_level}
 output_scope = '${OUTPUT_SCOPE}'
 enabled_modules = ['microg']
 acknowledgements = []
@@ -1005,6 +1012,7 @@ function generate_keys() {
 # Leverages `my-avbroot-setup` to patch the OTA
 # This function does a lot of things before patching the OTA
 function patch_ota() {
+  apply_rom_module_policy || return 1
   resolve_root_mode || return 1
 
   if [[ -z "${ROM_PROFILE[PROVIDER]:-}" ]]; then
@@ -1074,33 +1082,21 @@ function patch_ota() {
     "${ROM_FAMILY}" "${DEVICE_NAME:-}" "${RESOLVED_ROOT_MODE}" \
     "${OUTPUTS[PATCHED_OTA]}" "${secondary_ota}" || return 1
 
-  # Legacy output markers do not encode a locked module selection. Never reuse
-  # one for an enabled F-Droid build. A dual build is reusable only when both
-  # OTA triplets and both per-flavor update-info files are already complete.
-  local outputs_ready=false
-  if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
-    if [[ -f "${OUTPUTS[PATCHED_OTA_ROOTLESS]}" &&
-      -f "${OUTPUTS[PATCHED_OTA_ROOTLESS]}.csig" &&
-      -f "${OUTPUTS[PATCHED_OTA_MAGISK]}" &&
-      -f "${OUTPUTS[PATCHED_OTA_MAGISK]}.csig" &&
-      -f "${OUTPUTS[OTA_METADATA_ROOTLESS]}" &&
-      -f "${OUTPUTS[OTA_METADATA_MAGISK]}" ]]; then
-      outputs_ready=true
-    fi
-  elif [[ -f "${OUTPUTS[PATCHED_OTA]}" ]]; then
-    outputs_ready=true
-  fi
-
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" != 'true' &&
-    "${outputs_ready}" == true ]]; then
-    echo -e "Requested OTA output already exists locally. Patch skipped."
+  if [[ -e "${OUTPUTS[PATCHED_OTA]}" || -L "${OUTPUTS[PATCHED_OTA]}" ||
+    ( -n "${secondary_ota}" && ( -e "${secondary_ota}" || -L "${secondary_ota}" ) ) ]]; then
+    # The helper may have written outputs before a diagnostic failure. Reusing
+    # those files would bypass the guard on the next attempt. Release preflight
+    # can still reuse an independently matched published selection; local bytes
+    # need a fresh build, not an existence-only success path.
+    echo 'Error: requested OTA output already exists locally; move it aside before a fresh verified build.' >&2
+    return 1
   else
     echo -e "Patching OTA..."
     local args=()
     local tool_runner_prefix
     # Use the guarded source-built verifier for current LineageOS 24.0
     # nightlies, not only the frozen 23.2 development fixture. Publication
-    # publication scope remains an independent earlier policy check.
+    # scope remains an independent earlier policy check.
     local runtime_care_map_active=false
     if is_care_map_development_profile ||
       pdx235_guarded_runtime_care_map_required; then
@@ -1181,7 +1177,7 @@ function patch_ota() {
       ! prepare_lineage_vold_exfat_timeout_module "${my_avbroot_setup}"; then
       return 1
     fi
-    append_enabled_module_arguments args
+    append_enabled_module_arguments args || return 1
     if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
       args+=("${locked_module_args[@]}")
     elif [[ "${ADDITIONALS[MICROG]}" == 'true' ]]; then
@@ -1204,7 +1200,6 @@ function patch_ota() {
         echo -e "Unauthorized ADB is not enabled. Skipping debug module setup...\n"
     fi
 
-    echo -e "MAS_COMPATIBLE_SEPOLICY value: ${ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]}" #debug Placed above the patch arguments
     if [[ "${ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]}" == 'true' ]]; then
       echo -e "Compatible SEPolicy Flag is enabled.  Adding patch argument to setup script...\n"
       args+=("--compatible-sepolicy")
@@ -1258,7 +1253,8 @@ function patch_ota() {
     fi
     local helper_scratch helper_status=0
     helper_scratch="$(mktemp -d "$(realpath -- "${WORKDIR}")/helper-scratch.XXXXXX")" || return 1
-    TMPDIR="${helper_scratch}" "${helper_command[@]}" "${args[@]}" || helper_status=$?
+    TMPDIR="${helper_scratch}" run_patch_helper_with_diagnostics \
+      "${ota_zip}.zip" "${helper_command[@]}" "${args[@]}" || helper_status=$?
     # Python owns cleanup of its nested temporary directories. Remove only an
     # empty parent; preserve debugging contents for the normal WORKDIR lifecycle.
     rmdir -- "${helper_scratch}" 2>/dev/null || :
@@ -1272,13 +1268,38 @@ function patch_ota() {
     verify_requested_boot_animation_outputs || return 1
 
     if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
-      generate_custota_variant_sidecars         "${OUTPUTS[PATCHED_OTA_ROOTLESS]}"         "${OUTPUTS[OTA_METADATA_ROOTLESS]}" || return 1
-      generate_custota_variant_sidecars         "${OUTPUTS[PATCHED_OTA_MAGISK]}"         "${OUTPUTS[OTA_METADATA_MAGISK]}" || return 1
+      generate_custota_variant_sidecars \
+        "${OUTPUTS[PATCHED_OTA_ROOTLESS]}" "${OUTPUTS[OTA_METADATA_ROOTLESS]}" || return 1
+      generate_custota_variant_sidecars \
+        "${OUTPUTS[PATCHED_OTA_MAGISK]}" "${OUTPUTS[OTA_METADATA_MAGISK]}" || return 1
     fi
   fi
 
   # Deactivate the virtual environment after patching the OTA
   deactivate
+}
+
+function run_patch_helper_with_diagnostics() {
+  local source_ota="${1}"
+  shift
+  local report_dir="${MODOS_BUILD_DIAGNOSTICS_DIR:-${WORKDIR}/diagnostics}"
+  local -a diagnostic_args=(
+    --source-ota "${source_ota}"
+    --output-ota "${OUTPUTS[PATCHED_OTA]}"
+    --report "${report_dir}/build-diagnostics.json"
+    --summary "${report_dir}/build-diagnostics.md"
+  )
+  if [[ "${RESOLVED_ROOT_MODE}" == both ]]; then
+    diagnostic_args+=(--output-ota "${OUTPUTS[PATCHED_OTA_MAGISK]}")
+  fi
+  if [[ "${ADDITIONALS[MSD]}" == true ]]; then
+    diagnostic_args+=(--msd-selected)
+  fi
+  mkdir -p -- "${report_dir}" || return 1
+  # Keep the pinned helper and signed MSD archive intact. This consumer guard
+  # reports source warnings separately and rejects the emulator fallback before
+  # postprocessing or publication; helper verification remains authoritative.
+  python src/build_diagnostics.py "${diagnostic_args[@]}" -- "$@"
 }
 
 function extract_ota_boot_target() {
@@ -1594,7 +1615,7 @@ function my_avbroot_setup() {
     location_path="${DOMAIN}/${PIXENEOS_RELEASE_OWNER}/${PIXENEOS_RELEASE_REPOSITORY}/releases/download/${VERSION[GRAPHENEOS]}/${OUTPUTS[PATCHED_OTA]}"
   fi
 
-  echo -e "Running script modifications..."
+  echo 'Applying pinned helper compatibility...'
   python3 "${compatibility_helper}" "${compatibility_args[@]}" \
     --source "${helper_source}" \
     "${helper_root}" \
@@ -1852,7 +1873,7 @@ function extract_official_keys() {
   mkdir -p -- "${WORKDIR}/extracted" "${WORKDIR}/extracted/extracts" || return 1
   rm -f -- "${public_key}" || return 1
 
-  # The pinned avbroot 3.34.1 extracts only the root vbmeta header's key;
+  # avbroot's structured extractor returns only the root vbmeta header's key;
   # chained descriptors are never included. Retain the existing --all image
   # extraction for compatibility with downstream consumers.
   run_executable_tool avbroot ota extract \

@@ -30,6 +30,7 @@ on:
         type: boolean
         default: true
       bcr:
+        description: Include the signed BCR module on LineageOS
         required: false
         type: boolean
         default: true
@@ -147,7 +148,7 @@ env:
   ROOT_MODE: ${{ inputs.root-mode }}
   ADDITIONALS_AFSR: ${{ inputs.afsr }}
   ADDITIONALS_ALTERINSTALLER: ${{ inputs.alterinstaller }}
-  ADDITIONALS_BCR: ${{ inputs.bcr }}
+  ADDITIONALS_BCR: ${{ inputs.rom-family == 'lineageos' && inputs.bcr }}
   ADDITIONALS_CUSTOTA: ${{ inputs.custota }}
   ADDITIONALS_MSD: ${{ inputs.msd }}
   ADDITIONALS_OEMUNLOCKONBOOT: ${{ inputs.oemunlockonboot }}
@@ -165,7 +166,7 @@ env:
 jobs:
   build:
     if: inputs.publish && inputs.release-type != 'build-only'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     concurrency:
       group: gh-pages
       cancel-in-progress: false
@@ -270,6 +271,7 @@ jobs:
           source src/declarations.sh
           source src/rom_profiles.sh
           resolve_rom_profile
+          echo "ADDITIONALS_BCR=${ADDITIONALS[BCR]}" >> "${GITHUB_ENV}"
           [[ "${PROJECT_NAME}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
             echo '::error::PROJECT_NAME must be a repository-safe project name'
             exit 1
@@ -289,13 +291,13 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.15.0"
+          python-version: "3.15.2"
 
       - name: Setup Rust for compiled SELinux policy patcher
         if: inputs.fsck-sysfs-sepolicy
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.97.1
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.99.1
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
 
       - name: Install libclang for compiled SELinux policy patcher
         if: inputs.fsck-sysfs-sepolicy
@@ -343,6 +345,7 @@ jobs:
           CLEANUP: true
           EXPORT_DEVICE_CANDIDATE: ${{ inputs.export-device-candidate }}
           MAGISK_PREINIT: ${{ inputs.magisk-preinit-device }}
+          MODOS_BUILD_DIAGNOSTICS_DIR: ${{ runner.temp }}/modos-build-diagnostics
           PASSPHRASE_AVB: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_AVB || '' }}
           PASSPHRASE_OTA: ${{ ((inputs.publish && inputs.release-type != 'build-only') || inputs.signing-mode == 'repository') && secrets.PASSPHRASE_OTA || '' }}
         run: |
@@ -389,6 +392,24 @@ jobs:
             rootless) echo 'ROM_FLAVOR=rootless' >> "${GITHUB_ENV}" ;;
             both) echo 'ROM_FLAVOR=both' >> "${GITHUB_ENV}" ;;
           esac
+
+      - name: Summarize source and output diagnostics
+        if: always()
+        shell: bash
+        run: |
+          summary="${RUNNER_TEMP}/modos-build-diagnostics/build-diagnostics.md"
+          if [[ -f "${summary}" ]]; then
+            cat -- "${summary}" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Retain build diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-diagnostics-${{ inputs.rom-family }}-${{ inputs.device-id }}
+          path: ${{ runner.temp }}/modos-build-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Prepare canonical pdx235 Custota metadata
         if: inputs.publish && inputs.release-type != 'build-only' && inputs.rom-family == 'lineageos' && inputs.device-id == 'pdx235' && (env.ROOT_MODE_RESOLVED == 'rootless' || env.ROOT_MODE_RESOLVED == 'magisk')
@@ -530,6 +551,12 @@ jobs:
             echo "ROM family: ${ROM_FAMILY}"
             echo "Device: ${DEVICE_NAME}"
             echo "Root mode: ${ROOT_MODE_RESOLVED}"
+            echo "BCR enabled: ${ADDITIONALS_BCR}"
+            echo "MSD enabled: ${ADDITIONALS_MSD}"
+            if [[ "${ROM_FAMILY}" == lineageos && "${DEVICE_NAME}" == pdx235 && "${ADDITIONALS_MSD}" != true ]]; then
+              echo "MSD is disabled pending qualification of the device's USB gadget HAL policy and behavior."
+            fi
+            echo "Build diagnostics: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             if [[ "${ROOT_MODE_RESOLVED}" == both ]]; then
               echo "Rootless module-selection fingerprint: ${MODULE_SELECTION_FINGERPRINT_ROOTLESS}"
               echo "Magisk module-selection fingerprint: ${MODULE_SELECTION_FINGERPRINT_MAGISK}"
@@ -655,7 +682,7 @@ jobs:
 
   build_only:
     if: "!inputs.publish || inputs.release-type == 'build-only'"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     # The common pipeline defaults to disposable keys. An explicit device

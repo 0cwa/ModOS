@@ -30,6 +30,21 @@ function validate_device_name() {
   fi
 }
 
+# BCR remains a signed, selectable module for LineageOS. GrapheneOS excludes
+# it even when a legacy caller requests the old shared default. Validate before
+# applying the family policy so malformed values cannot be silently accepted.
+function apply_rom_module_policy() {
+  _require_profile_boolean ADDITIONALS_BCR "${ADDITIONALS[BCR]}" || return 1
+  case "${ROM_FAMILY}" in
+    grapheneos) ADDITIONALS[BCR]=false ;;
+    lineageos) ;;
+    *)
+      echo "Error: unsupported ROM_FAMILY: ${ROM_FAMILY}" >&2
+      return 1
+      ;;
+  esac
+}
+
 function resolve_rom_profile() {
   case "${ROM_FAMILY}" in
   grapheneos)
@@ -53,6 +68,8 @@ function resolve_rom_profile() {
     return 1
     ;;
   esac
+
+  apply_rom_module_policy || return 1
 
   GRAPHENEOS[OTA_BASE_URL]="${ROM_PROFILE[OTA_BASE_URL]}"
   GRAPHENEOS[UPDATE_CHANNEL]="${GRAPHENEOS_UPDATE_CHANNEL:-${ROM_PROFILE[DEFAULT_UPDATE_CHANNEL]}}"
@@ -219,7 +236,26 @@ function _boot_animation_payload_digest() {
     sha256sum | awk '{print $1}'
 }
 
+function _lineage_vold_builder_input_digest() {
+  local path digest
+  local -a inputs=()
+  for path in \
+    src/ci/build_lineage_vold.py \
+    src/ci/build_original_vold.py \
+    src/ci/lineage_vold_baseline.py \
+    src/ci/vold_baseline_compare.py \
+    src/ci/prepare_vold_vendor_makefiles.py \
+    locks/lineage-vold-baseline-20261016.json \
+    locks/lineage-vold-vendor-candidate-20261016.json; do
+    digest="$(_locked_input_digest "${path}")" || return 1
+    inputs+=("${path}=${digest}")
+  done
+  printf '%s\n' "${inputs[@]}" | sha256sum | awk '{print $1}'
+}
+
 function module_selection_fingerprint() {
+  local executable_tools_lock_digest
+  local build_diagnostics_digest
   local lock_digest="disabled"
   local profile_digest="disabled"
   local magisk_preinit="disabled"
@@ -240,7 +276,14 @@ function module_selection_fingerprint() {
   local lineage_vold_patch_digest="disabled"
   local lineage_vold_manifest_digest="disabled"
   local lineage_vold_binary_digest="disabled"
-  local entry
+  local entry module
+  local -A legacy_module_versions=(
+    [ALTERINSTALLER]=disabled
+    [BCR]=disabled
+    [CUSTOTA]=disabled
+    [MSD]=disabled
+    [OEMUNLOCKONBOOT]=disabled
+  )
   local -a module_entries=(
     "afsr:AFSR"
     "alterinstaller:ALTERINSTALLER"
@@ -268,6 +311,20 @@ function module_selection_fingerprint() {
     _require_profile_boolean \
       "ADDITIONALS_${entry#*:}" \
       "${ADDITIONALS[${entry#*:}]}" || return 1
+  done
+
+  executable_tools_lock_digest="$(_locked_input_digest locks/executable-tools-v1.json)" || {
+    echo "Error: the executable-tools lock is not clean and checked in." >&2
+    return 1
+  }
+  build_diagnostics_digest="$(_locked_input_digest src/build_diagnostics.py)" || {
+    echo "Error: the build diagnostic guard is not clean and checked in." >&2
+    return 1
+  }
+  for module in ALTERINSTALLER BCR CUSTOTA MSD OEMUNLOCKONBOOT; do
+    if [[ "${ADDITIONALS[${module}]}" == true ]]; then
+      legacy_module_versions[${module}]="${VERSION[${module}]:-}"
+    fi
   done
 
   if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]]; then
@@ -333,7 +390,7 @@ function module_selection_fingerprint() {
     fi
     lineage_vold_lock_digest="$(_locked_input_digest locks/lineage-vold-exfat-timeout.json)" || return 1
     lineage_vold_adapter_digest="$(_locked_input_digest src/lineage_vold.py)" || return 1
-    lineage_vold_builder_digest="$(_locked_input_digest src/ci/build_lineage_vold.py)" || return 1
+    lineage_vold_builder_digest="$(_lineage_vold_builder_input_digest)" || return 1
     lineage_vold_verifier_digest="$(_locked_input_digest src/ci/check_lineage_vold_artifact.py)" || return 1
     lineage_vold_patch_digest="$(_locked_input_digest patches/lineageos/android_system_vold/11d8982f824d52e8122c7aa732207ba66b8f23c8-exfat-fsck-timeout-120s.patch)" || return 1
     lineage_vold_manifest_digest="$(_locked_input_digest locks/lineage-pdx235-20261016-build-manifest.xml)" || return 1
@@ -408,16 +465,23 @@ function module_selection_fingerprint() {
   SELECTION_COMPATIBLE_SEPOLICY="${ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]}"
   SELECTION_CLEAR_VBMETA_FLAGS="${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}"
   SELECTION_HELPER_COMMIT="${VERSION[AVBROOT_SETUP]}"
+  SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256="${executable_tools_lock_digest}"
+  SELECTION_BUILD_DIAGNOSTICS_SHA256="${build_diagnostics_digest}"
   SELECTION_LOCK_SHA256="${lock_digest}"
   SELECTION_PROFILE_SHA256="${profile_digest}"
   SELECTION_MODULE_AFSR="${ADDITIONALS[AFSR]}"
   SELECTION_MODULE_ALTERINSTALLER="${ADDITIONALS[ALTERINSTALLER]}"
+  SELECTION_MODULE_ALTERINSTALLER_VERSION="${legacy_module_versions[ALTERINSTALLER]}"
   SELECTION_MODULE_BCR="${ADDITIONALS[BCR]}"
+  SELECTION_MODULE_BCR_VERSION="${legacy_module_versions[BCR]}"
   SELECTION_MODULE_CUSTOTA="${ADDITIONALS[CUSTOTA]}"
+  SELECTION_MODULE_CUSTOTA_VERSION="${legacy_module_versions[CUSTOTA]}"
   SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION="${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}"
   SELECTION_MODULE_MICROG="${ADDITIONALS[MICROG]}"
   SELECTION_MODULE_MSD="${ADDITIONALS[MSD]}"
+  SELECTION_MODULE_MSD_VERSION="${legacy_module_versions[MSD]}"
   SELECTION_MODULE_OEMUNLOCKONBOOT="${ADDITIONALS[OEMUNLOCKONBOOT]}"
+  SELECTION_MODULE_OEMUNLOCKONBOOT_VERSION="${legacy_module_versions[OEMUNLOCKONBOOT]}"
   SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
   SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
   SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"

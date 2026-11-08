@@ -124,46 +124,6 @@ assert_snapshot() {
   done
 }
 
-assert_modules_importable() {
-  local root="${1}"
-  python3 -B - "${root}" <<'PY'
-import importlib.util
-import pathlib
-import sys
-import types
-
-sys.dont_write_bytecode = True
-root = pathlib.Path(sys.argv[1])
-lib = types.ModuleType('lib')
-lib.__path__ = []
-filesystem = types.ModuleType('lib.filesystem')
-filesystem.CpioFs = type('CpioFs', (), {})
-filesystem.ExtFs = type('ExtFs', (), {})
-initscript = types.ModuleType('lib.initscript')
-initscript.InitScript = type('InitScript', (), {})
-modules = types.ModuleType('lib.modules')
-modules.ModuleRequirements = type('ModuleRequirements', (), {})
-modules.SignedZipCliModule = type('SignedZipCliModule', (), {})
-sys.modules.update({
-    'lib': lib,
-    'lib.filesystem': filesystem,
-    'lib.initscript': initscript,
-    'lib.modules': modules,
-})
-
-for index, relative in enumerate((
-    'lib/modules/alterinstaller.py',
-    'lib/modules/bcr.py',
-    'lib/modules/oemunlockonboot.py',
-)):
-    path = root / relative
-    spec = importlib.util.spec_from_file_location(f'compat_module_{index}', path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-PY
-}
-
 assert_python_files_compile() {
   local root="${1}"
   python3 -B - "${root}" <<'PY'

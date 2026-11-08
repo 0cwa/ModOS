@@ -10,11 +10,14 @@ ModOS is maintained as a soft fork of `pixincreate/PixeneOS`: upstream structure
 
 The Actions inventory is intentionally small: the upstream-style CI, release, multi-device release, and Renovate workflows, plus the reusable shared ROM build and the thin LineageOS release trigger. CI enforces this inventory so temporary acceptance or one-shot workflows cannot be committed accidentally.
 
+The [upstream maintenance guide](docs/upstream-maintenance.md) records the local
+compatibility boundaries and the upstream changes that would let us remove them.
+
 ## Features
 
-- [BCR](https://github.com/chenxiaolong/BCR)
+- [BCR](https://github.com/chenxiaolong/BCR) (LineageOS builds)
 - [Custota](https://github.com/chenxiaolong/Custota)
-- [MSD](https://github.com/chenxiaolong/MSD)
+- [MSD](https://github.com/chenxiaolong/MSD) (disabled by default for LineageOS pdx235 pending USB HAL qualification)
 - [OEMUnlockOnBoot](https://github.com/chenxiaolong/OEMUnlockOnBoot)
 - [AlterInstaller](https://github.com/chenxiaolong/AlterInstaller)
 - Optional Magisk using the repository selected by the build
@@ -36,6 +39,37 @@ The maintained `0cwa/my-avbroot-setup` helper is pinned to an exact Git revision
 
 Module versions are selected in `src/declarations.sh`; disabled modules are neither acquired nor passed to the patch helper.
 
+### Build diagnostics and MSD compatibility
+
+The build summary separates warnings from the original source OTA, warnings
+from each finished output, and module-injection warnings. Source LineageOS AVB
+test-key/flag warnings remain visible; final-output AVB warnings and MSD's
+emulator `su` fallback fail the build before publication. Passing verification
+does not establish physical-device behavior. See [diagnostic policy and MSD
+qualification](docs/build-diagnostics.md).
+
+MSD remains enabled in the GrapheneOS shiba preset. It is temporarily disabled
+in the LineageOS pdx235 preset and manual LineageOS workflow defaults. Explicit
+MSD selections still undergo the fallback guard; an alternative HAL domain is
+never guessed from its name. The read-only pdx235 module audit can observe the
+running gadget HAL label when MSD is selected, while export/unexport and USB
+recovery remain on-device acceptance checks.
+
+## BCR selection
+
+BCR 3.11 remains enabled by default for LineageOS, including the scheduled
+pdx235 builds and both rootless and Magisk outputs. Manual LineageOS builds
+can turn it off with the `bcr` workflow input or
+`'ADDITIONALS[BCR]' = false` in `env.toml`. Its signed archive, verification
+path, and helper version remain pinned as before.
+
+GrapheneOS builds exclude BCR. The shared ROM policy resolves BCR to `false`
+before acquisition, helper arguments, and build-selection fingerprinting,
+including for older configurations that still request `true`. GrapheneOS
+release defaults and its scheduled preset also select `false`. Selection
+metadata records `module.bcr=false` and `module.bcr.version=disabled`, so
+previous BCR-enabled GrapheneOS builds cannot satisfy the new selection.
+
 ## Working
 
 This repository acts as a server.
@@ -46,6 +80,14 @@ This repository acts as a server.
 4. After the exact assets are verified, the `gh-pages` OTA metadata is updated. Older assets for the same selection fingerprint are pruned without deleting other valid variants.
 
 ## Usage
+
+### Build the original pdx235 vold locally
+
+The unmodified LineageOS `vold` reproduction workflow can run on a local Linux
+x86_64 computer. It acquires pinned Sony vendor inputs from TheMuppets, retains
+source downloads and incremental output, and checks the result against the
+authenticated original OTA. See [local build setup and commands](docs/vold-baseline-ci.md).
+This qualification workflow does not require a GitHub Actions runner.
 
 ### Getting Started
 
@@ -179,7 +221,7 @@ Root changes the device security model and can introduce compatibility breakage 
 
 ModOS defaults to the official `topjohnwu/Magisk` repository. The source remains configurable through `MAGISK[REPOSITORY]` in `env.toml`, but alternate Magisk forks are opt-in rather than part of the GrapheneOS build contract. If you use Zygisk Next for GrapheneOS compatibility, install and manage it separately from the OTA build. Magisk/Zygisk behavior can change across releases, so rooted builds should be revalidated after ROM, Magisk, or Zygisk changes.
 
-ModOS currently pins **official Magisk v30.7** as its avbroot compatibility baseline. This mirrors the current rooted-GrapheneOS reference pairing with avbroot 3.34.1. avbroot 3.34.0 and newer explicitly recognize Magisk 31000, but parser/patch-format support is not the same as target-device runtime validation, so ModOS does not automatically advance to the highest Magisk tag. Override `MAGISK_VERSION` only for an intentional compatibility test.
+ModOS retains **official Magisk v30.7** as its reviewed runtime baseline. The avbroot executable is pinned separately in `locks/executable-tools-v1.json`. Advancing avbroot and its supported Magisk patch formats does not establish target-device runtime compatibility, so ModOS does not automatically advance to the highest Magisk tag. Override `MAGISK_VERSION` only for an intentional compatibility test.
 
 With avbroot, Magisk is not updated using the app's normal **Direct install** path. Magisk version changes must be made by repatching/re-signing the OTA and installing that OTA. The manager's **Additional setup / Environment fix** is a separate runtime-environment step and does not replace OTA repatching.
 
@@ -297,8 +339,8 @@ package URL, size, and SHA-256, but do not repeat the APT signature check.
 The experimental `lineage-vold-exfat-timeout` module aims to raise only the
 exFAT fsck timeout from 45 to 120 seconds. **It is default-off and has not
 passed a real unmodified-binary reproduction test.** Before compiling a patched
-`vold`, the dedicated, nonpublishing large-runner CI must build **unmodified
-`vold`** from the locked 1,243-project LineageOS 2026-10-16 manifest and
+`vold`, a suitable local host or the nonpublishing large-runner CI must build
+**unmodified `vold`** from the locked LineageOS 2026-10-16 sources and
 demonstrate a *byte-for-byte match* against the executable extracted from the
 publisher-authenticated official OTA. A matching ABI or source revision is
 not sufficient. A mismatch blocks all subsequent patched builds.

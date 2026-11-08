@@ -62,9 +62,9 @@ jobs:
         run: python3 src/ci/check_exfatprogs_artifact.py
 
       - name: Setup Rust for compiled SELinux policy patcher
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.97.1
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # Rust 1.99.1
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
 
       - name: Install libclang for compiled SELinux policy patcher
         shell: bash
@@ -74,6 +74,13 @@ jobs:
 
       - name: Test compiled SELinux policy patcher
         run: cargo test --locked --manifest-path src/exfatprogs_sepolicy/Cargo.toml
+
+      - name: Build policy patcher through production toolchain guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          source src/util_functions.sh
+          build_exfatprogs_policy_patcher "${GITHUB_WORKSPACE}"
 
       - name: Verify exfatprogs lock with pinned module-tool
         shell: bash
@@ -108,6 +115,38 @@ jobs:
       - name: Test source-built Vold workflow routing
         run: python3 tests/lineage_vold_workflow_contract_test.py
 
+      - name: Test unmodified original vold CI-only baseline
+        run: python3 tests/vold_baseline_ci_test.py
+
+      - name: Test actual Repo manifest selection and bounded build inputs
+        run: python3 tests/vold_original_build_test.py
+
+      - name: Test bounded original Vold source dependency resolver
+        run: python3 tests/vold_source_closure_test.py
+
+      - name: Test immutable Sony vendor acquisition and regeneration
+        run: python3 tests/vold_vendor_makefiles_test.py
+
+      - name: Test original vold probe ordering and bounded expansion
+        run: python3 tests/vold_probe_orchestration_test.py
+
+      - name: Test persistent local original vold build commands
+        run: python3 tests/vold_local_test.py
+
+      - name: Test authenticated local build tool setup
+        run: python3 tests/vold_local_tools_test.py
+
+      - name: Generate the provisional original vold source plan
+        run: python3 src/ci/vold_source_closure.py plan --output "${RUNNER_TEMP}/vold-source-plan.json"
+
+      - name: Retain the provisional original vold source plan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vold-source-provisional-plan
+          path: ${{ runner.temp }}/vold-source-plan.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Test pdx235 Custota metadata preparation
         run: bash tests/pdx235_custota_metadata_test.sh
 
@@ -121,6 +160,7 @@ jobs:
           bash tests/typed_config_resolver_test.sh
           bash tests/helper_preflight_test.sh
           bash tests/upstream_integration_test.sh
+          python3 tests/build_diagnostics_test.py
           bash tests/scheduled_build_definitions_test.sh
           bash tests/root_mode_both_test.sh
           bash tests/magisk_output_verification_test.sh
@@ -156,10 +196,16 @@ jobs:
         shell: bash
         run: bash src/ci/smoke_test.sh
 
-  # Narrow, nonpublishing Android 17 qualification on this review branch only.
   # No repository signing secrets, release credentials or write permissions.
+  # Same-repository integration branches opt into real, nonpublishing OTA builds.
+  # This catches runner/tool upgrades that the deterministic tests cannot cover.
   lineage24_qualification:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/lineage24-care-map-qualification-20261015'
+    needs: test
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (startsWith(github.head_ref, 'integration/') ||
+       github.head_ref == 'feature/lineage24-care-map-qualification-20261015')
     permissions:
       contents: read
     uses: ./.github/workflows/build-rom.yml
@@ -173,9 +219,43 @@ jobs:
       compatible-sepolicy-patching: true
       allow-unauthorized-adb: false
       microg: true
+      bcr: true
+      # MSD v2.5's physical-device HAL mapping is not yet qualified on pdx235.
+      msd: false
+      exfatprogs-fsck: true
+      fsck-sysfs-sepolicy: true
       disable-system-updater: true
       boot-animation: true
       # Exercise the ordinary provider/build path, not the opt-in fixture profile.
+      development-profile: none
+      signing-mode: disposable
+      release-type: build-only
+      publish: false
+
+  grapheneos_qualification:
+    needs: test
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'integration/')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with:
+      rom-family: grapheneos
+      device-id: shiba
+      root: false
+      root-mode: both
+      magisk-preinit-device: sda10
+      update-channel: stable
+      compatible-sepolicy-patching: false
+      allow-unauthorized-adb: false
+      microg: false
+      bcr: false
+      exfatprogs-fsck: false
+      fsck-sysfs-sepolicy: false
+      disable-system-updater: true
+      boot-animation: true
       development-profile: none
       signing-mode: disposable
       release-type: build-only
@@ -244,6 +324,14 @@ jobs:
           set -euo pipefail
           python3 src/ci/build_lineage_vold.py sync \
             --source-root "${VOLD_BASELINE_WORK}/source" --jobs 4
+
+      - name: Verify pinned supplemental Sony vendor inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 src/ci/prepare_vold_vendor_makefiles.py \
+            --source-root "${VOLD_BASELINE_WORK}/source" \
+            --report "${VOLD_BASELINE_WORK}/sony-vendor-input-report.json"
 
       - name: Reproduce unmodified vold and check byte-exact OTA identity
         shell: bash

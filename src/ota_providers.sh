@@ -4,6 +4,7 @@
 
 function fetch_grapheneos_ota_metadata() {
   local release_metadata latest_version
+  ROM_OTA_API_LEVEL=""
 
   release_metadata="$(curl -sLf \
     "${ROM_PROFILE[OTA_BASE_URL]}/${DEVICE_NAME}-${GRAPHENEOS[UPDATE_CHANNEL]}")" || {
@@ -23,8 +24,10 @@ function fetch_grapheneos_ota_metadata() {
 }
 
 function fetch_lineageos_ota_metadata() {
-  local release_metadata parsed filename ota_url latest_version source_filename="" source_series=""
+  local release_metadata parsed filename ota_url ota_sha256 ota_api_level latest_version
+  local source_filename="" source_series=""
   local endpoint="${ROM_PROFILE[OTA_BASE_URL]}/devices/${DEVICE_NAME}/builds"
+  ROM_OTA_API_LEVEL=""
 
   # Reproduce the physical candidate failure without upgrading Android as well.
   # This reviewed development profile remains restricted to unpublished pdx235.
@@ -100,11 +103,16 @@ try:
     filename = item["filename"]
     url = item["url"]
     sha256 = item["sha256"]
+    api_level = item["os_sdk_level"]
 except (KeyError, IndexError, StopIteration, TypeError, ValueError, json.JSONDecodeError):
     raise SystemExit(1)
 if not isinstance(filename, str) or not re.fullmatch(r"[A-Za-z0-9._+-]+[.]zip", filename):
     raise SystemExit(1)
 if not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256):
+    raise SystemExit(1)
+# SDK identity belongs to the selected OTA file, not the build, another file,
+# or a version-name guess. bool is an int subclass, so require the exact type.
+if type(api_level) is not int or api_level <= 0:
     raise SystemExit(1)
 if source_filename and sha256 != "b2b4269738df1d3092de49bde6c7d0ffcb62ae19b342213a819187c30b7ab1f8":
     raise SystemExit(1)
@@ -121,6 +129,7 @@ if (
 print(filename)
 print(url)
 print(sha256)
+print(api_level)
 ' "${GRAPHENEOS[UPDATE_CHANNEL]}" "${DEVICE_NAME}" "${source_filename}" "${source_series}")" || {
     echo "Error: LineageOS returned invalid release metadata." >&2
     return 1
@@ -128,7 +137,9 @@ print(sha256)
   filename="${parsed%%$'\n'*}"
   parsed="${parsed#*$'\n'}"
   ota_url="${parsed%%$'\n'*}"
-  ROM_OTA_SHA256="${parsed#*$'\n'}"
+  parsed="${parsed#*$'\n'}"
+  ota_sha256="${parsed%%$'\n'*}"
+  ota_api_level="${parsed#*$'\n'}"
   latest_version="$(printf '%s\n' "${filename}" | sed -nE 's/.*(^|[^0-9])([0-9]{8})([^0-9]|$).*/\2/p')"
   if [[ ! "${latest_version}" =~ ^[0-9]{8}$ ]]; then
     echo "Error: LineageOS filename lacks an unambiguous build date." >&2
@@ -136,11 +147,16 @@ print(sha256)
   fi
 
   VERSION[GRAPHENEOS]="${latest_version}"
+  ROM_OTA_SHA256="${ota_sha256}"
+  ROM_OTA_API_LEVEL="${ota_api_level}"
   GRAPHENEOS[OTA_TARGET]="${filename%.zip}"
   GRAPHENEOS[OTA_URL]="${ota_url}"
 }
 
 function fetch_rom_ota_metadata() {
+  # A failed selection or a provider without SDK metadata must not retain the
+  # previous source's SDK. Successful LineageOS selection sets it with its digest.
+  ROM_OTA_API_LEVEL=""
   validate_device_name || return 1
 
   case "${ROM_PROFILE[PROVIDER]}" in

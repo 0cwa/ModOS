@@ -1,0 +1,82 @@
+{
+  "base_build_id": "lineage-24.0-20261016-nightly-pdx235-signed",
+  "inventory_format": "sha256(json.dumps(sorted regular files by path, objects with path/mode/size/sha256, sort_keys=True, separators=(comma,colon)))",
+  "kind": "lineageos-pdx235-public-vendor-candidate",
+  "manifest_sha256": "d4ded1ca84de399497b68d7ac006808059b6be9cf76725029420a3495a2e5468",
+  "provenance": {
+    "acceptance": "An authenticated byte-identical unmodified vold comparison remains mandatory; mirror pinning is reproducibility evidence, not LineageOS publisher authentication.",
+    "compatibility_evidence": "Both pinned public source lists name Sony68.2.A.3.107; all1106 destination files exist, all27 pinned common hashes match raw or fixed-up contents, and all8 declarations regenerate identically with the manifest-pinned scripts.",
+    "kind": "public-git-mirror-candidate",
+    "original_ota_vendor_identity_proven": false,
+    "publisher_authenticated": false,
+    "selection": "Latest lineage-24.0 commits preceding 2026-10-16; identical to branch heads observed 2026-10-22."
+  },
+  "schema_version": 1,
+  "source_input_sha256": {
+    "device/sony/pdx235/extract-files.py": "440af4750e0496627003295606935d3a534f2e758ab42adacd3d5da6e255f0e0",
+    "device/sony/pdx235/proprietary-files.txt": "93da9a7ac7957afde23ac9c59425947a29b410d01fd5b1fcde2efb5ec155855f",
+    "device/sony/sm6375-common/extract-files.py": "266ac34e070a5755d513979ad74196b4341c363915b0cfaa24e51d4bf49d6ec8",
+    "device/sony/sm6375-common/proprietary-files.txt": "8056cdd324881ba179fbac2553e77ddc0d1456ade7ef1e37f9630bb5f6c39a29",
+    "tools/extract-utils/extract_utils/elf.py": "58d3a6db079185d94e2d283211f73fa71f32bb882618ac47b0feb6d2f5e01d31",
+    "tools/extract-utils/extract_utils/main.py": "3470e7a43a9788f2699c13d627750b7f5fdc448bf364a48a3a7c86f2b931562d",
+    "tools/extract-utils/extract_utils/makefiles.py": "2a550851c75a2a32d4d294338df3e73f7d95b4418721653224565d27ba6fa111",
+    "tools/extract-utils/extract_utils/module.py": "1d1f77c66e05a3f3fea1e710caca7842c38c11b76c1a7bb486724826e72f73ef"
+  },
+  "source_projects": [
+    {
+      "path": "device/sony/pdx235",
+      "repository": "LineageOS/android_device_sony_pdx235",
+      "revision": "0559de69466e1e9af69b121985f592c4f4609283"
+    },
+    {
+      "path": "device/sony/sm6375-common",
+      "repository": "LineageOS/android_device_sony_sm6375-common",
+      "revision": "d1d80af1ad9032cb092ff6d85db437709cc54e28"
+    },
+    {
+      "path": "tools/extract-utils",
+      "repository": "LineageOS/android_tools_extract-utils",
+      "revision": "ff6589c6b0a4a00c592e98940e9e6b6a50c76569"
+    }
+  ],
+  "vendor_projects": [
+    {
+      "commit_date": "2026-03-28T18:47:17Z",
+      "content_bytes": 380859981,
+      "declaration_sha256": {
+        "Android.bp": "04efde7c0f819ca7b096efaf3d5186c4589d8a7a1109bb36771a732b64ec5d85",
+        "Android.mk": "7a5e9b2a048ce3b454ca66d2be7775eaf808c0cdac69b680a5deeb072ca08eb0",
+        "BoardConfigVendor.mk": "31932b8ede523a06046fb6287bdaf6495bf50508dd849cb619aec7ea7d61bdec",
+        "pdx235-vendor.mk": "8b46c82d0d0f8876288b00840eb127a965e774512f240611fda7e193cb414912"
+      },
+      "description": "Update from Sony 68.2.A.3.107",
+      "file_count": 232,
+      "inventory_sha256": "529efe19916b9dd2dd3aea6ed3d41a4bb18d4c780377299b6b5af69ef281ba94",
+      "observed_branch": "lineage-24.0",
+      "path": "vendor/sony/pdx235",
+      "repository": "TheMuppets/proprietary_vendor_sony_pdx235",
+      "revision": "1e503a56c0d16de1f19f2b011581908dac29065b",
+      "tree": "87f37284815b03640bb3df0305356f31b43d393c",
+      "url": "https://github.com/TheMuppets/proprietary_vendor_sony_pdx235.git"
+    },
+    {
+      "commit_date": "2026-08-25T15:23:11Z",
+      "content_bytes": 304006211,
+      "declaration_sha256": {
+        "Android.bp": "0da6991ffe51153e5af2919db465b1bbe44fb39b35f9d7567e84990c690a9718",
+        "Android.mk": "7a5e9b2a048ce3b454ca66d2be7775eaf808c0cdac69b680a5deeb072ca08eb0",
+        "BoardConfigVendor.mk": "31932b8ede523a06046fb6287bdaf6495bf50508dd849cb619aec7ea7d61bdec",
+        "sm6375-common-vendor.mk": "fc58774d6c95c3f3ebdf7eadc9c2dcc829152cbe86fed9672703aca200d69559"
+      },
+      "description": "Update WFD system blobs from marvel_g A171WEH.20; base Sony68.2.A.3.107",
+      "file_count": 882,
+      "inventory_sha256": "efb9f9e1903bb67e873125dbba5485fe6a53ab9fa370cced9b06f7cfb889469e",
+      "observed_branch": "lineage-24.0",
+      "path": "vendor/sony/sm6375-common",
+      "repository": "TheMuppets/proprietary_vendor_sony_sm6375-common",
+      "revision": "2114108d5adfe787503ad0c87508d78123551991",
+      "tree": "7dd8d71c689778a4cdf246df63e6b76e4014d827",
+      "url": "https://github.com/TheMuppets/proprietary_vendor_sony_sm6375-common.git"
+    }
+  ]
+}

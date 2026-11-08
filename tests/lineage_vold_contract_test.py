@@ -196,47 +196,22 @@ class LineageVoldContractTest(unittest.TestCase):
                 with self.assertRaisesRegex(lineage_vold.VoldModuleError, "changed filesystem entry metadata"):
                     lineage_vold.inject_vold(fs, product_fs, tree, lineage_vold.BASE_BUILD_ID)
 
-    def test_vold_builder_requires_every_source_project_to_be_clean(self):
-        from unittest.mock import patch
+    def test_patched_builder_requires_same_inputs_as_original_baseline(self):
+        import copy
 
-        expected = {
-            "system/vold": ("LineageOS/android_system_vold", "1" * 40),
-            "system/core": ("LineageOS/android_system_core", "2" * 40),
-        }
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for path in expected:
-                (root / path).mkdir(parents=True)
-
-            def clean_git(project, command, *args):
-                relative = project.relative_to(root).as_posix()
-                if command == "rev-parse":
-                    return expected[relative][1]
-                if command == "status":
-                    self.assertIn("--ignored", args)
-                    self.assertIn("--untracked-files=all", args)
-                    return ""
-                self.fail(f"unexpected git argument: {command}")
-
-            with patch.object(build_lineage_vold, "git", side_effect=clean_git):
-                build_lineage_vold.verify_source_checkouts_clean(root, expected)
-
-            def dirty_git(project, command, *args):
-                if command == "rev-parse":
-                    return expected[project.relative_to(root).as_posix()][1]
-                if project == root / "system" / "core":
-                    return "?? malicious-local-overlay.cpp"
-                return ""
-
-            with patch.object(build_lineage_vold, "git", side_effect=dirty_git):
-                with self.assertRaisesRegex(build_lineage_vold.BuildError, "source project is dirty"):
-                    build_lineage_vold.verify_source_checkouts_clean(root, expected)
-
-            (root / "system" / "core").rmdir()
-            (root / "system" / "core").symlink_to(root / "system" / "vold")
-            with patch.object(build_lineage_vold, "git", side_effect=clean_git):
-                with self.assertRaisesRegex(build_lineage_vold.BuildError, "missing or unsafe"):
-                    build_lineage_vold.verify_source_checkouts_clean(root, expected)
+        lock, manifest, _ = build_lineage_vold.load_contract()
+        original = build_lineage_vold.original_build_contract(lock, manifest)
+        self.assertEqual(original["build"]["release"], "cp2a")
+        self.assertEqual(original["build"]["setup_command"], "_lunch_meat lineage_pdx235 cp2a userdebug")
+        for field in ("base_build_id", "source_ota_sha256", "device"):
+            changed = copy.deepcopy(lock)
+            changed[field] = "different"
+            with self.subTest(field=field), self.assertRaisesRegex(build_lineage_vold.BuildError, "contracts disagree"):
+                build_lineage_vold.original_build_contract(changed, manifest)
+        changed = copy.deepcopy(lock)
+        changed["build"]["artifact"] = "/unrelated/output/vold"
+        with self.assertRaisesRegex(build_lineage_vold.BuildError, "contracts disagree"):
+            build_lineage_vold.original_build_contract(changed, manifest)
 
     def test_published_module_requires_independent_binary_approval(self):
         from unittest.mock import patch

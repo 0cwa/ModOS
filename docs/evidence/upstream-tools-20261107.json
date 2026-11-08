@@ -1,0 +1,245 @@
+{
+  "artifacts": [
+    {
+      "app_contexts": null,
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "system/etc/permissions/privapp-permissions-com.chiller3.bcr.xml",
+          "sha256": "3d9e8a7c22f041bcbf8bc243a2532ee3ff188aeb74cd33a8ef8872afe1fcce7d",
+          "size": 292,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/priv-app/com.chiller3.bcr/app-release.apk",
+          "sha256": "3c937c0c27361e5a692fe22cf484b12f9fbfd94bece304615221ac9d8bd072da",
+          "size": 5194220,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "helper-consumed files; scripts are not executed by the image adapter",
+      "name": "BCR-3.11-release.zip",
+      "release_digest_matches": true,
+      "sha256": "a5c8c2cf611891992c072d28cf85ec275da27a77b5dbf2408c6398d5bccee918",
+      "signature_sha256": "4784d0bcc78a1e3305052bb69ea621a0f14201164eb5757d4f46a5a34b9425f2",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 2787358,
+      "url": "https://github.com/chenxiaolong/BCR/releases/download/v3.11/BCR-3.11-release.zip"
+    },
+    {
+      "app_contexts": "user=_app isPrivApp=true name=com.chiller3.custota domain=custota_app type=app_data_file levelFrom=all",
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "plat_seapp_contexts",
+          "sha256": "ba7cf38226cff4ef72328d9e9478d621c724d56e0b4bd525a39cec04a25aed55",
+          "size": 102,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/permissions/privapp-permissions-com.chiller3.custota.xml",
+          "sha256": "303c3599f4e5d6f08d072e519a7c4dfc2abc5fd2af06c65186598f93a9ea82e5",
+          "size": 510,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/sysconfig/config-com.chiller3.custota.xml",
+          "sha256": "16c897fb40c9280db450a34cab5ec2eebedb9fb5ee439849f9917fb65a305161",
+          "size": 182,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/priv-app/com.chiller3.custota/app-release.apk",
+          "sha256": "37ba3b5d5a694e5fc2226db0fb5e90fc8edcbef28e6b348090a7f932d284cc46",
+          "size": 4490165,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "custota-selinux.arm64-v8a",
+          "sha256": "23753728bb53a04b72cd2782ce1c20b1f938a127bdfb44252f7c94bca8a54c54",
+          "size": 1146704,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "custota-selinux.x86_64",
+          "sha256": "cb3c88d88f28d9a504ad59b53c26b5e5f38a5170581ed9850f309517048c92f6",
+          "size": 1265312,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "helper-consumed files; scripts are not executed by the image adapter",
+      "name": "Custota-6.8-release.zip",
+      "release_digest_matches": true,
+      "sha256": "b583dce3e3dddb7535ba848e9806d2fababdbff63b1512b5da179999583a8e3f",
+      "signature_sha256": "49fca905e40087f72c6ff57a7c020b5b11e1630c4272da2c6e23ba3f73b9c7c6",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 3527255,
+      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.8/Custota-6.8-release.zip"
+    },
+    {
+      "app_contexts": null,
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "size": 35149,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "README.md",
+          "sha256": "398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6",
+          "size": 33214,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "avbroot",
+          "sha256": "6233bd83e9a3c85012cdb4c406ec72750dd51c26829369a1abe29ca2a99e6315",
+          "size": 10974384,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "complete executable archive",
+      "name": "avbroot-3.37.1-x86_64-unknown-linux-gnu.zip",
+      "release_digest_matches": true,
+      "sha256": "ca8e1e02bc33f5569d5228f312ce1351d0244fecd2d2163cb5a3c1a283a6e4a3",
+      "signature_sha256": "8b034b5fa465f33a149bd42f6edb606072866ad82aa08e2f2ef34d07ee97cf47",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 4293699,
+      "url": "https://github.com/chenxiaolong/avbroot/releases/download/v3.37.1/avbroot-3.37.1-x86_64-unknown-linux-gnu.zip"
+    },
+    {
+      "app_contexts": null,
+      "layout": [
+        {
+          "mode": "0755",
+          "path": "custota-tool",
+          "sha256": "2ec3f2f23cafd21137f380e1aaac120a08495f640d26cdffe90e17d43a75a49f",
+          "size": 5644336,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "complete executable archive",
+      "name": "custota-tool-6.8-x86_64-unknown-linux-gnu.zip",
+      "release_digest_matches": true,
+      "sha256": "7c7e6cb64f3fe0993969813d26b4a66b7ea1689af47579e6543391a55ca40ecb",
+      "signature_sha256": "90f883cef460c65c4c1170657f182f339d85684bde9144fab3ca01e41bc1c0dc",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 2421143,
+      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.8/custota-tool-6.8-x86_64-unknown-linux-gnu.zip"
+    }
+  ],
+  "checks": {
+    "archive_regressions": "21 tests passed using /usr/bin/python3 3.13.5.",
+    "authenticated_install": "Production bootstrap downloaded and verified both host archives, signatures, complete members, and modes against the committed lock.",
+    "avbroot_cli": "ota patch and ota verify expose the existing rootless, Magisk/preinit, AVB-key and OTA-certificate options consumed by the helper.",
+    "bootstrap_regressions": "13 tests passed using /usr/bin/python3 3.13.5.",
+    "custota_csig": "gen-csig help retains helper input, key, cert, and passphrase arguments; no OTA signing performed in this qualification.",
+    "custota_metadata": "gen-update-info creates version 2 metadata with exact full OTA/csig URLs; malformed missing-version metadata is rejected without rewriting.",
+    "lock_policy": "Offline validator and executable_tool_lock_test.sh passed; independent fixture pins both updated host archives and their members.",
+    "modules": "BCR and Custota signed APK/XML payloads, Custota platform app-context selector, and both SELinux tool ABI members retain helper-compatible paths.",
+    "sealed_execution": [
+      "avbroot 3.37.1",
+      "custota-tool v6.8"
+    ],
+    "ssh_signatures": "All four release ZIPs verified with unchanged trust/chenxiaolong.allowed_signers, identity chenxiaolong, namespace file.",
+    "tool_routing": "executable_tool_routing_test.sh passed."
+  },
+  "date": "2026-11-07",
+  "limitations": [
+    "This is archive, host execution, CLI and source compatibility qualification, not a full OTA build or physical-device validation.",
+    "The official avbroot binary does not replace the guarded source verifier on paths that require it.",
+    "No signer, signing key, module policy, publication permission, or device acceptance gate is changed.",
+    "The primary bundled Python lacks the fcntl sealing constants needed for the existing sealed-execution tests; those tests were run successfully with the system Python instead."
+  ],
+  "purpose": "Qualify upstream-adopted signed host tools and module inputs; no device acceptance claim.",
+  "schema_version": 1,
+  "source_reviews": [
+    {
+      "base_commit": "b2c6a8790361a87299489bd1c8297fbf14ec1386",
+      "base_ref": "v6.6",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        "CHANGELOG.md",
+        "Cargo.lock",
+        "README.md",
+        "app/module/updates/release/changelog.txt",
+        "app/module/updates/release/info.json",
+        "app/src/main/java/com/chiller3/custota/Preferences.kt",
+        "app/src/main/java/com/chiller3/custota/settings/ErrorDetailsDialog.kt",
+        "app/src/main/java/com/chiller3/custota/settings/SettingsScreen.kt",
+        "app/src/main/java/com/chiller3/custota/standalone/ClearBadJobSchedulerData.kt",
+        "app/src/main/java/com/chiller3/custota/standalone/ClearPackageManagerCaches.kt",
+        "app/src/main/java/com/chiller3/custota/ui/Preferences.kt",
+        "app/src/main/java/com/chiller3/custota/ui/SegmentedList.kt",
+        "app/src/main/java/com/chiller3/custota/updater/UpdaterJob.kt",
+        "app/src/main/java/com/chiller3/custota/updater/UpdaterThread.kt",
+        "app/src/main/res/values/strings.xml",
+        "custota-tool/Cargo.toml",
+        "gradle/libs.versions.toml",
+        "gradle/verification-metadata.xml",
+        "gradle/wrapper/gradle-wrapper.jar",
+        "gradle/wrapper/gradle-wrapper.properties",
+        "gradlew.bat"
+      ],
+      "head_commit": "4e9c2bca3b95f2cbc4e5a1a2a4a2f24e18f890c0",
+      "head_ref": "v6.8",
+      "repository": "chenxiaolong/Custota",
+      "review": "No changes to AndroidManifest.xml, privileged-permission XML, sysconfig XML, SELinux patcher source, or app-context rules. Helper-consumed archive paths and BCR RemoveHardRestrictions entry point are retained."
+    },
+    {
+      "base_commit": "e187b855096bbc383e8ce523e122c9012ef24f9a",
+      "base_ref": "v3.9",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        "CHANGELOG.md",
+        "README.md",
+        "app/magisk/updates/release/changelog.txt",
+        "app/magisk/updates/release/info.json",
+        "app/src/main/java/com/chiller3/bcr/NotificationActionService.kt",
+        "app/src/main/java/com/chiller3/bcr/RecorderProvider.kt",
+        "app/src/main/java/com/chiller3/bcr/RecorderThread.kt",
+        "app/src/main/java/com/chiller3/bcr/format/AacFormat.kt",
+        "app/src/main/java/com/chiller3/bcr/output/CallMetadataCollector.kt",
+        "app/src/main/java/com/chiller3/bcr/output/OutputFilenameGenerator.kt",
+        "app/src/main/java/com/chiller3/bcr/rule/PickContactGroupScreen.kt",
+        "app/src/main/java/com/chiller3/bcr/rule/RecordRuleChoiceDialog.kt",
+        "app/src/main/java/com/chiller3/bcr/rule/RecordRuleEditorScreen.kt",
+        "app/src/main/java/com/chiller3/bcr/rule/RecordRulesScreen.kt",
+        "app/src/main/java/com/chiller3/bcr/settings/FormatChoiceDialog.kt",
+        "app/src/main/java/com/chiller3/bcr/settings/OutputDirectoryScreen.kt",
+        "app/src/main/java/com/chiller3/bcr/settings/OutputFormatScreen.kt",
+        "app/src/main/java/com/chiller3/bcr/settings/SettingsScreen.kt",
+        "app/src/main/java/com/chiller3/bcr/standalone/ClearPackageManagerCaches.kt",
+        "app/src/main/java/com/chiller3/bcr/ui/Preferences.kt",
+        "app/src/main/java/com/chiller3/bcr/ui/SegmentedList.kt",
+        "gradle/libs.versions.toml",
+        "gradle/verification-metadata.xml",
+        "gradle/wrapper/gradle-wrapper.jar",
+        "gradle/wrapper/gradle-wrapper.properties",
+        "gradlew.bat"
+      ],
+      "head_commit": "ff27999b90e3ca03999432087661bcbd11d09c65",
+      "head_ref": "v3.11",
+      "repository": "chenxiaolong/BCR",
+      "review": "No changes to AndroidManifest.xml, privileged-permission XML, sysconfig XML, SELinux patcher source, or app-context rules. Helper-consumed archive paths and BCR RemoveHardRestrictions entry point are retained."
+    }
+  ],
+  "upstream_lead": [
+    "https://github.com/pixincreate/PixeneOS/pull/368",
+    "https://github.com/pixincreate/PixeneOS/pull/373",
+    "https://github.com/pixincreate/PixeneOS/pull/374"
+  ]
+}
