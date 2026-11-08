@@ -228,6 +228,7 @@ function module_selection_fingerprint() {
   local magisk_version="disabled"
   local boot_animation_digest="disabled"
   local shizuku_lock_digest="disabled"
+  local shizuku_adapter_digest="disabled"
   local shizuku_root_mode="disabled"
   local exfatprogs_fsck_lock_digest="disabled"
   local exfatprogs_fsck_adapter_digest="disabled"
@@ -289,6 +290,10 @@ function module_selection_fingerprint() {
     fi
     shizuku_lock_digest="$(_locked_input_digest locks/shizuku-v13.6.0.json)" || {
       echo "Error: the Shizuku lock is not clean and checked in." >&2
+      return 1
+    }
+    shizuku_adapter_digest="$(_locked_input_digest src/shizuku.py)" || {
+      echo "Error: the Shizuku adapter is not clean and checked in." >&2
       return 1
     }
   fi
@@ -410,6 +415,7 @@ function module_selection_fingerprint() {
   SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
   SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
   SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"
+  SELECTION_SHIZUKU_ADAPTER_SHA256="${shizuku_adapter_digest}"
   SELECTION_SHIZUKU_ROOT_MODE="${shizuku_root_mode}"
   SELECTION_MODULE_EXFATPROGS_FSCK="${ADDITIONALS[EXFATPROGS_FSCK]}"
   SELECTION_EXFATPROGS_FSCK_LOCK_SHA256="${exfatprogs_fsck_lock_digest}"

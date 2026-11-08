@@ -116,6 +116,7 @@ set_selection_fixture() {
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
   ADDITIONALS[MICROG]="false"
+  ADDITIONALS[SHIZUKU]="false"
   resolve_rom_profile
 }
 
@@ -394,6 +395,7 @@ test_shizuku_selection_follows_supported_rom_profiles() (
   set_selection_fixture
   _locked_input_digest() {
     [[ "${1}" == "locks/shizuku-v13.6.0.json" ||
+      "${1}" == "src/shizuku.py" ||
       "${1}" == "locks/executable-tools-v1.json" ]] || return 1
     printf '%064d\n' 0
   }
@@ -416,6 +418,85 @@ test_shizuku_selection_follows_supported_rom_profiles() (
   if module_selection_fingerprint >/dev/null 2>&1; then
     fail "Shizuku selection unexpectedly accepted shared rootless/Magisk mode"
   fi
+)
+
+test_shizuku_adapter_is_required_and_fingerprinted_only_when_enabled() (
+  local fixture_repo="${TEST_ROOT}/shizuku-adapter-contract"
+  local disabled baseline updated adapter_digest manifest
+
+  load_contract
+  set_selection_fixture
+  ROOT_MODE="rootless"
+  mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
+  cp locks/executable-tools-v1.json locks/shizuku-v13.6.0.json "${fixture_repo}/locks/"
+  cp src/shizuku.py "${fixture_repo}/src/"
+  git -C "${fixture_repo}" init -q
+  git -C "${fixture_repo}" config user.email fixture@example.invalid
+  git -C "${fixture_repo}" config user.name fixture
+  git -C "${fixture_repo}" add locks src
+  git -C "${fixture_repo}" commit -q -m 'Original Shizuku adapter'
+  cd "${fixture_repo}"
+
+  disabled="$(fingerprint)"
+  module_selection_fingerprint >/dev/null
+  unset SELECTION_SHIZUKU_ADAPTER_SHA256
+  assert_equals "${disabled}" "$(selection_variant_fingerprint)" \
+    "disabled Shizuku must not require the new adapter identity field"
+  manifest="$(selection_variant_manifest)"
+  if grep -q '^shizuku_adapter_sha256=' <<<"${manifest}"; then
+    fail "disabled Shizuku changed the serialized selection contract"
+  fi
+
+  ADDITIONALS[SHIZUKU]="true"
+  baseline="$(fingerprint)"
+  module_selection_fingerprint >/dev/null
+  adapter_digest="$(sha256sum src/shizuku.py | awk '{print $1}')"
+  assert_equals "${adapter_digest}" "${SELECTION_SHIZUKU_ADAPTER_SHA256}" \
+    "enabled Shizuku must bind its actual adapter bytes"
+  manifest="$(selection_variant_manifest)"
+  grep -qx "shizuku_adapter_sha256=${adapter_digest}" <<<"${manifest}" ||
+    fail "enabled Shizuku did not serialize its adapter digest"
+  unset SELECTION_SHIZUKU_ADAPTER_SHA256
+  if selection_variant_fingerprint >/dev/null 2>&1; then
+    fail "enabled Shizuku unexpectedly accepted a missing adapter digest"
+  fi
+  SELECTION_SHIZUKU_ADAPTER_SHA256=invalid
+  if selection_variant_fingerprint >/dev/null 2>&1; then
+    fail "enabled Shizuku unexpectedly accepted an invalid adapter digest"
+  fi
+
+  # Keep the APK lock and helper fixed: launcher changes alone must rebuild.
+  printf '\n# changed launcher fixture\n' >>src/shizuku.py
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "dirty Shizuku adapter unexpectedly produced a fingerprint"
+  fi
+  ADDITIONALS[SHIZUKU]="false"
+  assert_equals "${disabled}" "$(fingerprint)" \
+    "disabled Shizuku must ignore adapter changes"
+  ADDITIONALS[SHIZUKU]="true"
+  git add src/shizuku.py
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "staged Shizuku adapter unexpectedly produced a fingerprint"
+  fi
+  git commit -q -m 'Updated Shizuku launcher'
+  updated="$(fingerprint)"
+  [[ "${updated}" != "${baseline}" ]] ||
+    fail "committed Shizuku launcher update reused the old selection identity"
+  module_selection_fingerprint >/dev/null
+  assert_equals "${updated}" "$(selection_variant_fingerprint)" \
+    "updated Shizuku adapter preserves build/preflight identity parity"
+
+  mv src/shizuku.py "${TEST_ROOT}/saved-shizuku-adapter.py"
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "missing Shizuku adapter unexpectedly produced a fingerprint"
+  fi
+  ln -s "${TEST_ROOT}/saved-shizuku-adapter.py" src/shizuku.py
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "symlink Shizuku adapter unexpectedly produced a fingerprint"
+  fi
+  ADDITIONALS[SHIZUKU]="false"
+  assert_equals "${disabled}" "$(fingerprint)" \
+    "disabled Shizuku must not require a usable adapter"
 )
 
 test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted() (
@@ -596,6 +677,8 @@ test_invalid_compatible_sepolicy_fails_closed
 test_selection_fingerprint
 test_executable_lock_is_required_and_fingerprinted
 test_selected_legacy_module_versions_are_fingerprinted
+test_shizuku_selection_follows_supported_rom_profiles
+test_shizuku_adapter_is_required_and_fingerprinted_only_when_enabled
 test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted
 test_grapheneos_rejects_pdx235_fsck_modules
 test_output_filename_contains_fingerprint

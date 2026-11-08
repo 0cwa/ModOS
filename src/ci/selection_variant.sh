@@ -130,6 +130,12 @@ function selection_variant_manifest() {
     return 1
   fi
 
+  if [[ "${SELECTION_MODULE_SHIZUKU}" == 'true' &&
+    ! "${SELECTION_SHIZUKU_ADAPTER_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Error: enabled Shizuku lacks a checked adapter digest." >&2
+    return 1
+  fi
+
   if [[ "${SELECTION_BOOT_ANIMATION}" == 'true' ]]; then
     if [[ ! "${SELECTION_BOOT_ANIMATION_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]; then
       echo "Error: enabled boot animation lacks a SHA-256 digest." >&2
@@ -206,6 +212,12 @@ function selection_variant_manifest() {
     "exfatprogs_fsck_adapter_sha256=${SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256}" \
     "exfatprogs_fsck_payload_sha256=${SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256}" \
     "exfatprogs_fsck_provenance_sha256=${SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256}"
+
+  # Changes to the in-image launcher must not reuse an older Shizuku build.
+  # Omit this field when disabled to preserve existing unrelated selections.
+  if [[ "${SELECTION_MODULE_SHIZUKU}" == 'true' ]]; then
+    printf '%s\n' "shizuku_adapter_sha256=${SELECTION_SHIZUKU_ADAPTER_SHA256}"
+  fi
 
   printf '%s\n' \
     "module.fsck-sysfs-sepolicy=${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" \

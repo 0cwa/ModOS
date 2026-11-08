@@ -152,6 +152,7 @@ test_reusable_workflow() {
     'msd:boolean:true' \
     'oemunlockonboot:boolean:true' \
     'microg:boolean:false' \
+    'shizuku:boolean:false' \
     'disable-system-updater:boolean:false' \
     'fdroid-privileged-extension:boolean:false'; do
     IFS=: read -r input expected_type expected_default <<<"${contract}"
@@ -527,6 +528,8 @@ test_release_triggers() {
   assert_dispatch_default "${RELEASE}" oemunlockonboot true
   assert_dispatch_default "${RELEASE}" disable-system-updater false
   assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
+  assert_dispatch_default "${RELEASE}" shizuku false
+  assert_dispatch_default "${RELEASE}" shizuku false workflow_call
   assert_dispatch_default "${RELEASE}" boot-animation true
   assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
   assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
@@ -584,6 +587,27 @@ test_microg_lineage_forwarding() {
   assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
   assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
   assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+}
+
+test_shizuku_manual_selection_and_ci() {
+  local multi="${WORKFLOW_DIR}/multi-release.yml"
+
+  assert_workflow_input_contract "${multi}" shizuku boolean false
+  assert_contains "${multi}" \
+    'shizuku:[[:space:]]*\$\{\{ inputs\.shizuku \}\}' \
+    "multi-device builds must forward their explicit Shizuku selection"
+  assert_contains "${REUSABLE}" \
+    'ADDITIONALS_SHIZUKU:[[:space:]]*\$\{\{ inputs\.shizuku \}\}' \
+    "shared builder must map the Shizuku input to typed configuration"
+  assert_contains "${RELEASE}" \
+    'shizuku:[[:space:]]*\$\{\{ github\.event_name != .schedule. && inputs\.shizuku \|\| false \}\}' \
+    "GrapheneOS must forward manual Shizuku selection and keep schedules disabled"
+  assert_contains "${WORKFLOW_DIR}/ci.yml" \
+    'python3 tests/shizuku_adapter_test\.py' \
+    "CI must run the Shizuku adapter regression tests"
+  assert_contains "${WORKFLOW_DIR}/ci.yml" \
+    'python3 tests/shizuku_post_boot_check_test\.py' \
+    "CI must run the read-only Shizuku health-check regression tests"
 }
 
 test_module_forwarding_contract() {
@@ -696,6 +720,7 @@ test_release_triggers
 test_config_loading_isolated_to_scheduled_releases
 test_release_configuration_forwarding
 test_microg_lineage_forwarding
+test_shizuku_manual_selection_and_ci
 test_module_forwarding_contract
 test_publication_identity_is_step_scoped
 test_workflow_inventory_is_intentional

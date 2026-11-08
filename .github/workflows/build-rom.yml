@@ -58,7 +58,7 @@ on:
         type: boolean
         default: false
       shizuku:
-        description: Install official Shizuku manager (supported ROM profile; separate rootless/Magisk builds)
+        description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
         required: false
         type: boolean
         default: false
