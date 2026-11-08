@@ -31,9 +31,10 @@ activate_development_profile() {
   case "${PIXENEOS_DEVELOPMENT_PROFILE:-}" in ''|none) return 0 ;; esac
   local repository_root manifest revision
   repository_root="$(git rev-parse --show-toplevel)" || return 1
-  manifest="${repository_root}/tools/compat/avbroot_setup_care_map_pdx235.json"
-  # No manifest is trusted until reviewed metadata is committed. There is no
-  # caller revision/manifest override or fallback to the production contract.
+  manifest="${repository_root}/tools/compat/avbroot_setup_compat.json"
+  # Production and development share one reviewed helper contract. The profile
+  # selects the source-built verifier and scope, not a second helper pin. No
+  # caller override or uncommitted/modified manifest is trusted.
   _locked_input_digest "${manifest}" >/dev/null || {
     echo 'Error: checked-in care-map development helper metadata is unavailable.' >&2
     return 1

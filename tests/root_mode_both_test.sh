@@ -116,14 +116,11 @@ import json
 import sys
 
 expected = sys.argv[1]
-for path in (
-    'tools/compat/avbroot_setup_compat.json',
-    'tools/compat/avbroot_setup_care_map_pdx235.json',
-):
-    with open(path, encoding='utf-8') as f:
-        manifest = json.load(f)
-    if manifest['revision'] != expected:
-        raise SystemExit(f'{path}: helper revision mismatch')
+path = 'tools/compat/avbroot_setup_compat.json'
+with open(path, encoding='utf-8') as f:
+    manifest = json.load(f)
+if manifest['revision'] != expected:
+    raise SystemExit(f'{path}: helper revision mismatch')
 PY
 
 echo "root-mode both tests passed"

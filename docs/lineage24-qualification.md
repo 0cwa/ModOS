@@ -5,6 +5,12 @@ for verified official LineageOS 24.0 pdx235 nightlies; other versions, devices,
 and private/shared output scopes remain unsupported. The existing six-hour
 release schedule, signing keys, and executable lock are unchanged.
 
+MSD is currently disabled in the pdx235 preset and manual-workflow defaults:
+its v2.5 policy injector uses an emulator `su` fallback on the reviewed source.
+An explicit MSD selection must pass the diagnostic guard. See [MSD qualification
+and source/output warning handling](build-diagnostics.md); artifact verification
+alone does not establish MSD compatibility on the phone.
+
 ## Why a separate profile exists
 
 The existing `care-map-pdx235` development profile selects the

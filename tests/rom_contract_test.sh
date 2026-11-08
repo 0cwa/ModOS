@@ -220,7 +220,7 @@ test_selection_fingerprint() (
     fail "GrapheneOS unexpectedly accepted microG"
   fi
   ADDITIONALS[MICROG]="false"
-  ADDITIONALS[BCR]="false"
+  ADDITIONALS[CUSTOTA]="false"
   module_changed="$(fingerprint)"
   [[ "${module_changed}" != "${baseline}" ]] ||
     fail "module selection did not change the fingerprint"
@@ -279,12 +279,13 @@ test_executable_lock_is_required_and_fingerprinted() (
 
   load_contract
   set_selection_fixture
-  mkdir -p "${fixture_repo}/locks"
+  mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
   cp locks/executable-tools-v1.json "${fixture_repo}/locks/"
+  cp src/build_diagnostics.py "${fixture_repo}/src/"
   git -C "${fixture_repo}" init -q
   git -C "${fixture_repo}" config user.email fixture@example.invalid
   git -C "${fixture_repo}" config user.name fixture
-  git -C "${fixture_repo}" add locks/executable-tools-v1.json
+  git -C "${fixture_repo}" add locks/executable-tools-v1.json src/build_diagnostics.py
   git -C "${fixture_repo}" commit -q -m 'Original executable lock'
   cd "${fixture_repo}"
 
@@ -322,6 +323,22 @@ PY
   assert_equals "${updated}" "$(selection_variant_fingerprint)" \
     "updated executable lock preserves build/preflight identity parity"
 
+  baseline="${updated}"
+  printf '\n# Reviewed diagnostic-contract fixture change.\n' >> src/build_diagnostics.py
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail 'Dirty diagnostic guard unexpectedly produced a fingerprint'
+  fi
+  git add src/build_diagnostics.py
+  git commit -q -m 'Updated diagnostic contract'
+  updated="$(fingerprint)"
+  [[ "${updated}" != "${baseline}" ]] ||
+    fail 'Diagnostic guard update did not change the build selection identity'
+  module_selection_fingerprint >/dev/null
+  SELECTION_BUILD_DIAGNOSTICS_SHA256=disabled
+  if selection_variant_fingerprint >/dev/null 2>&1; then
+    fail 'Diagnostic guard digest was unexpectedly optional'
+  fi
+
   mv locks/executable-tools-v1.json "${TEST_ROOT}/saved-executable-lock.json"
   if module_selection_fingerprint >/dev/null 2>&1; then
     fail "missing executable lock unexpectedly produced a fingerprint"
@@ -345,6 +362,10 @@ test_selected_legacy_module_versions_are_fingerprinted() (
 
   load_contract
   set_selection_fixture
+  # BCR is selectable only on LineageOS; exercise enabled-version identity
+  # using the family that can actually inject every legacy module.
+  ROM_FAMILY=lineageos
+  ADDITIONALS[BCR]=true
   baseline="$(fingerprint)"
   for module in "${modules[@]}"; do
     original="${VERSION[${module}]}"
@@ -382,6 +403,52 @@ test_selected_legacy_module_versions_are_fingerprinted() (
   done
 )
 
+test_bcr_family_policy_and_effective_identity() (
+  local enabled disabled graphene invalid
+
+  load_contract
+  ADDITIONALS[BOOT_ANIMATION]=false
+  ROM_FAMILY=lineageos
+  resolve_rom_profile
+  assert_equals true "${ADDITIONALS[BCR]}" "LineageOS default BCR selection"
+  enabled="$(fingerprint)"
+  module_selection_fingerprint >/dev/null
+  assert_equals true "${SELECTION_MODULE_BCR}" "LineageOS enabled BCR identity"
+  assert_equals "${VERSION[BCR]}" "${SELECTION_MODULE_BCR_VERSION}" \
+    "LineageOS enabled BCR version"
+
+  ADDITIONALS[BCR]=false
+  disabled="$(fingerprint)"
+  [[ "${disabled}" != "${enabled}" ]] ||
+    fail 'LineageOS BCR opt-out did not change the fingerprint'
+  assert_equals false "${ADDITIONALS[BCR]}" "LineageOS explicit BCR opt-out"
+
+  ROM_FAMILY=grapheneos
+  # A stale true from env.toml or a workflow must be normalized before identity
+  # generation, so GrapheneOS cannot reuse an older BCR-enabled build.
+  ADDITIONALS[BCR]=true
+  module_selection_fingerprint >/dev/null
+  graphene="${MODULE_SELECTION_FINGERPRINT}"
+  assert_equals false "${ADDITIONALS[BCR]}" "GrapheneOS effective BCR selection"
+  assert_equals false "${SELECTION_MODULE_BCR}" "GrapheneOS BCR identity"
+  assert_equals disabled "${SELECTION_MODULE_BCR_VERSION}" "GrapheneOS BCR version"
+  VERSION[BCR]=unused-invalid-version/
+  assert_equals "${graphene}" "$(fingerprint)" "GrapheneOS ignores disabled BCR version"
+  ADDITIONALS[BCR]=true
+  assert_equals "${graphene}" "$(fingerprint)" "GrapheneOS stale true has canonical identity"
+
+  # Invalid configuration remains an error even in the family that suppresses
+  # this module; normalization must not hide a malformed boolean.
+  for ROM_FAMILY in grapheneos lineageos; do
+    for invalid in '' yes 1; do
+      ADDITIONALS[BCR]="${invalid}"
+      if resolve_rom_profile >/dev/null 2>&1; then
+        fail "${ROM_FAMILY} accepted malformed BCR selection ${invalid@Q}"
+      fi
+    done
+  done
+)
+
 test_shizuku_selection_follows_supported_rom_profiles() (
   local profile family device
   local -a cases=(
@@ -396,7 +463,8 @@ test_shizuku_selection_follows_supported_rom_profiles() (
   _locked_input_digest() {
     [[ "${1}" == "locks/shizuku-v13.6.0.json" ||
       "${1}" == "src/shizuku.py" ||
-      "${1}" == "locks/executable-tools-v1.json" ]] || return 1
+      "${1}" == "locks/executable-tools-v1.json" ||
+      "${1}" == "src/build_diagnostics.py" ]] || return 1
     printf '%064d\n' 0
   }
   ADDITIONALS[SHIZUKU]="true"
@@ -429,7 +497,7 @@ test_shizuku_adapter_is_required_and_fingerprinted_only_when_enabled() (
   ROOT_MODE="rootless"
   mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
   cp locks/executable-tools-v1.json locks/shizuku-v13.6.0.json "${fixture_repo}/locks/"
-  cp src/shizuku.py "${fixture_repo}/src/"
+  cp src/shizuku.py src/build_diagnostics.py "${fixture_repo}/src/"
   git -C "${fixture_repo}" init -q
   git -C "${fixture_repo}" config user.email fixture@example.invalid
   git -C "${fixture_repo}" config user.name fixture
@@ -679,6 +747,7 @@ test_executable_lock_is_required_and_fingerprinted
 test_selected_legacy_module_versions_are_fingerprinted
 test_shizuku_selection_follows_supported_rom_profiles
 test_shizuku_adapter_is_required_and_fingerprinted_only_when_enabled
+test_bcr_family_policy_and_effective_identity
 test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted
 test_grapheneos_rejects_pdx235_fsck_modules
 test_output_filename_contains_fingerprint

@@ -186,9 +186,21 @@ def verify_checkout(
             path = source / relpath
             if path.is_symlink() or not path.is_dir() or not path.resolve().is_relative_to(source):
                 raise BuildError(f"source project is missing or unsafe: {relpath}")
+            top = command(
+                ["git", "rev-parse", "--show-toplevel"], path, capture_output=True, text=True,
+            ).stdout.strip()
+            if Path(top).resolve() != path.resolve():
+                raise BuildError(f"source project is not its own Git worktree: {relpath}")
             head = command(["git", "rev-parse", "HEAD"], path, capture_output=True, text=True).stdout.strip()
             if head != revision:
                 raise BuildError(f"source revision changed: {relpath}")
+            # Ordinary status hides tracked modifications under these flags.
+            # Source provenance must cover the bytes the compiler will read.
+            tracked = command(
+                ["git", "ls-files", "-v", "-z"], path, capture_output=True, text=True,
+            ).stdout.split("\0")
+            if any(entry and (entry[0].islower() or entry[0] == "S") for entry in tracked):
+                raise BuildError(f"source project has assume-unchanged or skip-worktree entries: {relpath}")
             dirt = command(
                 ["git", "status", "--porcelain", "--untracked-files=all", "--ignored"],
                 path, capture_output=True, text=True,

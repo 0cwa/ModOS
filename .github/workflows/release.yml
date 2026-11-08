@@ -25,9 +25,10 @@ on:
         type: boolean
         default: true
       bcr:
+        description: BCR is retained for LineageOS; GrapheneOS excludes it
         required: false
         type: boolean
-        default: true
+        default: false
       custota:
         required: false
         type: boolean
@@ -120,10 +121,10 @@ on:
         type: boolean
         default: true
       bcr:
-        description: Include the Basic Call Recorder module
+        description: BCR is retained for LineageOS; GrapheneOS excludes it
         required: false
         type: boolean
-        default: true
+        default: false
       custota:
         description: Include the Custom OTA Updater module
         required: false
@@ -268,7 +269,7 @@ jobs:
           ADDITIONALS_AFSR: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.afsr == 'true' || github.event_name != 'schedule' && inputs.afsr }}
           MAGISK_PREINIT: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.magisk_preinit_device || inputs.magisk-preinit-device || 'sda10' }}
           ADDITIONALS_ALTERINSTALLER: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.alterinstaller == 'true' || inputs.alterinstaller }}
-          ADDITIONALS_BCR: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.bcr == 'true' || inputs.bcr }}
+          ADDITIONALS_BCR: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.bcr == 'true' || (github.event_name != 'schedule' && inputs.bcr) }}
           ADDITIONALS_CUSTOTA: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.custota == 'true' || inputs.custota }}
           ADDITIONALS_MSD: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.msd == 'true' || inputs.msd }}
           ADDITIONALS_OEMUNLOCKONBOOT: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}

@@ -28,6 +28,7 @@ function selection_variant_manifest() {
     SELECTION_CLEAR_VBMETA_FLAGS
     SELECTION_HELPER_COMMIT
     SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256
+    SELECTION_BUILD_DIAGNOSTICS_SHA256
     SELECTION_LOCK_SHA256
     SELECTION_PROFILE_SHA256
     SELECTION_MODULE_AFSR
@@ -92,6 +93,10 @@ function selection_variant_manifest() {
 
   if [[ ! "${SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
     echo "Error: the executable-tools selection identity is not a SHA-256 digest." >&2
+    return 1
+  fi
+  if [[ ! "${SELECTION_BUILD_DIAGNOSTICS_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Error: the build-diagnostics selection identity is not a SHA-256 digest." >&2
     return 1
   fi
 
@@ -188,6 +193,7 @@ function selection_variant_manifest() {
     "clear_vbmeta_flags=${SELECTION_CLEAR_VBMETA_FLAGS}" \
     "helper_commit=${SELECTION_HELPER_COMMIT}" \
     "executable_tools_lock_sha256=${SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256}" \
+    "build_diagnostics_sha256=${SELECTION_BUILD_DIAGNOSTICS_SHA256}" \
     "lock_sha256=${SELECTION_LOCK_SHA256}" \
     "profile_sha256=${SELECTION_PROFILE_SHA256}" \
     "module.afsr=${SELECTION_MODULE_AFSR}" \

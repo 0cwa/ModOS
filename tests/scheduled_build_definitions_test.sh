@@ -53,7 +53,15 @@ check_definition() {
     [[ "$(toml_resolve_value microg false)" == "${expected_microg}" ]] ||
       fail "${file}: wrong scheduled microG selection"
 
-    for key in afsr alterinstaller bcr custota msd oemunlockonboot disable_system_updater; do
+    local expected_msd=true
+    [[ "${expected_family}" != lineageos ]] || expected_msd=false
+    [[ "$(toml_resolve_value msd '')" == "${expected_msd}" ]] ||
+      fail "${file}: wrong MSD selection for the qualified device profile"
+    local expected_bcr=false
+    [[ "${expected_family}" != lineageos ]] || expected_bcr=true
+    [[ "$(toml_resolve_value bcr '')" == "${expected_bcr}" ]] ||
+      fail "${file}: BCR must be enabled only for the LineageOS schedule"
+    for key in afsr alterinstaller custota oemunlockonboot disable_system_updater; do
       [[ "$(toml_resolve_value "${key}" '')" == true ]] ||
         fail "${file}: ${key} must be enabled"
     done
@@ -70,7 +78,13 @@ check_loader() {
   local file="${1}"
   local expected_device="${2}"
   local expected_family="${3}"
+  local expected_bcr="${4:-}"
   local output_file env_file
+
+  if [[ -z "${expected_bcr}" ]]; then
+    expected_bcr=false
+    [[ "${expected_family}" != lineageos ]] || expected_bcr=true
+  fi
 
   output_file="$(mktemp)"
   env_file="$(mktemp)"
@@ -113,12 +127,43 @@ check_loader() {
     fail "${file}: loader emitted wrong microG selection"
   grep -Fxq "ADDITIONALS_MICROG=${expected_microg}" "${env_file}" ||
     fail "${file}: loader exported wrong microG selection"
+  local expected_msd=true
+  [[ "${expected_family}" != lineageos ]] || expected_msd=false
+  grep -Fxq "msd=${expected_msd}" "${output_file}" ||
+    fail "${file}: loader emitted wrong MSD selection"
+  grep -Fxq "ADDITIONALS_MSD=${expected_msd}" "${env_file}" ||
+    fail "${file}: loader exported wrong MSD selection"
+  grep -Fxq "bcr=${expected_bcr}" "${output_file}" ||
+    fail "${file}: loader emitted wrong effective BCR selection"
+  grep -Fxq "ADDITIONALS_BCR=${expected_bcr}" "${env_file}" ||
+    fail "${file}: loader exported wrong effective BCR selection"
 
   rm -f "${output_file}" "${env_file}"
 }
 
 check_loader .github/schedules/grapheneos-shiba.toml shiba grapheneos
 check_loader .github/schedules/lineageos-pdx235.toml pdx235 lineageos
+
+# An older GrapheneOS schedule can still request true. Its exported value must
+# match the normalized build/fingerprint policy; LineageOS retains both choices.
+check_bcr_schedule_policy() {
+  local family device selected expected fixture
+  for family in grapheneos lineageos; do
+    device=shiba
+    [[ "${family}" != lineageos ]] || device=pdx235
+    for selected in true false; do
+      fixture="$(mktemp --suffix=.toml)"
+      sed "s/^'ADDITIONALS\\[BCR\\]' = .*$/'ADDITIONALS[BCR]' = ${selected}/" \
+        ".github/schedules/${family}-${device}.toml" >"${fixture}"
+      expected=false
+      [[ "${family}" != lineageos ]] || expected="${selected}"
+      check_loader "${fixture}" "${device}" "${family}" "${expected}"
+      rm -f "${fixture}"
+    done
+  done
+}
+
+check_bcr_schedule_policy
 
 # The loader must reject a tampered GrapheneOS schedule before exporting any
 # build inputs. Test each forbidden switch using an otherwise-valid definition.

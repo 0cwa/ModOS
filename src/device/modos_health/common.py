@@ -5,19 +5,22 @@ import re
 import subprocess
 
 STATUSES = ("PASS", "FAIL", "WARNING", "NOT_TESTED")
+MAX_PROBE_OUTPUT = 32768
 _ALLOWED = re.compile(
     r"(?:getprop [a-z0-9._]+|getenforce|bootctl get-current-slot|"
     r"bootctl is-slot-marked-successful [01]|"
     r"pm path [a-z0-9._]+|pm list packages -d|"
     r"test -f /[a-zA-Z0-9._/-]+|"
     r"cat /product/etc/permissions/privapp-permissions-com\.google\.android\.gms\.xml|"
-    r"cat /proc/sys/kernel/random/boot_id)"
+    r"cat /proc/sys/kernel/random/boot_id|"
+    r"getprop init\.svc\.vendor\.usbgadget-hal|ps -A -o LABEL,ARGS)"
 )
 
 @dataclass(frozen=True)
 class Probe:
     returncode: int | None
     output: str = ""
+    truncated: bool = False
 
 def item(module, name, status, explanation):
     if status not in STATUSES:
@@ -39,7 +42,10 @@ class Context:
                 result = self.runner(self.adb + ["shell", command],
                                      capture_output=True, text=True, timeout=20,
                                      check=False)
-                self._cache[command] = Probe(result.returncode, result.stdout[:32768])
+                self._cache[command] = Probe(
+                    result.returncode, result.stdout[:MAX_PROBE_OUTPUT],
+                    len(result.stdout) > MAX_PROBE_OUTPUT,
+                )
             except (OSError, subprocess.TimeoutExpired):
                 self._cache[command] = Probe(None)
         return self._cache[command]

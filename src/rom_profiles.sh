@@ -30,6 +30,21 @@ function validate_device_name() {
   fi
 }
 
+# BCR remains a signed, selectable module for LineageOS. GrapheneOS excludes
+# it even when a legacy caller requests the old shared default. Validate before
+# applying the family policy so malformed values cannot be silently accepted.
+function apply_rom_module_policy() {
+  _require_profile_boolean ADDITIONALS_BCR "${ADDITIONALS[BCR]}" || return 1
+  case "${ROM_FAMILY}" in
+    grapheneos) ADDITIONALS[BCR]=false ;;
+    lineageos) ;;
+    *)
+      echo "Error: unsupported ROM_FAMILY: ${ROM_FAMILY}" >&2
+      return 1
+      ;;
+  esac
+}
+
 function resolve_rom_profile() {
   case "${ROM_FAMILY}" in
   grapheneos)
@@ -53,6 +68,8 @@ function resolve_rom_profile() {
     return 1
     ;;
   esac
+
+  apply_rom_module_policy || return 1
 
   GRAPHENEOS[OTA_BASE_URL]="${ROM_PROFILE[OTA_BASE_URL]}"
   GRAPHENEOS[UPDATE_CHANNEL]="${GRAPHENEOS_UPDATE_CHANNEL:-${ROM_PROFILE[DEFAULT_UPDATE_CHANNEL]}}"
@@ -221,6 +238,7 @@ function _boot_animation_payload_digest() {
 
 function module_selection_fingerprint() {
   local executable_tools_lock_digest
+  local build_diagnostics_digest
   local lock_digest="disabled"
   local profile_digest="disabled"
   local magisk_preinit="disabled"
@@ -273,6 +291,10 @@ function module_selection_fingerprint() {
 
   executable_tools_lock_digest="$(_locked_input_digest locks/executable-tools-v1.json)" || {
     echo "Error: the executable-tools lock is not clean and checked in." >&2
+    return 1
+  }
+  build_diagnostics_digest="$(_locked_input_digest src/build_diagnostics.py)" || {
+    echo "Error: the build diagnostic guard is not clean and checked in." >&2
     return 1
   }
   for module in ALTERINSTALLER BCR CUSTOTA MSD OEMUNLOCKONBOOT; do
@@ -397,6 +419,7 @@ function module_selection_fingerprint() {
   SELECTION_CLEAR_VBMETA_FLAGS="${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}"
   SELECTION_HELPER_COMMIT="${VERSION[AVBROOT_SETUP]}"
   SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256="${executable_tools_lock_digest}"
+  SELECTION_BUILD_DIAGNOSTICS_SHA256="${build_diagnostics_digest}"
   SELECTION_LOCK_SHA256="${lock_digest}"
   SELECTION_PROFILE_SHA256="${profile_digest}"
   SELECTION_MODULE_AFSR="${ADDITIONALS[AFSR]}"
