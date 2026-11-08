@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the locked official Shizuku manager and rootless shell starter.
+"""Install the locked official Shizuku manager and a supervised shell server.
 
 The adapter uses one common product/init layout across ModOS ROM profiles.
 It checks required image partitions, shell executable metadata, native ABI
@@ -28,7 +28,10 @@ ROOT_MODE_ENVIRONMENT = "PIXENEOS_SHIZUKU_ROOT_MODE"
 ROM_FAMILY_ENVIRONMENT = "PIXENEOS_ROM_FAMILY"
 SUPPORTED_ROM_FAMILIES = ("grapheneos", "lineageos")
 SUPPORTED_STARTER_ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-SERVER_NATIVE_LIBRARIES = ("libshizuku.so", "librish.so")
+# Preinstalled system apps do not have their compressed JNI libraries extracted
+# by Package Manager. libadb is loaded by the manager even in rootless mode.
+# These are all libraries in the locked APK; their dependencies are system libs.
+APK_NATIVE_LIBRARIES = ("libshizuku.so", "librish.so", "libadb.so")
 STARTER_LIBRARY_ABIS = {
     "arm64-v8a": "arm64",
     "armeabi-v7a": "arm",
@@ -68,20 +71,20 @@ def _read_payload(path: Path) -> tuple[bytes, dict[str, dict[str, bytes]]]:
     native_libraries: dict[str, dict[str, bytes]] = {}
     try:
         with zipfile.ZipFile(io.BytesIO(apk_bytes)) as archive:
+            archive_members = set(archive.namelist())
             for abi in SUPPORTED_STARTER_ABIS:
-                archive_members = set(archive.namelist())
                 present = {
                     name: f"lib/{abi}/{name}" in archive_members
-                    for name in SERVER_NATIVE_LIBRARIES
+                    for name in APK_NATIVE_LIBRARIES
                 }
                 if not any(present.values()):
                     continue
                 if not all(present.values()):
                     raise ShizukuModuleError(
-                        f"Shizuku APK has an incomplete server library set for {abi}"
+                        f"Shizuku APK has an incomplete native library set for {abi}"
                     )
                 native_libraries[abi] = {}
-                for name in SERVER_NATIVE_LIBRARIES:
+                for name in APK_NATIVE_LIBRARIES:
                     library = archive.read(f"lib/{abi}/{name}")
                     if (
                         not library.startswith(b"\x7fELF")
@@ -95,17 +98,22 @@ def _read_payload(path: Path) -> tuple[bytes, dict[str, dict[str, bytes]]]:
         raise ShizukuModuleError("Shizuku APK is not a readable ZIP archive") from exc
 
     if not native_libraries:
-        raise ShizukuModuleError("Shizuku APK has no supported native server libraries")
+        raise ShizukuModuleError("Shizuku APK has no supported native libraries")
     return apk_bytes, native_libraries
 
 
 def _rootless_init_rc() -> bytes:
-    return b"""# Start Shizuku from init with the ADB shell identity; client approval stays in the manager.
+    # Android permits init -> shell through shell_exec, but does not select
+    # that transition automatically. Match adbd's supplementary groups too.
+    # Keep app_process in the foreground: init kills the service's remaining
+    # processes when its main PID exits, including for oneshot on Android R+.
+    return b"""# Init owns the server lifetime; client approval stays in the official manager.
 service shizuku /system/bin/sh /product/bin/shizuku
     user shell
-    group shell
+    group shell adb log input inet net_bt net_bt_admin sdcard_r sdcard_rw net_bw_stats readproc uhid ext_data_rw ext_obb_rw readtracefs
+    seclabel u:r:shell:s0
     disabled
-    oneshot
+    restart_period 10
 
 on property:sys.boot_completed=1
     start shizuku
@@ -117,7 +125,7 @@ def _rootless_launcher(abis: tuple[str, ...]) -> bytes:
     # locked APK. The property is device supplied and is matched as a full
     # literal before it is used as a path component.
     cases = "\n".join(
-        f"    {abi}) starter='{STARTER_LIBRARY_ABIS[abi]}' ;;" for abi in abis
+        f"    {abi}) library_abi='{STARTER_LIBRARY_ABIS[abi]}' ;;" for abi in abis
     )
     script = f"""#!/system/bin/sh
 abi=$(/system/bin/getprop ro.product.cpu.abi) || exit 1
@@ -125,9 +133,30 @@ case "$abi" in
 {cases}
     *) exit 64 ;;
 esac
-exec "/product/app/Shizuku/lib/$starter/libshizuku.so"
+apk='/product/app/Shizuku/Shizuku.apk'
+library_path="/product/app/Shizuku/lib/$library_abi"
+[ -r "$apk" ] && [ -r "$library_path/librish.so" ] || exit 66
+export CLASSPATH="$apk"
+# Match v13.6.0 starter.cpp's run_server(), without its fork-and-exit wrapper.
+exec /system/bin/app_process "-Djava.class.path=$apk" \\
+    "-Dshizuku.library.path=$library_path" /system/bin \\
+    --nice-name=shizuku_server rikka.shizuku.server.ShizukuService
 """
     return script.encode("ascii")
+
+
+def _rootless_component_overrides() -> bytes:
+    # The official v13.6.0 boot receiver can enable USB and wireless ADB when
+    # the last launch used UID 2000. Init replaces that startup mechanism.
+    # Apply the platform's component default override without modifying or
+    # re-signing the upstream APK; retain the receiver for Magisk ROOT mode.
+    return b'''<?xml version="1.0" encoding="utf-8"?>
+<config>
+    <component-override package="moe.shizuku.privileged.api">
+        <component class="moe.shizuku.manager.receiver.BootCompleteReceiver" enabled="false" />
+    </component-override>
+</config>
+'''
 
 
 def validate_target(rom_family: str) -> None:
@@ -203,6 +232,23 @@ def inject_payload(
         )
     )
 
+    # Both flavors preinstall the manager, so both need its JNI libraries.
+    directory("/app/Shizuku/lib")
+    for abi, libraries in native_libraries.items():
+        library_abi = STARTER_LIBRARY_ABIS[abi]
+        directory(f"/app/Shizuku/lib/{library_abi}")
+        for name, library in libraries.items():
+            requests.append(
+                install_request(
+                    f"/app/Shizuku/lib/{library_abi}/{name}",
+                    "RegularFile",
+                    0o755 if name == "libshizuku.so" else 0o644,
+                    0,
+                    0,
+                    library,
+                )
+            )
+
     if root_mode == "rootless":
         directory("/etc/init")
         requests.append(
@@ -210,22 +256,18 @@ def inject_payload(
                 "/etc/init/shizuku.rc", "RegularFile", 0o644, 0, 0, _rootless_init_rc()
             )
         )
+        directory("/etc/sysconfig")
+        requests.append(
+            install_request(
+                "/etc/sysconfig/modos-shizuku.xml",
+                "RegularFile",
+                0o644,
+                0,
+                0,
+                _rootless_component_overrides(),
+            )
+        )
         directory("/bin")
-        directory("/app/Shizuku/lib")
-        for abi, libraries in native_libraries.items():
-            library_abi = STARTER_LIBRARY_ABIS[abi]
-            directory(f"/app/Shizuku/lib/{library_abi}")
-            for name, library in libraries.items():
-                requests.append(
-                    install_request(
-                        f"/app/Shizuku/lib/{library_abi}/{name}",
-                        "RegularFile",
-                        0o755 if name == "libshizuku.so" else 0o644,
-                        0,
-                        0,
-                        library,
-                    )
-                )
         requests.append(
             install_request(
                 "/bin/shizuku",

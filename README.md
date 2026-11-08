@@ -23,6 +23,7 @@ compatibility boundaries and the upstream changes that would let us remove them.
 - Optional Magisk using the repository selected by the build
 - Custom boot animation enabled by default (opt-out available)
 - Optional locked F-Droid Privileged Extension integration (default-off)
+- Optional Shizuku with an init-managed rootless boot service (no wireless debugging)
 
 > [!NOTE]
 >
@@ -403,53 +404,90 @@ its matching helper lock. See the helper
 
 ### Shizuku module
 
-Set `'ADDITIONALS[SHIZUKU]' = true` to install the digest-locked official
-Shizuku v13.6.0 manager as a regular product app. It is not a privileged app,
-and ModOS does not add a privileged-permission allowlist or automatically
-approve client apps. Shizuku's normal per-client approval remains in effect.
-The locked APK's SHA-256 is `6e273ab0e991c4e79bc8b1bbb9b9dd739ccac1a8712a541a214078886b7b790f`;
-Google apksig 8.7.3 verified its v2 signature and the single Rikka signer
-certificate (`26:8B:55:90:E8:68:FB:08:BA:E7:E0:AC:41:35:64:CD:1F:F8:8F:5C:CF:F7:4A:F9:DB:D0:DC:91:8E:30:DB:30`).
+To patch Shizuku into the system image with automatic startup and no USB or
+wireless debugging requirement, select it in the existing `[build]` section
+of `env.toml`:
 
-Use separate `ROOT_MODE = "rootless"` or `ROOT_MODE = "magisk"` builds. For
-rootless builds, an init service invokes the official native starter after
-boot without starting wireless debugging. The adapter installs the starter at
-the path Shizuku v13.6.0 derives from the manager APK location:
-`/product/app/Shizuku/lib/<ABI>/libshizuku.so` (for example, `arm64`), plus
-the matching `librish.so` that the server loads from that same directory. The
-service's `user shell` and `group shell` settings select UID/GID 2000; they do
-not establish the process's SELinux domain or Binder access. Those runtime
-properties, reboot behavior, and startup under enforcing SELinux still need
-representative-device acceptance. Complete Shizuku's one-time manager setup
-first. Magisk builds install the same manager and use its ROOT startup after
-the user's one-time setup and approval. `ROOT_MODE = "both"` is rejected
-because this helper applies one shared product image to both outputs.
+```toml
+[build]
+ROOT_MODE = "rootless"
+'ADDITIONALS[SHIZUKU]' = true
+```
 
-Selection follows ModOS's supported ROM profiles (GrapheneOS and LineageOS)
-and the selected profile's device/OTA provider, rather than the local device
-example in `env.toml`. The project currently schedules GrapheneOS for shiba,
-accepts a caller-selected device ID in its GrapheneOS build flow, and qualifies
-LineageOS publication for pdx235 24.0 nightlies. Both manual release flows
-expose Shizuku as an opt-in; scheduled definitions keep it disabled. Those
-release targets are not a complete device allowlist for the adapter. The
-adapter uses one common product/init layout. It fails the build if the target
-lacks the required product image, rootless system image, standard
-`/system/bin/sh` executable and `shell_exec` label, a supported native library
-set in the locked APK, or file-context labels for the installed product paths.
-Its runtime launcher exits if `ro.product.cpu.abi` is absent or unsupported.
-Magisk mode does not need the rootless system shell checks. The adapter adds
-no custom SELinux rules. `ROOT_MODE = "both"` remains unsupported because the helper injects one
-shared product image before splitting output modes.
+The GrapheneOS single-device/multi-device and LineageOS manual workflows also
+expose the `shizuku` input. Select `root-mode: rootless` for the system-managed
+service. Shizuku remains default-off, including in scheduled builds.
 
-This is source-level support across the project profiles, not runtime
-validation of every profile/device combination. Startup under init, the
-runtime SELinux domain, Binder availability, reboot behavior, and enforcing
-SELinux behavior still need representative-device acceptance for each target
-combination. Do not infer those runtime properties from the configured shell
-UID/GID or `shell_exec` file label.
+#### Startup and permissions
 
-After boot, connect the device over USB ADB and run the read-only check for the
-build mode:
+The rootless module installs the official Shizuku manager and server from the
+[locked v13.6.0 APK](locks/shizuku-v13.6.0.json). Android init starts the server
+after `sys.boot_completed=1` on every boot and supervises it with a ten-second
+restart interval. The launcher executes `app_process` in the foreground using
+the official server entry point and the in-image APK/native library paths.
+It does not use the upstream native starter's fork-and-exit behavior, because
+Android init cleans up a service's child processes when its main process exits.
+See the [official starter](https://github.com/RikkaApps/Shizuku/blob/v13.6.0/manager/src/main/jni/starter.cpp)
+and [Android init lifecycle](https://android.googlesource.com/platform/system/core/+/refs/heads/main/init/service.cpp).
+
+The server runs as **shell UID/GID 2000**, with ADB's supplementary groups and
+the explicit SELinux label `u:r:shell:s0`. It uses the ROM's existing permitted
+init-to-shell transition through `/system/bin/sh`; it does not add SELinux
+rules or make SELinux permissive. This provides Shizuku's ordinary ADB-level
+capabilities, not unrestricted root or system UID 1000. The manager remains a
+regular product app, and clients still need the user's normal per-app Shizuku
+approval. The manager may call this mode “ADB” because of the server's UID;
+the service does not depend on an ADB connection or enabled debugging.
+
+For this rootless mode, `/product/etc/sysconfig/modos-shizuku.xml` disables the
+official manager's boot receiver by default, using its fully qualified
+component name.
+That receiver can otherwise [turn USB and wireless debugging on](https://github.com/RikkaApps/Shizuku/blob/v13.6.0/manager/src/main/java/moe/shizuku/manager/receiver/BootCompleteReceiver.kt)
+when its last launch used shell permissions. The platform component override
+preserves the signed APK while leaving startup to init. No wireless pairing
+or manual server-start step is required. Open the manager to manage client
+permissions; its Stop action is temporary because init restarts the server.
+To remove automatic startup, rebuild the OTA with the module disabled.
+
+**When upgrading an existing Shizuku installation, turn off Shizuku's own
+Start on boot setting and leave it off in rootless mode.** Android preserves
+explicit per-user component settings ahead of the image's default override.
+The official manager's switch may also appear on when Android is using the
+disabled default; explicitly switching it off records the intended state.
+The init service still starts automatically with this switch off.
+
+Both rootless and Magisk builds install the APK's complete native library set
+(`libadb.so`, `librish.so`, and `libshizuku.so`) beneath
+`/product/app/Shizuku/lib/<ISA>/`. The manager needs `libadb.so` even when
+debugging is unused; Android does not extract compressed native libraries
+for an unupdated system app. The server and native payload stay pinned to the
+image version, so update them together through the APK lock and a rebuilt OTA.
+The adapter's SHA-256 also participates in Shizuku-enabled build fingerprints,
+so boot-service fixes cannot reuse an older selection's published OTA.
+
+`ROOT_MODE = "magisk"` installs the same complete manager payload and retains
+Shizuku's normal ROOT startup after the user's one-time setup and root approval.
+It does not install the shell init service or disable the manager's boot
+receiver. `ROOT_MODE = "both"` remains unsupported with Shizuku because the
+helper injects one shared product image before splitting output modes.
+
+#### Compatibility and device acceptance
+
+Selection follows ModOS's GrapheneOS/LineageOS profiles and OTA providers. The
+adapter fails the build if the required product image, rootless system shell
+and `shell_exec` label, complete supported native payload, or product file
+contexts are unavailable. The launcher rejects missing or unsupported device
+ABIs. Host tests exercise payload installation, foreground process identity,
+startup arguments, receiver overrides, build selection, and the acceptance
+script. They do not establish target-device runtime compatibility.
+
+For rootless acceptance on each ROM/device combination, keep Shizuku's own
+**Start on boot** setting off, boot the patched image with **both USB and
+wireless debugging disabled**, open Shizuku, and confirm that an approved
+client works. Check that an unapproved client still requires approval, then reboot
+again with debugging disabled and repeat. This verifies the actual no-debugging
+boot path. For additional diagnostics, enable USB debugging afterwards, keep
+wireless debugging off, connect by USB, and run the read-only check:
 
 ```shell
 bash tests/shizuku_post_boot_check.sh rootless
@@ -457,26 +495,18 @@ bash tests/shizuku_post_boot_check.sh rootless
 bash tests/shizuku_post_boot_check.sh magisk
 ```
 
-The script uses `adb -d` for every device command and never connects over the
-network. A failed or unrecognized Package Manager response is reported as
-unknown; a successful query with no package path is a failure only when the
-response is empty. Process identity is checked
-only when `ps` returns the expected `UID PID NAME` header and numeric UID/PID
-columns. The script requires exactly one `shizuku_server` process with UID
-2000 for rootless or UID 0 for Magisk; malformed output is unknown, while a
-missing process, duplicate process, or unexpected UID is a failure. It also
-checks the manager's Binder provider and the `adb_wifi_enabled` global setting
-when Android exposes it. A missing or unsupported setting is reported as
-unknown. Shizuku v13.6.0 sends its Binder
-through the manager provider at `content://moe.shizuku.privileged.api.shizuku`
-using `getBinder`; it does not register a named Binder service. The provider
-check is a read-only Binder probe. This script does not prove the process's
-SELinux domain, exercise a client app, or inspect per-client approval state.
-Open Shizuku and a client app manually to confirm those behaviors. The script
-does not reboot, install packages, change settings, or request root or client
-permissions. Exit status is 0 when all automated checks pass, 1 if any required
-check fails (even if another check is inconclusive), and 2 when no required
-check fails but at least one required check is unavailable or inconclusive.
+The script uses `adb -d` throughout. It checks the installed manager, exactly
+one server with the expected UID, and wireless debugging off. In rootless
+mode it also checks the running init service, enforcing SELinux, the server's
+actual shell SELinux domain, and the boot receiver's effective disabled state
+for user 0. A saved explicit enablement fails the check with instructions to
+turn off Start on boot. It probes the manager's Binder provider
+using `getBinder`; an unsupported response or inability to unpack its custom
+Parcelable is inconclusive. It does not reboot, change settings, install
+anything, or grant permissions. Exit status is 0 when the automated checks
+pass, 1 for a required-check failure, and 2 when a required check is unavailable
+or inconclusive without another failure. The manual client and cold-boot
+checks remain necessary even when the script passes.
 
 ### Disable the stock ROM updater
 
