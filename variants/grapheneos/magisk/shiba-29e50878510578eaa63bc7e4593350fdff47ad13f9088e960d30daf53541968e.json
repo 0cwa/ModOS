@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "full": {
+    "location_ota": "https://github.com/0cwa/ModOS/releases/download/2026110200/shiba-2026110200-magisk-v30.7-29e50878510578eaa63bc7e4593350fdff47ad13f9088e960d30daf53541968e-b431d8b.zip",
+    "location_csig": "https://github.com/0cwa/ModOS/releases/download/2026110200/shiba-2026110200-magisk-v30.7-29e50878510578eaa63bc7e4593350fdff47ad13f9088e960d30daf53541968e-b431d8b.zip.csig"
+  }
+}
