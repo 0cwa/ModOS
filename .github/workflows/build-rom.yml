@@ -417,6 +417,9 @@ jobs:
           import pathlib
           import sys
 
+          sys.path.insert(0, str(pathlib.Path("src/ci").resolve()))
+          from companion_continuity import publication_fields
+
           (path, artifact_name, rom_family, device, version, fingerprint,
            output_scope, source_sha256, source_target, build_commit) = sys.argv[1:]
           data = {
@@ -431,6 +434,16 @@ jobs:
               "source_ota_target": source_target,
               "modos_commit": build_commit,
           }
+          # The helper binds its report to both verified outputs before writing.
+          # A paired build shares the injected system and primary microG report.
+          import os
+          if rom_family == "lineageos" and device == "pdx235":
+              microg = os.environ.get("ADDITIONALS_MICROG")
+              if microg not in ("true", "false"):
+                  raise SystemExit("Resolved microG selection is missing")
+              report = (pathlib.Path(os.environ["OUTPUTS_PATCHED_OTA"] + ".microg-patch-report.json")
+                        if microg == "true" else None)
+              data.update(publication_fields(pathlib.Path(artifact_name), report))
           pathlib.Path(path).write_text(
               json.dumps(data, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
@@ -520,6 +533,15 @@ jobs:
           resolve_rom_profile
           enforce_publication_evidence "${OUTPUT_SCOPE}"
           [[ "${MODULE_SELECTION_FINGERPRINT}" =~ ^[0-9a-f]{64}$ ]]
+
+      - name: Preserve published Companion identity before release upload
+        if: inputs.publish && inputs.release-type != 'build-only'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source src/ci/companion_continuity.sh
+          check_companion_release_inputs "${GRAPHENEOS_VERSION}"
 
       - name: Generate changelog
         if: inputs.publish && inputs.release-type != 'build-only'
@@ -624,6 +646,7 @@ jobs:
         if: inputs.publish && inputs.release-type != 'build-only' && env.ROOT_MODE_RESOLVED != 'both'
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           GIT_COMMIT_EMAIL: ${{ secrets.EMAIL }}
           GIT_COMMIT_NAME: ${{ github.repository_owner }}
           OTA_ARTIFACT_PATH: ${{ env.OUTPUTS_PATCHED_OTA }}
@@ -641,6 +664,7 @@ jobs:
         if: inputs.publish && inputs.release-type != 'build-only' && env.ROOT_MODE_RESOLVED == 'both'
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           GIT_COMMIT_EMAIL: ${{ secrets.EMAIL }}
           GIT_COMMIT_NAME: ${{ github.repository_owner }}
           ROM_PROFILE_PROVIDER: ${{ env.ROM_PROFILE_PROVIDER }}

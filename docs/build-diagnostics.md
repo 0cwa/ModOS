@@ -65,7 +65,7 @@ continues to check the configured ModOS signing identity.
 
 ## MSD on pdx235
 
-[MSD v2.5's policy code](https://github.com/chenxiaolong/MSD/blob/v2.5/msd-tool/src/sepatch.rs)
+[MSD v2.6's policy code](https://github.com/chenxiaolong/MSD/blob/v2.6/msd-tool/src/sepatch.rs)
 substitutes the `su` type if `hal_usb_gadget_impl` is missing. Its own comment
 describes an emulator fake HAL. The substituted target receives the daemon's
 process-inspection and signal rules. That is unsuitable as an implicit

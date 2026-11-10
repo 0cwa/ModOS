@@ -58,6 +58,9 @@ jobs:
       - name: Check microG release against immutable helper lock
         run: python3 src/ci/check_microg_helper_lock.py
 
+      - name: Test Companion publication continuity
+        run: python3 tests/companion_continuity_test.py
+
       - name: Verify pinned exfatprogs package with image adapter
         run: python3 src/ci/check_exfatprogs_artifact.py
 
@@ -213,7 +216,7 @@ jobs:
       allow-unauthorized-adb: false
       microg: true
       bcr: true
-      # MSD v2.5's physical-device HAL mapping is not yet qualified on pdx235.
+      # MSD v2.6's physical-device HAL mapping is not yet qualified on pdx235.
       msd: false
       exfatprogs-fsck: true
       fsck-sysfs-sepolicy: true
