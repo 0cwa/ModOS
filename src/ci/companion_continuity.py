@@ -200,23 +200,26 @@ def previous_identity(api: GitHub, repository: str, snapshot: str, flavor: str, 
             and digest(raw_selection) == selection_asset["digest"][7:], "Selection asset digest mismatch")
     selection = parse_json(raw_selection)
     validate_selection(selection, artifact=artifact, version=version)
-    if "microg_companion" in selection:
-        require(selection.get("ota_sha256") == ota["digest"][7:], "Selection does not bind the published OTA digest")
-        return validate_identity(selection["microg_companion"])
-    # Exact reviewed legacy records only: no branch/filename/schedule inference.
+    # A known legacy URL ALWAYS requires its exact pinned receipt. Adding modern
+    # fields to a replaced selection asset must never relabel the shipped OTA.
     legacy = [entry for entry in contract.get("legacy_releases", [])
               if entry.get("location_ota") == url]
-    require(len(legacy) == 1, "Legacy OTA has no reviewed Companion identity; publication stopped")
-    entry = legacy[0]
-    require(entry.get("ota_asset_id") == ota["id"]
-            and entry.get("ota_sha256") == ota["digest"][7:]
-            and entry.get("selection_asset_id") == selection_asset["id"]
-            and entry.get("selection_sha256") == digest(raw_selection)
-            and entry.get("modos_commit") == selection.get("modos_commit"),
-            "Legacy OTA differs from the reviewed publication receipt")
-    signer = entry.get("companion_signer_sha256")
-    require(sha(signer), "Legacy receipt has an invalid Companion signer")
-    return {"signer_sha256": signer}
+    if legacy:
+        require(len(legacy) == 1, "Ambiguous legacy Companion identity receipt")
+        entry = legacy[0]
+        require(entry.get("ota_asset_id") == ota["id"]
+                and entry.get("ota_sha256") == ota["digest"][7:]
+                and entry.get("selection_asset_id") == selection_asset["id"]
+                and entry.get("selection_sha256") == digest(raw_selection)
+                and entry.get("modos_commit") == selection.get("modos_commit"),
+                "Legacy OTA differs from the reviewed publication receipt")
+        signer = entry.get("companion_signer_sha256")
+        require(sha(signer), "Legacy receipt has an invalid Companion signer")
+        return {"signer_sha256": signer}
+    require("microg_companion" in selection,
+            "Legacy OTA has no reviewed Companion identity; publication stopped")
+    require(selection.get("ota_sha256") == ota["digest"][7:], "Selection does not bind the published OTA digest")
+    return validate_identity(selection["microg_companion"])
 
 
 def incoming_identity(path: Path):

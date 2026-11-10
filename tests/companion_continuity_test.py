@@ -65,7 +65,7 @@ class API:
     def sync_release(self):
         self.data[f"repos/{REPO}/releases/tags/20261106"] = encoded(self.release)
 
-    def modern(self, signer):
+    def relabel_legacy_selection(self, signer):
         for asset in self.release["assets"]:
             if not asset["name"].endswith(".selection.json"):
                 continue
@@ -76,6 +76,33 @@ class API:
             self.data[endpoint] = raw = encoded(selection)
             asset.update(digest="sha256:" + c.digest(raw), size=len(raw))
         self.sync_release()
+
+    def modern(self, signer):
+        # Modern publications have genuinely distinct URLs, asset IDs and OTA
+        # bytes. They must never mutate the already-pinned legacy pair in place.
+        release = {"tag_name": "20261107", "draft": False, "prerelease": False, "assets": []}
+        for index, flavor in enumerate(("rootless", "magisk")):
+            name = f"pdx235-20261107-{flavor}-modern-fixture.zip"
+            ota_digest = c.digest(f"new verified {flavor} OTA".encode())
+            selection = {"schema_version": 2, "artifact_name": name, "device": "pdx235",
+                         "rom_family": "lineageos", "grapheneos_version": "20261107",
+                         "output_scope": "published", "modos_commit": "8" * 40,
+                         "module_selection_fingerprint": "9" * 64,
+                         "ota_sha256": ota_digest, "microg_companion": identity(signer)}
+            raw_selection = encoded(selection)
+            selection_id = 1002 + index * 3
+            release["assets"] += [
+                self.asset(1000 + index * 3, name, ota_digest, 100),
+                self.asset(1001 + index * 3, name + ".csig", "5" * 64, 100),
+                self.asset(selection_id, name + ".selection.json",
+                           c.digest(raw_selection), len(raw_selection)),
+            ]
+            self.data[f"repos/{REPO}/releases/assets/{selection_id}"] = raw_selection
+            url = f"https://github.com/{REPO}/releases/download/20261107/{name}"
+            feed = encoded({"version": 2, "full": {"location_ota": url, "location_csig": url + ".csig"}})
+            for device in ("pdx235", "XQ-DC72"):
+                self.set_content(f"{flavor}/{device}.json", feed)
+        self.data[f"repos/{REPO}/releases/tags/20261107"] = encoded(release)
 
     def raw(self, endpoint, *, binary=False):
         if endpoint not in self.data:
@@ -158,6 +185,10 @@ class ContinuityTests(unittest.TestCase):
                 self.api.modern(signer)
                 self.assertEqual(self.check(self.incoming(signer)), SNAPSHOT)
 
+    def test_known_legacy_cannot_be_relabelled_by_new_metadata_fields(self):
+        self.api.relabel_legacy_selection(OFFICIAL)
+        self.assert_blocked(self.incoming(OFFICIAL), "differs from the reviewed publication receipt")
+
     def test_single_update_checks_both_current_feeds(self):
         self.assertEqual(self.check(self.incoming(flavors=("rootless",))), SNAPSHOT)
         del self.api.data[f"repos/{REPO}/contents/magisk/XQ-DC72.json?ref={SNAPSHOT}"]
@@ -207,8 +238,10 @@ class ContinuityTests(unittest.TestCase):
 
     def test_modern_selection_must_bind_published_ota_digest(self):
         self.api.modern(CUSTOM)
-        self.api.release["assets"][0]["digest"] = "sha256:" + "9" * 64
-        self.api.sync_release()
+        endpoint = f"repos/{REPO}/releases/tags/20261107"
+        release = self.api.json(endpoint)
+        release["assets"][0]["digest"] = "sha256:" + "9" * 64
+        self.api.data[endpoint] = encoded(release)
         self.assert_blocked(self.incoming(), "published OTA digest")
 
     def test_report_derives_identity_and_rejects_ambiguous_signers(self):
@@ -367,11 +400,20 @@ else:
         baseline = self.publisher_env(paths)
         wrong = self.root / "pdx235-20261110-rootless-other.zip"
         wrong.write_bytes(b"another output")
+        actual = self.pairs(paths)["rootless"][2]
+        alternate = self.root / "alternate" / actual.name
+        alternate.parent.mkdir()
+        alternate.write_bytes(b"same basename, different output")
+        symlink = self.root / "symlink" / actual.name
+        symlink.parent.mkdir()
+        symlink.symlink_to(actual)
         for field, value, message in (
             ("OUTPUTS_PATCHED_OTA_ROOTLESS", wrong.name, "Upload OTA path differs"),
+            ("OUTPUTS_PATCHED_OTA_ROOTLESS", str(alternate), "Upload OTA path differs"),
+            ("OUTPUTS_PATCHED_OTA_ROOTLESS", str(symlink), "Upload OTA path differs"),
             ("RELEASE_TAG", "20261111", "Upload release tag differs"),
         ):
-            with self.subTest(field=field):
+            with self.subTest(field=field, value=value):
                 env = {**baseline, field: value}
                 result = self.run_publisher("publish_exfatprogs_release_assets.sh", env)
                 self.assertNotEqual(result.returncode, 0)
