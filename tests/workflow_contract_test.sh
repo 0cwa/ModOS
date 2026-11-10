@@ -807,24 +807,7 @@ assert not selected(condition(lineage), branch, event='push')
 assert not selected(condition(graphene), branch)
 assert selected(condition(graphene), 'integration/upstream-check')
 for name in ('microg-spoof-patch', 'lineage-vold-exfat-timeout'):
-    match = re.search(r'^      ' + name + r': \$\{\{\s*(.*?)\s*\}\}test_build_only_permissions
-test_device_candidate_signing_routes
-test_encrypted_device_candidate_request_gate
-test_development_profile_activation
-test_guarded_lineage24_routing
-test_release_triggers
-test_bcr_reusable_workflow_family_policy
-test_config_loading_isolated_to_scheduled_releases
-test_release_configuration_forwarding
-test_microg_lineage_forwarding
-test_shizuku_manual_selection_and_ci
-test_module_forwarding_contract
-test_publication_identity_is_step_scoped
-test_workflow_inventory_is_intentional
-test_no_lineage_checkout_anywhere
-
-echo "Workflow contract tests passed"
-, lineage, re.M)
+    match = re.search(r'^      ' + name + r': \$\{\{\s*(.*?)\s*\}\}$', lineage, re.M)
     assert match, name
     assert selected(match[1], branch)
     assert not selected(match[1], 'integration/upstream-check')
@@ -832,62 +815,11 @@ echo "Workflow contract tests passed"
     assert not re.search(r'^      ' + name + ':', graphene, re.M), name
 for key, value in (('root-mode', 'both'), ('signing-mode', 'disposable'),
                    ('release-type', 'build-only'), ('publish', 'false')):
-    assert re.search(r'^      ' + key + ': ' + value + 'test_build_only_permissions
-test_device_candidate_signing_routes
-test_encrypted_device_candidate_request_gate
-test_development_profile_activation
-test_guarded_lineage24_routing
-test_release_triggers
-test_bcr_reusable_workflow_family_policy
-test_config_loading_isolated_to_scheduled_releases
-test_release_configuration_forwarding
-test_microg_lineage_forwarding
-test_shizuku_manual_selection_and_ci
-test_module_forwarding_contract
-test_publication_identity_is_step_scoped
-test_workflow_inventory_is_intentional
-test_no_lineage_checkout_anywhere
-
-echo "Workflow contract tests passed"
-, lineage, re.M), key
-assert re.search(r'^      contents: readtest_build_only_permissions
-test_device_candidate_signing_routes
-test_encrypted_device_candidate_request_gate
-test_development_profile_activation
-test_guarded_lineage24_routing
-test_release_triggers
-test_bcr_reusable_workflow_family_policy
-test_config_loading_isolated_to_scheduled_releases
-test_release_configuration_forwarding
-test_microg_lineage_forwarding
-test_shizuku_manual_selection_and_ci
-test_module_forwarding_contract
-test_publication_identity_is_step_scoped
-test_workflow_inventory_is_intentional
-test_no_lineage_checkout_anywhere
-
-echo "Workflow contract tests passed"
-, lineage, re.M)
+    assert re.search(r'^      ' + key + ': ' + value + '$', lineage, re.M), key
+assert re.search(r'^      contents: read$', lineage, re.M)
 assert not re.search(r'^\s+secrets:', lineage, re.M)
 reusable = Path('.github/workflows/build-rom.yml').read_text()
-assert re.search(r'^  ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT: \$\{\{ inputs.lineage-vold-exfat-timeout \}\}test_build_only_permissions
-test_device_candidate_signing_routes
-test_encrypted_device_candidate_request_gate
-test_development_profile_activation
-test_guarded_lineage24_routing
-test_release_triggers
-test_bcr_reusable_workflow_family_policy
-test_config_loading_isolated_to_scheduled_releases
-test_release_configuration_forwarding
-test_microg_lineage_forwarding
-test_shizuku_manual_selection_and_ci
-test_module_forwarding_contract
-test_publication_identity_is_step_scoped
-test_workflow_inventory_is_intentional
-test_no_lineage_checkout_anywhere
-
-echo "Workflow contract tests passed"
-,
+assert re.search(r'^  ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT: \$\{\{ inputs.lineage-vold-exfat-timeout \}\}$',
                  reusable, re.M)
 PYTEST
 }
