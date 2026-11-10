@@ -52,6 +52,8 @@ check_definition() {
     [[ "${expected_family}" != lineageos ]] || expected_microg=true
     [[ "$(toml_resolve_value microg false)" == "${expected_microg}" ]] ||
       fail "${file}: wrong scheduled microG selection"
+    [[ "$(toml_resolve_value microg_spoof_patch false)" == "${expected_microg}" ]] ||
+      fail "${file}: wrong scheduled microG signer patch selection"
 
     local expected_msd=true
     [[ "${expected_family}" != lineageos ]] || expected_msd=false
@@ -127,6 +129,10 @@ check_loader() {
     fail "${file}: loader emitted wrong microG selection"
   grep -Fxq "ADDITIONALS_MICROG=${expected_microg}" "${env_file}" ||
     fail "${file}: loader exported wrong microG selection"
+  grep -Fxq "microg_spoof_patch=${expected_microg}" "${output_file}" ||
+    fail "${file}: loader emitted wrong microG signer patch selection"
+  grep -Fxq "ADDITIONALS_MICROG_SPOOF_PATCH=${expected_microg}" "${env_file}" ||
+    fail "${file}: loader exported wrong microG signer patch selection"
   local expected_msd=true
   [[ "${expected_family}" != lineageos ]] || expected_msd=false
   grep -Fxq "msd=${expected_msd}" "${output_file}" ||
@@ -244,6 +250,8 @@ echo "scheduled build definition tests passed"
 
 grep -Fq "needs.schedule_config.outputs.microg == 'true'" .github/workflows/release-lineage.yml ||
   fail 'LineageOS schedule does not forward microG'
+grep -Fq "needs.schedule_config.outputs.microg_spoof_patch == 'true'" .github/workflows/release-lineage.yml ||
+  fail 'LineageOS schedule does not forward the microG signer patch'
 
 # Cron events have no workflow_dispatch inputs. When a scheduled boolean is
 # false, its reusable-workflow binding must not fall through to the missing

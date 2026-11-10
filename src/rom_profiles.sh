@@ -222,6 +222,19 @@ function _resolve_boot_animation_payloads() {
   BOOT_ANIMATION_DARK_PAYLOAD="${BOOT_ANIMATION_DARK_PAYLOAD:-${BOOT_ANIMATION_LIGHT_PAYLOAD}}"
 }
 
+# The Companion signer certificate is a public build input, never a key.
+# MICROG_COMPANION_CERT overrides the default location.
+function _microg_companion_cert_path() {
+  local repository_root cert_path
+  repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)" || return 1
+  cert_path="${MICROG_COMPANION_CERT:-${repository_root}/custom/microg-companion-signer/cert.pem}"
+  if [[ ! -f "${cert_path}" || -L "${cert_path}" ]]; then
+    echo "Error: the microG Companion signer patch requires a certificate at ${cert_path}." >&2
+    return 1
+  fi
+  printf '%s\n' "${cert_path}"
+}
+
 function _boot_animation_payload_path() {
   _resolve_boot_animation_payloads || return 1
   printf '%s\n' "${BOOT_ANIMATION_LIGHT_PAYLOAD}"
@@ -253,6 +266,9 @@ function module_selection_fingerprint() {
   local exfatprogs_fsck_payload_digest="disabled"
   local exfatprogs_fsck_provenance_digest="disabled"
   local fsck_sysfs_sepolicy_adapter_digest="disabled"
+  local microg_spoof_patch_adapter_digest="disabled"
+  local microg_spoof_patch_cert_digest="disabled"
+  local microg_spoof_patch_cert_path=""
   local entry module
   local -A legacy_module_versions=(
     [ALTERINSTALLER]=disabled
@@ -271,6 +287,7 @@ function module_selection_fingerprint() {
     "msd:MSD"
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
+    "microg-spoof-patch:MICROG_SPOOF_PATCH"
     "shizuku:SHIZUKU"
     "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
     "exfatprogs-fsck:EXFATPROGS_FSCK"
@@ -358,6 +375,26 @@ function module_selection_fingerprint() {
     }
   fi
 
+  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]}" == 'true' ]]; then
+    if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
+      echo "Error: the microG Companion signer patch is supported only by the LineageOS profile." >&2
+      return 1
+    fi
+    if [[ "${ADDITIONALS[MICROG]}" != 'true' ]]; then
+      echo "Error: the microG Companion signer patch requires ADDITIONALS[MICROG]=true." >&2
+      return 1
+    fi
+    microg_spoof_patch_adapter_digest="$(_locked_input_digest src/microg_spoof_patch.py)" || {
+      echo "Error: the microG Companion signer patch adapter is not clean and checked in." >&2
+      return 1
+    }
+    microg_spoof_patch_cert_path="$(_microg_companion_cert_path)" || return 1
+    microg_spoof_patch_cert_digest="$(python3 src/microg_spoof_patch.py check-cert "${microg_spoof_patch_cert_path}")" || {
+      echo "Error: the microG Companion signer certificate failed validation." >&2
+      return 1
+    }
+  fi
+
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]]; then
     boot_animation_digest="$(_boot_animation_payload_digest)" || {
       echo "Error: enabled boot animation payload failed validation." >&2
@@ -436,6 +473,9 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_OEMUNLOCKONBOOT="${ADDITIONALS[OEMUNLOCKONBOOT]}"
   SELECTION_MODULE_OEMUNLOCKONBOOT_VERSION="${legacy_module_versions[OEMUNLOCKONBOOT]}"
   SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
+  SELECTION_MODULE_MICROG_SPOOF_PATCH="${ADDITIONALS[MICROG_SPOOF_PATCH]}"
+  SELECTION_MICROG_SPOOF_PATCH_ADAPTER_SHA256="${microg_spoof_patch_adapter_digest}"
+  SELECTION_MICROG_SPOOF_PATCH_CERT_SHA256="${microg_spoof_patch_cert_digest}"
   SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
   SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"
   SELECTION_SHIZUKU_ADAPTER_SHA256="${shizuku_adapter_digest}"

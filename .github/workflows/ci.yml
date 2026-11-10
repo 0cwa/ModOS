@@ -185,6 +185,9 @@ jobs:
           python3 tests/shizuku_post_boot_check_test.py
           python3 tests/disable_system_updater_test.py
           bash tests/disable_system_updater_registration_test.sh
+          python3 tests/microg_spoof_patch_test.py
+          bash tests/microg_spoof_patch_registration_test.sh
+          bash tests/microg_companion_build_test.sh
           bash tests/secrets_scan_test.sh
           bash tests/verifier_test.sh
 
@@ -256,3 +259,171 @@ jobs:
       signing-mode: disposable
       release-type: build-only
       publish: false
+
+  # This PR branch compiles the Companion using a fresh runner-only test key.
+  # Only logs and verification receipts leave the job; no APK or key is retained.
+  microg_companion_qualification:
+    needs: test
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/microg-companion-signer-patch'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out the proposed Companion builder
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install reviewed Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Build and verify the Companion with a disposable signer
+        shell: bash
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/microg-companion-gradle
+          MICROG_GRADLE_ARGS: --max-workers=2
+        run: |
+          set -euo pipefail
+          umask 077
+          evidence="${RUNNER_TEMP}/microg-companion-evidence"
+          mkdir -m 700 -- "${evidence}"
+          private_dir="$(mktemp -d "${RUNNER_TEMP}/microg-companion-key.XXXXXXXX")"
+          output="$(mktemp -d "${RUNNER_TEMP}/microg-companion-output.XXXXXXXX")"
+          trap 'rm -rf -- "${private_dir}" "${output}"' EXIT
+          python3 - "${private_dir}/password" <<'PY'
+          import secrets
+          import sys
+          from pathlib import Path
+          Path(sys.argv[1]).write_text(secrets.token_urlsafe(48) + "\n")
+          PY
+          keytool -genkeypair -keystore "${private_dir}/test.p12" -storetype PKCS12 \
+            -alias companion-ci-test -keyalg RSA -keysize 3072 -validity 2 \
+            -dname 'CN=ModOS disposable compilation test' \
+            -storepass:file "${private_dir}/password" -keypass:file "${private_dir}/password" \
+            -noprompt
+          keytool -exportcert -keystore "${private_dir}/test.p12" -alias companion-ci-test \
+            -storepass:file "${private_dir}/password" -file "${private_dir}/certificate.der"
+          {
+            printf 'modos_commit=%s\n' "$(git rev-parse HEAD)"
+            java -version
+            cat "${ANDROID_HOME}/build-tools/35.0.0/source.properties"
+            cat "${ANDROID_HOME}/platforms/android-35/source.properties"
+          } >"${evidence}/toolchain.txt" 2>&1
+          tools/build-microg-companion.sh \
+            --keystore "${private_dir}/test.p12" --alias companion-ci-test \
+            --pass-file "${private_dir}/password" --output "${output}" \
+            2>&1 | tee "${evidence}/build.log"
+          build_tools="${ANDROID_HOME}/build-tools/35.0.0"
+          "${build_tools}/zipalign" -c -p 4 "${output}/com.android.vending.apk"
+          "${build_tools}/aapt" dump badging "${output}/com.android.vending.apk" \
+            >"${evidence}/apk-badging.txt"
+          "${build_tools}/apksigner" verify --print-certs "${output}/com.android.vending.apk" \
+            >"${evidence}/signer-verified.txt"
+          cp -- "${output}/build-record.txt" "${evidence}/build-record.txt"
+          cp -- "${output}/signer.txt" "${evidence}/signer.txt"
+          python3 - "${output}" "${private_dir}/certificate.der" "${evidence}" <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          output, certificate, evidence = map(Path, sys.argv[1:])
+          def require(ok, message):
+              if not ok:
+                  raise SystemExit(message)
+          def digest(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+          receipt_lines = (evidence / "build-record.txt").read_text().splitlines()
+          def field(name):
+              values = [line.split("=", 1)[1] for line in receipt_lines if line.startswith(name + "=")]
+              require(len(values) == 1, "Missing or repeated build receipt field: " + name)
+              return values[0]
+
+          require(field("release") == "v0.3.17.252432", "Unexpected source release")
+          require(field("source_commit") == "32bc8954ff872d0e1a05ddfae81561b6dbecef69",
+                  "Unexpected upstream source commit")
+          commit, tree = field("gmscore_commit"), field("gmscore_tree")
+          require(re.fullmatch(r"[0-9a-f]{40}", commit) and re.fullmatch(r"[0-9a-f]{40}", tree),
+                  "Invalid patched source identity")
+          patch_lines = [line for line in receipt_lines if line.startswith("patch=")]
+          patches = sorted(Path("patches/microg").glob("*.patch"))
+          expected_patches = [f"patch={path.name} sha256={digest(path)}" for path in patches]
+          require(patches and patch_lines == expected_patches, "Build receipt does not match reviewed patches")
+
+          badging = (evidence / "apk-badging.txt").read_text()
+          package_lines = [line for line in badging.splitlines() if line.startswith("package: ")]
+          require(len(package_lines) == 1, "Expected exactly one package declaration")
+          package = dict(re.findall(r"(\w+)='([^']*)'", package_lines[0]))
+          expected_name = f"0.3.17.40226-{len(patches)} ({commit[:7]})"
+          require(package.get("name") == "com.android.vending", "Unexpected APK package")
+          require(package.get("versionCode") == "84022635", "Unexpected Companion versionCode")
+          require(package.get("versionName") == expected_name, "Unexpected Companion versionName")
+          require(not re.search(r"^application-debuggable(?:$|:|\s)", badging, re.M),
+                  "Debuggable APK refused")
+          apk_digest = digest(output / "com.android.vending.apk")
+          require(apk_digest == field("apk_sha256"), "APK digest differs from build receipt")
+
+          signer_text = (evidence / "signer-verified.txt").read_text()
+          signers = re.findall(r"^Signer #(\d+) certificate SHA-256 digest: ([0-9a-fA-F]{64})$",
+                               signer_text, re.M)
+          expected_signer = digest(certificate)
+          require(signers == [("1", expected_signer)], "APK signer differs from the disposable test key")
+          require(signer_text == (evidence / "signer.txt").read_text(),
+                  "Independent signature verification differs from builder receipt")
+          report = {
+              "status": "disposable-companion-build-verified",
+              "production_eligible": False,
+              "apk_retained": False,
+              "device_acceptance": "not-tested",
+              "workflow_run": os.environ["GITHUB_SERVER_URL"] + "/" + os.environ["GITHUB_REPOSITORY"]
+                              + "/actions/runs/" + os.environ["GITHUB_RUN_ID"],
+              "modos_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "source_commit": field("source_commit"),
+              "patched_commit": commit,
+              "patched_tree": tree,
+              "patches": patch_lines,
+              "package": package["name"],
+              "version_code": int(package["versionCode"]),
+              "version_name": package["versionName"],
+              "apk_sha256": apk_digest,
+              "signer_sha256": expected_signer,
+              "signer_purpose": "fresh disposable compilation test only",
+          }
+          (evidence / "verification.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Retain Companion build evidence only
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: microg-companion-compilation-evidence
+          path: |
+            ${{ runner.temp }}/microg-companion-evidence/build.log
+            ${{ runner.temp }}/microg-companion-evidence/build-record.txt
+            ${{ runner.temp }}/microg-companion-evidence/signer.txt
+            ${{ runner.temp }}/microg-companion-evidence/signer-verified.txt
+            ${{ runner.temp }}/microg-companion-evidence/apk-badging.txt
+            ${{ runner.temp }}/microg-companion-evidence/toolchain.txt
+            ${{ runner.temp }}/microg-companion-evidence/verification.json
+          if-no-files-found: warn
+          retention-days: 14

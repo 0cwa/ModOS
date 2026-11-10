@@ -4,11 +4,12 @@ set -euo pipefail
 source src/declarations.sh
 source src/rom_profiles.sh
 reject() { if "$@"; then echo "Unexpected acceptance: $*" >&2; exit 1; fi; }
-repair=b553f46a9b94fff3960617830b6072b0f8b054b5
-previous_repair=abdede21c1b048e11700ec2789d0fb96ace0b0e4
+repair=902ed62e63f6d7d7d332a07619d75409d17fe514
+previous_repair=b553f46a9b94fff3960617830b6072b0f8b054b5
 for mode in rootless both; do
   require_pdx235_repaired_helper lineageos pdx235 "${mode}" "${repair}"
   reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" "${previous_repair}"
+  reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" abdede21c1b048e11700ec2789d0fb96ace0b0e4
   reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" c9d091225bdbed9f62d6401a040e3cdbae834078
   reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" ed6c24fdcc34d048f1fd51580c0c08569c3c0cc5
   reject require_pdx235_repaired_helper lineageos pdx235 "${mode}" ''
