@@ -1,0 +1,86 @@
+From dd9fe374bbd16c42877046dbab18baf48830ee4a Mon Sep 17 00:00:00 2001
+From: Saeed <8407855+SaeedDev94@users.noreply.github.com>
+Date: Tue, 3 Nov 2026 20:00:44 +0330
+Subject: [PATCH] Make extracted native library read-only (#3883)
+
+* Maps: make extracted mapbox native library read-only
+
+Android 17 refuses System.load() of writable files for apps targeting
+SDK 37+, so the library copied into the app's cache failed to load and
+the app crashed in NativeConnectivityListener.initialize().
+
+Fixes #3882
+
+* setReadOnly() is idempotent, it's safe to call it w/o checking canWrite()
+
+* Apply same to other native library loaders
+
+---------
+
+Co-authored-by: Marvin W <git@larma.de>
+---
+ .../android/gms/providerinstaller/ProviderInstallerImpl.java    | 2 ++
+ .../kotlin/org/microg/gms/maps/mapbox/utils/MultiArchLoader.kt  | 2 ++
+ .../src/main/java/org/microg/gms/maps/vtm/BackendMapView.java   | 2 ++
+ 3 files changed, 6 insertions(+)
+
+diff --git a/play-services-conscrypt-provider-core/src/main/java/com/google/android/gms/providerinstaller/ProviderInstallerImpl.java b/play-services-conscrypt-provider-core/src/main/java/com/google/android/gms/providerinstaller/ProviderInstallerImpl.java
+index 818270862d..e08fd682f3 100644
+--- a/play-services-conscrypt-provider-core/src/main/java/com/google/android/gms/providerinstaller/ProviderInstallerImpl.java
++++ b/play-services-conscrypt-provider-core/src/main/java/com/google/android/gms/providerinstaller/ProviderInstallerImpl.java
+@@ -134,6 +134,7 @@ private static void loadConscryptDirect(Context context, String packageName) thr
+             cacheFile.getParentFile().mkdirs();
+             File apkFile = new File(context.getPackageCodePath());
+             if (!cacheFile.exists() || cacheFile.lastModified() < apkFile.lastModified()) {
++                cacheFile.delete();
+                 ZipFile zipFile = new ZipFile(apkFile);
+                 ZipEntry entry = zipFile.getEntry(path);
+                 if (entry != null) {
+@@ -142,6 +143,7 @@ private static void loadConscryptDirect(Context context, String packageName) thr
+                     Log.d(TAG, "Can't load native library: " + path + " does not exist in " + apkFile);
+                 }
+             }
++            cacheFile.setReadOnly();
+             Log.d(TAG, "Loading conscrypt_gmscore_jni from " + cacheFile.getPath());
+             System.load(cacheFile.getAbsolutePath());
+ 
+diff --git a/play-services-maps/core/mapbox/src/main/kotlin/org/microg/gms/maps/mapbox/utils/MultiArchLoader.kt b/play-services-maps/core/mapbox/src/main/kotlin/org/microg/gms/maps/mapbox/utils/MultiArchLoader.kt
+index 5a37a6d83c..42b7962a81 100644
+--- a/play-services-maps/core/mapbox/src/main/kotlin/org/microg/gms/maps/mapbox/utils/MultiArchLoader.kt
++++ b/play-services-maps/core/mapbox/src/main/kotlin/org/microg/gms/maps/mapbox/utils/MultiArchLoader.kt
+@@ -45,6 +45,7 @@ class MultiArchLoader(private val mapContext: Context, private val appContext: C
+                 val mapVersion = PackageUtils.versionName(mapContext, Constants.GMS_PACKAGE_NAME)
+                 val apkFile = File(mapContext.packageCodePath)
+                 if (!cacheFile.exists() || cacheVersion == null || cacheVersion != mapVersion) {
++                    cacheFile.delete()
+                     val zipFile = ZipFile(apkFile)
+                     val entry = zipFile.getEntry(path)
+                     if (entry != null) {
+@@ -54,6 +55,7 @@ class MultiArchLoader(private val mapContext: Context, private val appContext: C
+                     }
+                     cacheFileStamp.writeText(mapVersion.toString())
+                 }
++                cacheFile.setReadOnly()
+                 Log.d(TAG, "Loading $name from ${cacheFile.getPath()}")
+                 System.load(cacheFile.absolutePath)
+                 return
+diff --git a/play-services-maps/core/vtm/src/main/java/org/microg/gms/maps/vtm/BackendMapView.java b/play-services-maps/core/vtm/src/main/java/org/microg/gms/maps/vtm/BackendMapView.java
+index 6af341e68c..ef25e55182 100644
+--- a/play-services-maps/core/vtm/src/main/java/org/microg/gms/maps/vtm/BackendMapView.java
++++ b/play-services-maps/core/vtm/src/main/java/org/microg/gms/maps/vtm/BackendMapView.java
+@@ -70,6 +70,7 @@ static synchronized Context loadNativeLib(Context context) {
+                 cacheFile.getParentFile().mkdirs();
+                 File apkFile = new File(context.getPackageCodePath());
+                 if (!cacheFile.exists() || cacheFile.lastModified() < apkFile.lastModified()) {
++                    cacheFile.delete();
+                     ZipFile zipFile = new ZipFile(apkFile);
+                     ZipEntry entry = zipFile.getEntry(path);
+                     if (entry != null) {
+@@ -78,6 +79,7 @@ static synchronized Context loadNativeLib(Context context) {
+                         Log.d(TAG, "Can't load native library: " + path + " does not exist in " + apkFile);
+                     }
+                 }
++                cacheFile.setReadOnly();
+                 Log.d(TAG, "Loading vtm-jni from " + cacheFile.getPath());
+                 System.load(cacheFile.getAbsolutePath());
+                 nativeLibLoaded = true;

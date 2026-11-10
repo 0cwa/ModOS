@@ -61,6 +61,9 @@ jobs:
       - name: Test Companion publication continuity
         run: python3 tests/companion_continuity_test.py
 
+      - name: Test isolated microG candidate preparation
+        run: python3 tests/microg_candidate_test.py
+
       - name: Verify pinned exfatprogs package with image adapter
         run: python3 src/ci/check_exfatprogs_artifact.py
 
@@ -191,6 +194,51 @@ jobs:
       - name: Check upstream download endpoints
         shell: bash
         run: bash src/ci/smoke_test.sh
+
+  # Compile the unsigned Mapbox candidate only on its explicit review branches.
+  # Production still uses the official microG APK lock in the pinned helper.
+  microg_candidate:
+    needs: test
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'candidate/microg-mapbox-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout candidate recipe
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install reviewed Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Build unsigned microG Mapbox candidate
+        run: python3 tools/build_microg_candidate.py --output "${RUNNER_TEMP}/microg-mapbox-candidate"
+
+      - name: Retain unsigned candidate and build evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: microg-mapbox-unsigned-candidate
+          path: |
+            ${{ runner.temp }}/microg-mapbox-candidate/com.google.android.gms-unsigned.apk
+            ${{ runner.temp }}/microg-mapbox-candidate/candidate.json
+            ${{ runner.temp }}/microg-mapbox-candidate/gradle.log
+          if-no-files-found: error
+          retention-days: 14
 
   # No repository signing secrets, release credentials or write permissions.
   # Same-repository integration branches opt into real, nonpublishing OTA builds.

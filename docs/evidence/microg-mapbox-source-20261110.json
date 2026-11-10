@@ -1,0 +1,35 @@
+{
+  "source_repository": "https://github.com/microg/GmsCore.git",
+  "source_release": "v0.3.17.252432",
+  "source_commit": "32bc8954ff872d0e1a05ddfae81561b6dbecef69",
+  "upstream_fix_commit": "dd9fe374bbd16c42877046dbab18baf48830ee4a",
+  "patch_sha256": "d737d577d0496f1258665234d4476e6b525ee1b297852b6ba383fff209e63115",
+  "backport_commit": "6234f43e3dc4ae41da30300dfe95a54b38cc323f",
+  "backport_tree": "a6ea2e1e75c61f7a19513b33e0a2a206617910ac",
+  "prepared_commit": "b647d49357115d22f56ad326a74c0d411c4e8ef0",
+  "prepared_tree": "b4f6cadb4802bba7547b5a2cdf61322d3cccf1e9",
+  "gradle_distribution_sha256": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+  "production_eligible": false,
+  "state": "source-prepared",
+  "validation": {
+    "source_preparations_compared": 2,
+    "source_receipts_identical": true,
+    "prepared_worktree_clean": true,
+    "offline_candidate_tests_passed": 10,
+    "workflow_contract_tests_passed": true,
+    "apk_compiled": false,
+    "device_tested": false,
+    "java": "Temurin 17.0.21+9",
+    "gradle": "8.13",
+    "gradle_help_passed": true,
+    "gradle_build_environment_passed": true,
+    "resolved_build_plugins": {
+      "wire": "6.4.6",
+      "kotlin": "2.2.21",
+      "compose": "2.2.21",
+      "reason": "Wire brings the Kotlin Gradle plugin; the Kotlin plugins BOM aligns the Compose plugin."
+    },
+    "gradle_help_log_sha256": "2e8fd309bfc0484fa03665e0745bec3ed9b7390ace53cf60f2b0ede1e63f3982",
+    "gradle_build_environment_log_sha256": "70b5f97c3654244e7f983eba7b32c8bb6c78e8f952cff30d7fb091c4759f2b30"
+  }
+}
