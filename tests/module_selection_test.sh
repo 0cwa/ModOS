@@ -205,6 +205,7 @@ reset_fixture() {
   ADDITIONALS[OEMUNLOCKONBOOT]="true"
   ADDITIONALS[ALTERINSTALLER]="true"
   ADDITIONALS[DISABLE_SYSTEM_UPDATER]="false"
+  ADDITIONALS[MICROG_SPOOF_PATCH]="false"
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
   ADDITIONALS[MICROG]="false"
@@ -460,6 +461,16 @@ test_disable_system_updater_module_is_optional() {
   run_patch
   assert_pair     "--module-disable-system-updater"     "${WORKDIR}/modules/disable-system-updater.zip"     "disable system updater"
   assert_pair     "--module-disable-system-updater-sig"     "${WORKDIR}/signatures/disable-system-updater.zip.sig"     "disable system updater"
+}
+
+test_microg_spoof_patch_module_is_optional() {
+  reset_fixture microg-spoof-patch-enabled
+  ADDITIONALS[MICROG_SPOOF_PATCH]="true"
+  prepare_microg_spoof_patch_module() { :; }
+
+  run_patch
+  assert_pair     "--module-microg-spoof-patch"     "${WORKDIR}/modules/microg-spoof-patch.zip"     "microg spoof patch"
+  assert_pair     "--module-microg-spoof-patch-sig"     "${WORKDIR}/signatures/microg-spoof-patch.zip.sig"     "microg spoof patch"
 }
 
 test_boot_animation_module_is_optional_and_ordered() {
@@ -1034,6 +1045,7 @@ test_invalid_bcr_fails_before_build_side_effects
 test_module_argument_failure_prevents_helper_execution
 test_special_cases_remain_available
 test_disable_system_updater_module_is_optional
+test_microg_spoof_patch_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
 test_microg_profile_uses_selected_source_sdk

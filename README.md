@@ -379,6 +379,42 @@ helper pin and compatibility manifests. CI rejects a release selector without
 its matching helper lock. See the helper
 [lock update procedure](https://github.com/0cwa/my-avbroot-setup/blob/master/docs/microg.md).
 
+### microG Companion signer patch (LineageOS)
+
+LineageOS only spoofs signatures for `com.android.vending` and
+`com.google.android.gms` when they carry the official microG certificate, a
+constant compiled into `framework.jar` (`MicrogUtils.REAL_SIGNATURE`). Nothing
+in a ROM overlay or config can add another signer. A Companion APK built from
+source and signed with your own key therefore loses spoofing.
+
+Set `'ADDITIONALS[MICROG_SPOOF_PATCH]' = true` (LineageOS only, default off) to
+patch `/system/framework/services.jar` in the system image so that
+`com.android.vending` signed with **one additional certificate** is accepted as
+well. The official microG certificate stays accepted and `com.google.android.gms`
+is not extended. The patch redirects the two services-side call sites
+(`ComputerEngine.generatePackageInfo` and `AppsFilterImpl`) to a small helper
+class that first asks the stock `MicrogUtils` and only then checks your
+certificate. `framework.jar` is left alone: it is part of the boot image, so
+editing it would invalidate that image.
+
+* Put the **public** signer certificate (PEM or DER) at
+  `custom/microg-companion-signer/cert.pem`, or point `MICROG_COMPANION_CERT`
+  at it. Never place a private key or keystore there. Its SHA-256 and the adapter
+  bytes are part of the build identity.
+* Java is required. baksmali and smali 3.0.10 are downloaded from the official
+  release and verified against pinned SHA-256 digests.
+* The build fails closed if either call site is not found exactly once, so a
+  Lineage release that changes the code is refused rather than half-patched.
+* The stock `services.odex`/`vdex`/`art` no longer match and are removed; ART
+  recompiles from the jar, so the first boot after an update can be slower.
+* This only adds trust. Installing the self-built, self-signed Companion itself
+  is a separate step; the locked microG module still installs the official one.
+
+The patch has been verified to disassemble, reassemble and pass ART's dex2oat
+verification (including soft failures) against a real LineageOS 24.0 (Android 17)
+`services.jar`. It has not been booted from an OTA built with it, so treat the
+first flash as untested.
+
 ### Shizuku module
 
 To patch Shizuku into the system image with automatic startup and no USB or
