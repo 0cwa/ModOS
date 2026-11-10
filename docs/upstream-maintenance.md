@@ -43,6 +43,11 @@ update cannot leave a duplicate development manifest behind. Development still
 requires its existing device and unpublished-output scope, and refuses missing,
 uncommitted or modified manifest bytes.
 
+The unreleased microG native-library crash fix has a separate
+[Mapbox source-build candidate](microg-mapbox-candidate.md). Its pinned source
+backport and unsigned build evidence do not replace the official APK lock;
+production promotion still requires the matching signer and device contract.
+
 The [compatibility transformer](../tools/compat/avbroot_setup_compat.py) checks the
 repository, exact revision, original blob hash, working-tree state and source
 shape before applying its bounded change. It compiles staged Python and preserves
