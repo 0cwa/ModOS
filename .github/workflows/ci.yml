@@ -58,6 +58,9 @@ jobs:
       - name: Check microG release against immutable helper lock
         run: python3 src/ci/check_microg_helper_lock.py
 
+      - name: Test Companion publication continuity
+        run: python3 tests/companion_continuity_test.py
+
       - name: Verify pinned exfatprogs package with image adapter
         run: python3 src/ci/check_exfatprogs_artifact.py
 
@@ -203,7 +206,8 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (startsWith(github.head_ref, 'integration/') ||
-       github.head_ref == 'feature/lineage24-care-map-qualification-20261015')
+       github.head_ref == 'feature/lineage24-care-map-qualification-20261015' ||
+       github.head_ref == 'feat/vold-exfat-timeout-binary-patch')
     permissions:
       contents: read
     uses: ./.github/workflows/build-rom.yml
@@ -217,6 +221,9 @@ jobs:
       compatible-sepolicy-patching: true
       allow-unauthorized-adb: false
       microg: true
+      # The vold PR exercises both patches in the same verified OTA pair.
+      microg-spoof-patch: ${{ github.head_ref == 'feat/vold-exfat-timeout-binary-patch' }}
+      lineage-vold-exfat-timeout: ${{ github.head_ref == 'feat/vold-exfat-timeout-binary-patch' }}
       bcr: true
       # MSD v2.6's physical-device HAL mapping is not yet qualified on pdx235.
       msd: false

@@ -1,0 +1,12 @@
+{
+  "artifact_name": "pdx235-20261106-magisk-v30.7-3681613ca8d7d652d0463879bed65dfb657b932a8954aa3b62d2ca97cf130a30-d349d72.zip",
+  "device": "pdx235",
+  "grapheneos_version": "20261106",
+  "modos_commit": "d349d72382babd0bdb91a1fce7665d7f94f444f3",
+  "module_selection_fingerprint": "3681613ca8d7d652d0463879bed65dfb657b932a8954aa3b62d2ca97cf130a30",
+  "output_scope": "published",
+  "rom_family": "lineageos",
+  "schema_version": 2,
+  "source_ota_sha256": "3104003df66aa467fd2e50912dd21f966ce078ae6ef0b2c760129555900adaa8",
+  "source_ota_target": "lineage-24.0-20261106-nightly-pdx235-signed"
+}

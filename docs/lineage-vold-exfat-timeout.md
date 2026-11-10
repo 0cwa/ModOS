@@ -44,6 +44,23 @@ entry so mode, owner and SELinux metadata stay attached to the path.
 The adapter's SHA-256 joins the module-selection fingerprint only when the
 option is enabled, so existing fingerprints do not change.
 
+## Build selection and PR qualification
+
+The reusable build workflow accepts the boolean input
+`lineage-vold-exfat-timeout`, which defaults to `false`. A direct
+`workflow_call` caller can select it for LineageOS; other ROM families are
+rejected before checkout. The normal release triggers and scheduled builds
+keep this module disabled.
+
+For the same-repository PR branch `feat/vold-exfat-timeout-binary-patch`,
+`lineage24_qualification` selects both this patch and `microg-spoof-patch`.
+It builds rootless and Magisk outputs together with disposable OTA signing
+keys, read-only repository permissions, and `publish: false`. The existing
+integration-branch selections and GrapheneOS qualification route are unchanged.
+Successful completion of that job establishes combined OTA build and
+cryptographic verification evidence; physical-device acceptance remains a
+separate requirement.
+
 ## Offline use
 
 ```sh
@@ -66,8 +83,10 @@ input/output hashes, the instruction sequence and authenticated tool versions.
 
 The source OTA's full avbroot verification still reports its care-map mismatch;
 that is recorded separately from signature authentication and was not waived
-for production. **No OTA containing the patch has been built or flashed, and
-the longer timeout has not been observed on a device.**
+for production. That binary qualification did not build or flash a patched
+OTA. The PR qualification job above checks the combined OTA build separately;
+its result is recorded in the workflow run. **The longer timeout has not been
+observed on a physical device.**
 
 Before enabling this module for releases, validate the current patcher against
 an authenticated OTA's vold, build and verify nonpublishing OTAs for each

@@ -153,6 +153,7 @@ test_reusable_workflow() {
     'oemunlockonboot:boolean:true' \
     'microg:boolean:false' \
     'microg-spoof-patch:boolean:false' \
+    'lineage-vold-exfat-timeout:boolean:false' \
     'shizuku:boolean:false' \
     'disable-system-updater:boolean:false' \
     'fdroid-privileged-extension:boolean:false'; do
@@ -409,6 +410,19 @@ with tempfile.TemporaryDirectory() as scratch:
                  module: 'true'},
             capture_output=True)
         assert allowed.returncode == 0, (module, allowed.stderr)
+
+    # The vold workflow input is LineageOS-only and remains opt-in.
+    for family in ('lineageos', 'grapheneos'):
+        for enabled in ('true', 'false'):
+            result = subprocess.run(
+                ['bash', '-euc', script],
+                env={**normal, 'ROM_FAMILY': family, 'DEVICE_NAME': 'pdx235',
+                     'ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT': enabled},
+                capture_output=True)
+            permitted = family == 'lineageos' or enabled == 'false'
+            assert (result.returncode == 0) == permitted, (family, enabled, result.stderr)
+            if not permitted:
+                assert b'vold exFAT timeout patch requires LineageOS' in result.stdout
 # Device-candidate uploads use only the export script's allowlisted stage,
 # after normal patch/postflight and metadata steps. The independent diagnostic
 # upload is restricted to its own report directory, including failed builds.
@@ -756,6 +770,129 @@ test_no_lineage_checkout_anywhere() {
     \( -name '*.yml' -o -name '*.yaml' \) -print0)
 }
 
+test_vold_combined_qualification_route() {
+  python3 - <<'PYTEST'
+from pathlib import Path
+import re
+
+ci = Path('.github/workflows/ci.yml').read_text()
+def job(name):
+    match = re.search(r'^  ' + name + r':\n(.*?)(?=^  [A-Za-z_]|\Z)', ci, re.M | re.S)
+    assert match, name
+    return match[1]
+def condition(section):
+    match = re.search(r'^    if: >-\n((?:^      .*\n)+)', section, re.M)
+    assert match
+    return ' '.join(line.strip() for line in match[1].splitlines())
+def selected(expression, branch, same_repository=True, event='pull_request'):
+    values = {
+        'github.event.pull_request.head.repo.full_name': '0cwa/ModOS' if same_repository else 'fork/ModOS',
+        'github.repository': '0cwa/ModOS',
+        'github.event_name': event,
+        'github.head_ref': branch,
+    }
+    for key in sorted(values, key=len, reverse=True):
+        expression = expression.replace(key, repr(values[key]))
+    expression = expression.replace('&&', ' and ').replace('||', ' or ')
+    return bool(eval(expression, {'__builtins__': {}, 'startsWith': str.startswith}, {}))
+
+lineage = job('lineage24_qualification')
+graphene = job('grapheneos_qualification')
+branch = 'feat/vold-exfat-timeout-binary-patch'
+for name in (branch, 'integration/upstream-check', 'feature/lineage24-care-map-qualification-20261015'):
+    assert selected(condition(lineage), name), name
+assert not selected(condition(lineage), 'unrelated/branch')
+assert not selected(condition(lineage), branch, same_repository=False)
+assert not selected(condition(lineage), branch, event='push')
+assert not selected(condition(graphene), branch)
+assert selected(condition(graphene), 'integration/upstream-check')
+for name in ('microg-spoof-patch', 'lineage-vold-exfat-timeout'):
+    match = re.search(r'^      ' + name + r': \$\{\{\s*(.*?)\s*\}\}test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_guarded_lineage24_routing
+test_release_triggers
+test_bcr_reusable_workflow_family_policy
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_shizuku_manual_selection_and_ci
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+, lineage, re.M)
+    assert match, name
+    assert selected(match[1], branch)
+    assert not selected(match[1], 'integration/upstream-check')
+    assert not selected(match[1], 'feature/lineage24-care-map-qualification-20261015')
+    assert not re.search(r'^      ' + name + ':', graphene, re.M), name
+for key, value in (('root-mode', 'both'), ('signing-mode', 'disposable'),
+                   ('release-type', 'build-only'), ('publish', 'false')):
+    assert re.search(r'^      ' + key + ': ' + value + 'test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_guarded_lineage24_routing
+test_release_triggers
+test_bcr_reusable_workflow_family_policy
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_shizuku_manual_selection_and_ci
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+, lineage, re.M), key
+assert re.search(r'^      contents: readtest_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_guarded_lineage24_routing
+test_release_triggers
+test_bcr_reusable_workflow_family_policy
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_shizuku_manual_selection_and_ci
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+, lineage, re.M)
+assert not re.search(r'^\s+secrets:', lineage, re.M)
+reusable = Path('.github/workflows/build-rom.yml').read_text()
+assert re.search(r'^  ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT: \$\{\{ inputs.lineage-vold-exfat-timeout \}\}test_build_only_permissions
+test_device_candidate_signing_routes
+test_encrypted_device_candidate_request_gate
+test_development_profile_activation
+test_guarded_lineage24_routing
+test_release_triggers
+test_bcr_reusable_workflow_family_policy
+test_config_loading_isolated_to_scheduled_releases
+test_release_configuration_forwarding
+test_microg_lineage_forwarding
+test_shizuku_manual_selection_and_ci
+test_module_forwarding_contract
+test_publication_identity_is_step_scoped
+test_workflow_inventory_is_intentional
+test_no_lineage_checkout_anywhere
+
+echo "Workflow contract tests passed"
+,
+                 reusable, re.M)
+PYTEST
+}
+
+test_vold_combined_qualification_route
 test_reusable_workflow
 test_build_only_signing
 test_build_only_permissions
