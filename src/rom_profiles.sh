@@ -253,6 +253,7 @@ function module_selection_fingerprint() {
   local exfatprogs_fsck_payload_digest="disabled"
   local exfatprogs_fsck_provenance_digest="disabled"
   local fsck_sysfs_sepolicy_adapter_digest="disabled"
+  local lineage_vold_adapter_digest="disabled"
   local entry module
   local -A legacy_module_versions=(
     [ALTERINSTALLER]=disabled
@@ -271,6 +272,7 @@ function module_selection_fingerprint() {
     "msd:MSD"
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
+    "lineage-vold-exfat-timeout:LINEAGE_VOLD_EXFAT_TIMEOUT"
     "shizuku:SHIZUKU"
     "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
     "exfatprogs-fsck:EXFATPROGS_FSCK"
@@ -358,6 +360,17 @@ function module_selection_fingerprint() {
     }
   fi
 
+  if [[ "${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}" == 'true' ]]; then
+    if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
+      echo "Error: the vold exFAT timeout patch is supported only by the LineageOS profile." >&2
+      return 1
+    fi
+    lineage_vold_adapter_digest="$(_locked_input_digest src/lineage_vold.py)" || {
+      echo "Error: the vold exFAT timeout adapter is not clean and checked in." >&2
+      return 1
+    }
+  fi
+
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]]; then
     boot_animation_digest="$(_boot_animation_payload_digest)" || {
       echo "Error: enabled boot animation payload failed validation." >&2
@@ -436,6 +449,8 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_OEMUNLOCKONBOOT="${ADDITIONALS[OEMUNLOCKONBOOT]}"
   SELECTION_MODULE_OEMUNLOCKONBOOT_VERSION="${legacy_module_versions[OEMUNLOCKONBOOT]}"
   SELECTION_DISABLE_SYSTEM_UPDATER="${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}"
+  SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT="${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}"
+  SELECTION_LINEAGE_VOLD_ADAPTER_SHA256="${lineage_vold_adapter_digest}"
   SELECTION_MODULE_SHIZUKU="${ADDITIONALS[SHIZUKU]}"
   SELECTION_SHIZUKU_LOCK_SHA256="${shizuku_lock_digest}"
   SELECTION_SHIZUKU_ADAPTER_SHA256="${shizuku_adapter_digest}"

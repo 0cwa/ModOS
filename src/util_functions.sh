@@ -235,6 +235,7 @@ function append_enabled_module_arguments() {
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "alterinstaller:ALTERINSTALLER"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
+    "lineage-vold-exfat-timeout:LINEAGE_VOLD_EXFAT_TIMEOUT"
     "boot-animation:BOOT_ANIMATION"
     "shizuku:SHIZUKU"
     "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
@@ -401,6 +402,64 @@ function prepare_disable_system_updater_module() {
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/disable-system-updater.zip"
   : >"${WORKDIR}/signatures/disable-system-updater.zip.sig"
+  export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+}
+
+# Register the LineageOS vold exFAT timeout patch. It edits one instruction of
+# the OTA's own /system/bin/vold at injection time (see src/lineage_vold.py), so
+# there is no artifact to build, fetch or pin, and no Java or network tooling.
+function prepare_lineage_vold_exfat_timeout_module() {
+  local helper_root="${1}"
+  local init_file="${helper_root}/lib/modules/__init__.py"
+  local registry_file="${helper_root}/lib/modules/registry.py"
+  local module_source="${helper_root}/lib/modules/lineage_vold.py"
+
+  if [[ "${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}" != 'true' ]]; then
+    return 0
+  fi
+  if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
+    echo "Error: the vold exFAT timeout patch is supported only for LineageOS." >&2
+    return 1
+  fi
+  if [[ ! -f src/lineage_vold.py || -L src/lineage_vold.py ||
+    ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
+    -L "${module_source}" ]]; then
+    echo "Error: the vold adapter or pinned helper registry path is missing or unsafe." >&2
+    return 1
+  fi
+
+  cp -- src/lineage_vold.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+  if ! grep -Fq 'from lib.modules.lineage_vold import LineageVoldMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.lineage_vold import LineageVoldMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(LineageVoldMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(LineageVoldMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
+  : >"${WORKDIR}/modules/lineage-vold-exfat-timeout.zip"
+  : >"${WORKDIR}/signatures/lineage-vold-exfat-timeout.zip.sig"
   export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
 }
 
@@ -826,6 +885,11 @@ function prepare_microg() {
     echo "Error: microG is supported only for LineageOS." >&2
     return 1
   fi
+  # With the signer patch, ship ModOS's own Companion build (same release plus
+  # the billing fix, ModOS signer). Services stays the official APK.
+  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]:-false}" == 'true' ]]; then
+    lock_path="${helper_root}/locks/microg-${VERSION[MICROG]}-modos.json"
+  fi
   if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
     ! -f "${module_tool}" || -L "${module_tool}" ]]; then
     echo "Error: pinned helper lacks the reviewed microG lock/module tool." >&2
@@ -1083,6 +1147,10 @@ function patch_ota() {
     fi
     if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" == 'true' ]] &&
       ! prepare_disable_system_updater_module "${my_avbroot_setup}"; then
+      return 1
+    fi
+    if [[ "${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}" == 'true' ]] &&
+      ! prepare_lineage_vold_exfat_timeout_module "${my_avbroot_setup}"; then
       return 1
     fi
     if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]] &&

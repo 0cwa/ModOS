@@ -182,6 +182,8 @@ jobs:
           python3 tests/shizuku_post_boot_check_test.py
           python3 tests/disable_system_updater_test.py
           bash tests/disable_system_updater_registration_test.sh
+          python3 tests/lineage_vold_test.py
+          bash tests/lineage_vold_registration_test.sh
           bash tests/secrets_scan_test.sh
           bash tests/verifier_test.sh
 
