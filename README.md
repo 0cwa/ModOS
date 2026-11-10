@@ -417,8 +417,9 @@ editing it would invalidate that image.
   repository) instead of the official one. Services stays the official APK, and
   the helper accepts exactly two Companion identities (official, or the ModOS
   signer with its own version code).
-* Scheduled pdx235 builds keep the official Companion and leave this patch off.
-  The manual Lineage workflow exposes an opt-in input for qualification.
+* Scheduled pdx235 builds preserve the already-published ModOS Companion and
+  enable this patch. Other builds keep the default off; the manual Lineage
+  workflow also exposes the selection.
 
 #### Building the patched Companion
 
@@ -449,10 +450,19 @@ The result is signed with your key, not the
 official microG key, so it is only useful on a ROM built with
 `MICROG_SPOOF_PATCH`. Keep keystores in `.keys/` (gitignored), never in the tree.
 
+A fresh [November 10 hosted source build](docs/evidence/microg-companion-build-20261110.json)
+passed with Java 17, SDK 35 and the reviewed source plus billing patch. It
+produced `com.android.vending` versionCode `84022635`, versionName
+`0.3.17.40226-1 (676edb5)`. CI verified its release manifest, alignment, digest
+and fresh disposable signer, and retained only logs and receipts. The test APK
+and private key were deleted. This closes the source compilation check; device
+boot, signer migration, restricted spoofing and live billing still need device
+acceptance.
+
 The original PR author reports disassembly, reassembly and ART dex2oat
 verification (including soft failures) against a real LineageOS 24.0 (Android 17)
-`services.jar`. The repository tests exercise orchestration and synthetic inputs;
-they do not establish boot, restricted spoofing, an upgrade from the official
+`services.jar`. The automated checks do not establish boot, restricted
+spoofing, an upgrade from the official
 Companion signer, or live Play billing. Confirm the installed Companion signer,
 microG self-check and Signal purchase screen on a device. Loading prices does
 not require making a purchase.

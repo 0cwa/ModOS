@@ -169,6 +169,77 @@ assert calls[0].args[1].value == expected_url
 PY
 }
 
+assert_verified_output_binding() {
+  local root="${1}"
+  python3 -B - "${root}/patch.py" <<'PY'
+import ast
+import copy
+import hashlib
+import pathlib
+import sys
+import tempfile
+import types
+
+tree = ast.parse(pathlib.Path(sys.argv[1]).read_text())
+report_ifs = [
+    node for node in ast.walk(tree)
+    if isinstance(node, ast.If)
+    and ast.unparse(node.test) == 'locked_report is not None'
+]
+assert len(report_ifs) == 1
+report_if = report_ifs[0]
+owners = [
+    node for node in ast.walk(tree)
+    if isinstance(node, ast.FunctionDef) and report_if in node.body
+]
+assert len(owners) == 1
+owner = owners[0]
+loops = [
+    node for node in owner.body
+    if isinstance(node, ast.For) and node.lineno < report_if.lineno
+    and any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+            and call.func.id == '_require_microg_ota_api'
+            for call in ast.walk(node))
+]
+assert len(loops) == 1
+tail = ast.Module(body=owner.body[owner.body.index(loops[0]):], type_ignores=[])
+compiled = compile(ast.fix_missing_locations(tail), '<verified-output-tail>', 'exec')
+with tempfile.TemporaryDirectory() as temporary:
+    root = pathlib.Path(temporary)
+    outputs = [root / 'rootless.zip', root / 'magisk.zip']
+    for index, output in enumerate(outputs):
+        output.write_bytes(f'verified output {index}'.encode())
+    for failed_output in (None, *outputs):
+        written = []
+        def verify(output, *unused):
+            if output == failed_output:
+                raise RuntimeError('injected output verification failure')
+        args = types.SimpleNamespace(
+            output=outputs[0], sign_cert_ota=root / 'cert',
+            skip_custota_tool=True, patch_report=root / 'report.json',
+        )
+        environment = {
+            'args': args, 'runtime_map': False, 'locked_selection': object(),
+            'locked_report': {'selected_modules': ['microg']},
+            'public_key_avb': root / 'public-key', 'temp_dir': root,
+            '_patch_output_plans': lambda unused: [(output, []) for output in outputs],
+            '_require_microg_ota_api': lambda *unused: None,
+            'external': types.SimpleNamespace(verify_ota=verify),
+            'write_patch_report': lambda path, report: written.append(copy.deepcopy(report)),
+        }
+        try:
+            exec(compiled, environment)
+        except RuntimeError:
+            assert failed_output is not None and written == []
+        else:
+            assert failed_output is None and len(written) == 1
+            assert written[0]['modos_verified_outputs'] == [
+                {'artifact_name': output.name, 'sha256': hashlib.sha256(output.read_bytes()).hexdigest()}
+                for output in outputs
+            ]
+PY
+}
+
 test_production_manifest_matches_pin() {
   python3 -B - "${HELPER}" "${PRODUCTION_MANIFEST}" "${PINNED_REVISION}" <<'PY'
 import importlib.util
@@ -242,6 +313,7 @@ test_success_and_idempotence() {
   run_helper "${root}"
   assert_python_files_compile "${root}"
   assert_patch_url "${root}"
+  assert_verified_output_binding "${root}"
   [[ "$(stat -c '%a' "${root}/patch.py")" == "${mode_before}" ]] ||
     fail 'The staged replacement did not preserve file mode'
   snapshot_checkout "${root}" "${snapshot}"

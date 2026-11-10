@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "description": "Fresh hosted compilation of the reviewed Companion source with a disposable signing key; no installable artifact or signing credentials retained.",
+  "run": {
+    "id": 42767824449,
+    "url": "https://github.com/0cwa/ModOS/actions/runs/42767824449",
+    "job_id": 129670774936,
+    "job_url": "https://github.com/0cwa/ModOS/actions/runs/42767824449/job/129670774936",
+    "conclusion": "success",
+    "completed_at_utc": "2026-11-10T06:34:03Z",
+    "test_job_id": 129668377064,
+    "test_conclusion": "success"
+  },
+  "extraction": "verification.json printed in the completed job log; artifact metadata and SHA-256 independently matched to the upload log",
+  "verification": {
+    "apk_retained": false,
+    "apk_sha256": "4876928296692d9ac4b91412eb06d3029b8bb39c1cf116d02fce0efb6f67b255",
+    "device_acceptance": "not-tested",
+    "modos_commit": "8ec94c4e609c380363b779f647276d8448bdaa0f",
+    "package": "com.android.vending",
+    "patched_commit": "676edb563954b9d255d1ae65d4cd09ec20515252",
+    "patched_tree": "62f735a9fc0c3b4f7d9c7e99f7b5bccb696ae658",
+    "patches": [
+      "patch=0001-Vending-Keep-list-valued-SKU-details-flags-as-lists-.patch sha256=6c308edc7e541a9397d1122fc19959bc369842eccbee5acf561cf68238e781b9"
+    ],
+    "production_eligible": false,
+    "signer_purpose": "fresh disposable compilation test only",
+    "signer_sha256": "324704db56061fcf99197c76e0b3e4abed4655a4f93e8eca2854abb2b31e2181",
+    "source_commit": "32bc8954ff872d0e1a05ddfae81561b6dbecef69",
+    "status": "disposable-companion-build-verified",
+    "version_code": 84022635,
+    "version_name": "0.3.17.40226-1 (676edb5)",
+    "workflow_run": "https://github.com/0cwa/ModOS/actions/runs/42767824449"
+  },
+  "build": {
+    "task": ":vending-app:assembleDefaultRelease",
+    "gradle_version": "8.13",
+    "jdk": "Temurin 17.0.21+9",
+    "android_platform": 35,
+    "android_build_tools": "35.0.0",
+    "gradle_result": "BUILD SUCCESSFUL in 6m 44s",
+    "actionable_tasks": 499,
+    "executed_tasks": 431,
+    "cached_tasks": 68,
+    "gradle_arguments": [
+      "--no-daemon",
+      "--console=plain",
+      "--max-workers=2"
+    ],
+    "compiler_compatibility_patches": []
+  },
+  "checks": [
+    "Reviewed upstream source commit and applied patch receipt",
+    "Pre- and post-build tracked source commit/tree/status and hidden-index checks",
+    "APK package, version code, clean patched version name and non-debuggable manifest",
+    "ZIP alignment",
+    "Independent apksigner verification against the fresh test key's DER certificate",
+    "Signed APK SHA-256 equals build receipt",
+    "Normal deterministic CI, including real-Git hidden-index regressions"
+  ],
+  "artifact": {
+    "id": 13740424858,
+    "name": "microg-companion-compilation-evidence",
+    "url": "https://github.com/0cwa/ModOS/actions/runs/42767824449/artifacts/13740424858",
+    "size_bytes": 14578,
+    "sha256": "8f6fce1baeec7f8f59a835f569efa574b46835efbd51b682d12fe0d66db16a46",
+    "expires_at": "2026-11-24T06:34:00Z",
+    "retained_files": [
+      "build.log",
+      "build-record.txt",
+      "signer.txt",
+      "signer-verified.txt",
+      "apk-badging.txt",
+      "toolchain.txt",
+      "verification.json"
+    ]
+  },
+  "limitations": [
+    "The signer is disposable and is not a production or official microG signing identity.",
+    "The signed APK and private credentials were removed by the job and were not uploaded.",
+    "This build does not establish installed-package migration, device boot, ART verification, restricted spoofing, microG self-check or live billing acceptance.",
+    "Mutable upstream dependency repositories mean this is not a claim of a hermetic or bit-for-bit reproducible APK."
+  ],
+  "recorded_on": "2026-11-10"
+}

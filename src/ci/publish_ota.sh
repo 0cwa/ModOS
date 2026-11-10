@@ -29,6 +29,7 @@ set -o nounset -o pipefail -o errexit
 _publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
 source "${_publish_ci_dir}/publish_custota_device_alias.sh"
+source "${_publish_ci_dir}/companion_continuity.sh"
 
 die() {
   echo "::error::$*" >&2
@@ -174,11 +175,19 @@ if [[ "${ADDITIONALS_EXFATPROGS_FSCK:-false}" == true ]]; then
 fi
 echo "Verified release assets for ${GRAPHENEOS_VERSION}."
 
+prepare_companion_publication_snapshot "--${ROM_FLAVOR}" \
+  "${SELECTION_METADATA_PATH}" "${OTA_METADATA_PATH}" "${OTA_ARTIFACT_PATH}" \
+  --release-tag "${GRAPHENEOS_VERSION}" || exit 1
+
 git config user.email "${GIT_COMMIT_EMAIL-}"
 git config user.name "${GIT_COMMIT_NAME-}"
 current_commit="$(git rev-parse --short HEAD)"
 
 git checkout gh-pages
+if [[ -n "${COMPANION_FEED_SNAPSHOT:-}" ]]; then
+  [[ "$(git rev-parse HEAD)" == "${COMPANION_FEED_SNAPSHOT}" ]] ||
+    die 'Canonical feed commit changed before publication'
+fi
 target_file="${ROM_FLAVOR}/${DEVICE_NAME}.json"
 variant_file="variants/${ROM_FAMILY}/${ROM_FLAVOR}/${DEVICE_NAME}-${MODULE_SELECTION_FINGERPRINT}.json"
 mkdir -p -- "${ROM_FLAVOR}" "$(dirname -- "${variant_file}")"
