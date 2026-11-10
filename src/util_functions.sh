@@ -924,6 +924,11 @@ function prepare_microg() {
     echo "Error: pinned helper lacks the reviewed microG lock/module tool." >&2
     return 1
   fi
+  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]:-false}" == 'true' ]]; then
+    local cert_path
+    cert_path="$(_microg_companion_cert_path)" || return 1
+    python3 src/microg_spoof_patch.py check-lock "${lock_path}" "${cert_path}" || return 1
+  fi
   write_microg_resolution_profile "${profile_path}" || return 1
   python "${module_tool}" artifacts fetch \
     --lock "${lock_path}" \

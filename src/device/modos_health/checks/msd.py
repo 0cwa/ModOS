@@ -6,7 +6,7 @@ from ..common import item, manual
 
 ID = "msd"
 
-# The signed MSD v2.5 policy patcher targets this domain, and substitutes su
+# The signed MSD v2.6 policy patcher targets this domain, and substitutes su
 # when it is absent. An observed vendor domain is evidence to review, not
 # authorization to substitute it in policy or proof that MSD works.
 _POLICY_TARGET = "hal_usb_gadget_impl"
@@ -93,9 +93,9 @@ def _gadget_domain(ctx):
                     f"Multiple gadget HAL processes observed ({len(observations)}): {summary}; the active policy target is ambiguous")
     if observations[0][1] != _POLICY_TARGET:
         return item(ID, "usb-gadget-domain", "WARNING",
-                    f"Observed {summary}; differs from MSD v2.5 target {_POLICY_TARGET}. A replacement domain still requires policy and device qualification")
+                    f"Observed {summary}; differs from MSD v2.6 target {_POLICY_TARGET}. A replacement domain still requires policy and device qualification")
     return item(ID, "usb-gadget-domain", "PASS",
-                f"Observed {summary}, matching MSD v2.5's policy target; this is a process-label observation only")
+                f"Observed {summary}, matching MSD v2.6's policy target; this is a process-label observation only")
 
 
 def check(ctx):

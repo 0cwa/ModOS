@@ -80,6 +80,7 @@ expect_failure 'passwords are not accepted on the command line' \
   "${script}" --ks-pass pass:secret
 expect_failure '--keystore, --alias and --pass-file are required' "${script}"
 expect_failure 'unknown argument' "${script}" --bogus
+expect_failure 'missing value for --output' "${script}" --output
 
 expect_failure 'keystore is not a regular file' \
   "${script}" --keystore "${fixture_root}/missing.p12" --alias a --pass-file "${pass_file}"
@@ -96,6 +97,10 @@ chmod 644 "${pass_file}"
 expect_failure 'must not be accessible to other users' \
   "${script}" --keystore "${keystore}" --alias a --pass-file "${pass_file}"
 chmod 600 "${pass_file}"
+chmod 640 "${pass_file}"
+expect_failure 'must not be accessible to other users' \
+  "${script}" --keystore "${keystore}" --alias a --pass-file "${pass_file}"
+chmod 600 "${pass_file}"
 
 # A keystore inside the repository (outside .keys/) is refused.
 repo_keystore="$(mktemp -p "${PWD}" keystore-test-XXXXXX.p12)"
@@ -105,6 +110,43 @@ expect_failure 'keep the keystore out of the repository' \
 
 expect_failure 'unrecognized microG release tag' \
   "${script}" --keystore "${keystore}" --alias a --pass-file "${pass_file}" --release 'v1;rm'
+
+expect_failure 'no reviewed source pin' \
+  "${script}" --keystore "${keystore}" --alias a --pass-file "${pass_file}" --release v0.0.1
+expect_failure 'keep signing credentials outside the output directory' \
+  "${script}" --keystore "${keystore}" --alias a --pass-file "${pass_file}" --output "${fixture_root}"
+expect_failure 'output must be outside the repository' \
+  "${script}" --keystore "${keystore}" --alias a --pass-file "${pass_file}" --output "${PWD}"
+
+# A moved release tag must stop before Gradle/signing. Preserve unrelated
+# output/src contents and a previously successful result on that failure.
+mkdir -p "${fixture_root}/bin" "${fixture_root}/sdk/build-tools/35.0.0" \
+  "${fixture_root}/output/src"
+printf 'keep\n' >"${fixture_root}/output/src/sentinel"
+printf 'previous verified APK\n' >"${fixture_root}/output/com.android.vending.apk"
+export MICROG_TEST_REAL_GIT="$(command -v git)"
+cat >"${fixture_root}/bin/git" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == clone ]]; then
+  mkdir -p -- "${@: -1}"
+elif [[ "${3:-}" == rev-parse && "${4:-}" == HEAD ]]; then
+  printf '%040d\n' 0
+else
+  exec "${MICROG_TEST_REAL_GIT}" "$@"
+fi
+SH
+for tool in apksigner zipalign; do
+  printf '#!/usr/bin/env bash\nexit 97\n' >"${fixture_root}/sdk/build-tools/35.0.0/${tool}"
+  chmod +x "${fixture_root}/sdk/build-tools/35.0.0/${tool}"
+done
+chmod +x "${fixture_root}/bin/git"
+expect_failure 'release tag no longer resolves to the reviewed source commit' \
+  env "PATH=${fixture_root}/bin:${PATH}" "ANDROID_HOME=${fixture_root}/sdk" \
+  "${script}" --keystore "${keystore}" --alias a --pass-file "${pass_file}" \
+  --output "${fixture_root}/output"
+[[ "$(cat "${fixture_root}/output/src/sentinel")" == keep ]] || fail 'removed unrelated source work'
+[[ "$(cat "${fixture_root}/output/com.android.vending.apk")" == 'previous verified APK' ]] || fail 'damaged prior output'
+[[ -z "$(find "${fixture_root}/output" -name '.build.*' -print)" ]] || fail 'left a failed temporary build'
 
 # The password only ever reaches apksigner as a file reference.
 grep -Fq -- '--ks-pass "file:${pass_file}"' "${script}" || fail "apksigner must read the password from a file"

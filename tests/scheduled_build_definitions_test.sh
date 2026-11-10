@@ -52,7 +52,7 @@ check_definition() {
     [[ "${expected_family}" != lineageos ]] || expected_microg=true
     [[ "$(toml_resolve_value microg false)" == "${expected_microg}" ]] ||
       fail "${file}: wrong scheduled microG selection"
-    [[ "$(toml_resolve_value microg_spoof_patch false)" == "${expected_microg}" ]] ||
+    [[ "$(toml_resolve_value microg_spoof_patch false)" == false ]] ||
       fail "${file}: wrong scheduled microG signer patch selection"
 
     local expected_msd=true
@@ -129,9 +129,9 @@ check_loader() {
     fail "${file}: loader emitted wrong microG selection"
   grep -Fxq "ADDITIONALS_MICROG=${expected_microg}" "${env_file}" ||
     fail "${file}: loader exported wrong microG selection"
-  grep -Fxq "microg_spoof_patch=${expected_microg}" "${output_file}" ||
+  grep -Fxq "microg_spoof_patch=false" "${output_file}" ||
     fail "${file}: loader emitted wrong microG signer patch selection"
-  grep -Fxq "ADDITIONALS_MICROG_SPOOF_PATCH=${expected_microg}" "${env_file}" ||
+  grep -Fxq "ADDITIONALS_MICROG_SPOOF_PATCH=false" "${env_file}" ||
     fail "${file}: loader exported wrong microG signer patch selection"
   local expected_msd=true
   [[ "${expected_family}" != lineageos ]] || expected_msd=false

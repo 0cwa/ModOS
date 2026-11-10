@@ -400,7 +400,10 @@ editing it would invalidate that image.
 * Put the **public** signer certificate (PEM or DER) at
   `custom/microg-companion-signer/cert.pem`, or point `MICROG_COMPANION_CERT`
   at it. Never place a private key or keystore there. Its SHA-256 and the adapter
-  bytes are part of the build identity.
+  bytes are part of the build identity. The certificate must match the Companion
+  signer in the selected helper lock; a mismatch stops artifact acquisition.
+  Shipping a build signed with another key requires a reviewed helper lock and
+  adapter identity update as well as its matching certificate.
 * Java is required. baksmali and smali 3.0.10 are downloaded from the official
   release and verified against pinned SHA-256 digests.
 * The build fails closed if either call site is not found exactly once, so a
@@ -414,7 +417,8 @@ editing it would invalidate that image.
   repository) instead of the official one. Services stays the official APK, and
   the helper accepts exactly two Companion identities (official, or the ModOS
   signer with its own version code).
-* The scheduled pdx235 build enables both.
+* Scheduled pdx235 builds keep the official Companion and leave this patch off.
+  The manual Lineage workflow exposes an opt-in input for qualification.
 
 #### Building the patched Companion
 
@@ -423,28 +427,46 @@ Signal's "Signal Login" purchase showing "Unavailable": the Play Billing Library
 passes list-valued flags such as `PRODUCT_TYPES_TO_RETURN_MULTIPLE_OFFERS`, and
 microG sent them as the single string `"[subs, inapp]"` instead of a list.
 
-`tools/build-microg-companion.sh` clones the reviewed microG release tag (from
-`VERSION[MICROG]`), applies those patches, builds the Companion and signs it with
-your key. The password is read only from a file you pass with `--pass-file` and
-is never accepted on the command line:
+`tools/build-microg-companion.sh` checks the reviewed microG release tag against
+source commit `32bc8954ff872d0e1a05ddfae81561b6dbecef69`, applies those patches
+with deterministic commit dates, builds the Companion and signs it with your
+key. An unreviewed release or moved tag stops the build. The password is read
+only from a file you pass with `--pass-file`; that file must have no group or
+other-user permissions:
 
 ```sh
-agent-heavy -- tools/build-microg-companion.sh \
+tools/build-microg-companion.sh \
   --keystore .keys/microg-test/keystore.p12 --alias modos-microg-test \
   --pass-file .keys/microg-test/keystore.pass
 ```
 
-It needs git, JDK 17+ and an Android SDK (`ANDROID_HOME`, platform 35 and
+It needs git, Python 3, JDK 17+ and an Android SDK (`ANDROID_HOME`, platform 35 and
 build-tools 35.0.0 with licenses you have accepted). Output goes to
 `<git dir>/tmp/microg-companion` with a `build-record.txt` naming the source
-commit, patch digests and signer. The result is signed with your key, not the
+base and patched source commits, source tree, patch digests and signer. Build
+scratch is isolated; a failed build preserves the previous verified output.
+The result is signed with your key, not the
 official microG key, so it is only useful on a ROM built with
 `MICROG_SPOOF_PATCH`. Keep keystores in `.keys/` (gitignored), never in the tree.
 
-The patch has been verified to disassemble, reassemble and pass ART's dex2oat
+The original PR author reports disassembly, reassembly and ART dex2oat
 verification (including soft failures) against a real LineageOS 24.0 (Android 17)
-`services.jar`. It has not been booted from an OTA built with it, so treat the
-first flash as untested.
+`services.jar`. The repository tests exercise orchestration and synthetic inputs;
+they do not establish boot, restricted spoofing, an upgrade from the official
+Companion signer, or live Play billing. Before scheduled rollout, qualify an
+unpublished OTA in both root modes, confirm the installed Companion signer and
+microG self-check, and verify that the Signal purchase screen loads. Loading
+prices does not require making a purchase.
+
+An independent [November 10 offline patch check](docs/evidence/microg-companion-services-20261110.json)
+used the real November 6 pdx235 `services.jar`: only `classes2.dex` changed,
+DEX 039 and ZIP integrity/alignment were preserved, and re-disassembly showed
+the two intended redirects and new helper. The remaining differences were one
+equivalent jumbo string instruction with adjusted branch labels and omitted
+explicit default field initializers. That check did not run ART or boot a device.
+Whole-file and payload authentication completed for the source OTA, but its
+separate care-map check failed; no OTA acceptance or production-gate exception
+is implied by the extracted-file test.
 
 ### Shizuku module
 

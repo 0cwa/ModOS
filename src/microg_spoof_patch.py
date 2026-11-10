@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -134,6 +135,30 @@ def load_certificate_der(path: str | os.PathLike[str]) -> bytes:
 
 def certificate_sha256(der: bytes) -> str:
     return hashlib.sha256(der).hexdigest()
+
+
+def validate_companion_lock(path: Path, cert_der: bytes) -> None:
+    """Bind the spoofed signer to the exact Companion selected for installation."""
+
+    try:
+        lock = json.loads(path.read_text(encoding="utf-8"))
+        modules = [module for module in lock["modules"] if module["id"] == "microg"]
+        if len(modules) != 1:
+            raise ValueError("expected one microg module")
+        companions = [
+            artifact for artifact in modules[0]["artifacts"]
+            if (artifact.get("apk") or {}).get("package_name") == COMPANION_PACKAGE
+        ]
+        if len(companions) != 1 or companions[0]["id"] != "companion-apk":
+            raise ValueError("expected one Companion APK")
+        signer = companions[0]["apk"]["signer_sha256"]
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise MicrogSpoofPatchError("invalid microG Companion artifact lock") from exc
+    if signer != certificate_sha256(cert_der):
+        raise MicrogSpoofPatchError(
+            "signer certificate does not match the locked Companion APK; "
+            "update the reviewed helper lock and certificate together"
+        )
 
 
 # --------------------------------------------------------------------- smali
@@ -489,15 +514,7 @@ def install_patch(
     if source.is_symlink() or not source.is_file():
         raise MicrogSpoofPatchError(f"{SERVICES_JAR} is not a safe regular tree file")
 
-    with tempfile.TemporaryDirectory(prefix="modos-spoof-out-") as tmp:
-        patched = Path(tmp) / "services.jar"
-        patcher(source, patched, cert_der, baksmali_jar, smali_jar, api_level)
-        verify_patched_jar(patched, cert_der)
-        payload = patched.read_bytes()
-
-    with fs.open(str(SERVICES_JAR), "wb", mode=0o644) as stream:
-        stream.write(payload)
-
+    stale_files = []
     for stale in STALE_AOT_FILES:
         stale_entries = [e for e in fs.info.entries if e.path == stale]
         stale_tree = fs.tree / stale.relative_to("/")
@@ -508,9 +525,21 @@ def install_patch(
         if stale_tree.is_symlink():
             raise MicrogSpoofPatchError(f"{stale} is a symlink in the unpacked tree")
         if stale_entries:
-            if stale_tree.exists():
-                stale_tree.unlink()
-            fs.info.entries.remove(stale_entries[0])
+            stale_files.append((stale_entries[0], stale_tree))
+
+    with tempfile.TemporaryDirectory(prefix="modos-spoof-out-") as tmp:
+        patched = Path(tmp) / "services.jar"
+        patcher(source, patched, cert_der, baksmali_jar, smali_jar, api_level)
+        verify_patched_jar(patched, cert_der)
+        payload = patched.read_bytes()
+
+    with fs.open(str(SERVICES_JAR), "wb", mode=0o644) as stream:
+        stream.write(payload)
+
+    for stale_entry, stale_tree in stale_files:
+        if stale_tree.exists():
+            stale_tree.unlink()
+        fs.info.entries.remove(stale_entry)
 
 
 def _module_class() -> type[Any]:
@@ -585,6 +614,10 @@ def main(argv: list[str]) -> int:
     check = sub.add_parser("check-cert", help="validate a signer certificate")
     check.add_argument("certificate", type=Path)
 
+    check_lock = sub.add_parser("check-lock", help="verify the installed Companion signer")
+    check_lock.add_argument("lock", type=Path)
+    check_lock.add_argument("certificate", type=Path)
+
     patch = sub.add_parser("patch-jar", help="patch a services.jar (for offline testing)")
     patch.add_argument("services_jar", type=Path)
     patch.add_argument("output_jar", type=Path)
@@ -599,6 +632,8 @@ def main(argv: list[str]) -> int:
                 print(f"{name}\t{path}")
         elif args.command == "check-cert":
             print(certificate_sha256(load_certificate_der(args.certificate)))
+        elif args.command == "check-lock":
+            validate_companion_lock(args.lock, load_certificate_der(args.certificate))
         else:
             der = load_certificate_der(args.certificate)
             tools = fetch_tools(args.tools)

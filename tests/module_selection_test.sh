@@ -509,7 +509,16 @@ enable_microg_fixture() {
   RESOLVED_ROOT_MODE=""
   mkdir -p "${WORKDIR}/tools/my-avbroot-setup/locks"
   touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json"
-  touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}-modos.json"
+  python3 - "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}-modos.json" <<'PY'
+import json, sys
+sys.path.insert(0, 'src')
+from microg_spoof_patch import certificate_sha256, load_certificate_der
+signer = certificate_sha256(load_certificate_der('custom/microg-companion-signer/cert.pem'))
+with open(sys.argv[1], 'w') as stream:
+    json.dump({'modules': [{'id': 'microg', 'artifacts': [{
+        'id': 'companion-apk', 'apk': {'package_name': 'com.android.vending',
+                                    'signer_sha256': signer}}]}]}, stream)
+PY
 }
 
 test_microg_locked_preparation_and_arguments() {
@@ -548,6 +557,26 @@ test_microg_signer_patch_selects_the_modos_companion_lock() {
   assert_pair "--module-profile" "${WORKDIR}/locked-profiles/microg.toml" "ModOS Companion lock"
   assert_pair "--module-microg-spoof-patch" "${WORKDIR}/modules/microg-spoof-patch.zip" "signer patch"
 }
+
+test_microg_signer_mismatch_stops_before_artifact_fetch() (
+  reset_fixture microg-signer-mismatch
+  enable_microg_fixture
+  ADDITIONALS[MICROG_SPOOF_PATCH]=true
+  local cert="${WORKDIR}/other-cert.der"
+  python3 - "${cert}" <<'PY'
+import sys
+from pathlib import Path
+Path(sys.argv[1]).write_bytes(b'\x30' + b'other-certificate' * 8)
+PY
+  MICROG_COMPANION_CERT="${cert}"
+  local -a args=()
+  if prepare_microg args "${WORKDIR}/tools/my-avbroot-setup" >/dev/null 2>&1; then
+    fail 'a Companion certificate different from the installed APK was accepted'
+  fi
+  assert_prepare_stages 'signer mismatch must not acquire artifacts'
+  [[ "${#args[@]}" == 0 && ! -e "${WORKDIR}/locked-profiles" ]] ||
+    fail 'signer mismatch prepared an invalid image configuration'
+)
 
 test_microg_profile_uses_selected_source_sdk() (
   reset_fixture microg-source-sdk
@@ -1063,6 +1092,7 @@ test_microg_spoof_patch_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
 test_microg_signer_patch_selects_the_modos_companion_lock
+test_microg_signer_mismatch_stops_before_artifact_fetch
 test_microg_profile_uses_selected_source_sdk
 test_microg_rejects_missing_or_invalid_source_sdk
 test_disabled_microg_does_not_require_source_sdk

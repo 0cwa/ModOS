@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import sys
 import tempfile
 import zipfile
@@ -117,6 +118,24 @@ def test_smali_rewrite() -> None:
         assert "isDebuggable" in helper  # same gate as the stock check
         assert f"{m._MICROG}->isMicrogSigned" in helper  # stock check runs first
         assert "gms" not in helper  # Services is deliberately not extended
+
+
+def test_companion_lock_requires_the_installed_signer() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "lock.json"
+        companion = {
+            "id": "companion-apk",
+            "apk": {"package_name": "com.android.vending",
+                    "signer_sha256": m.certificate_sha256(CERT_DER)},
+        }
+        lock = {"modules": [{"id": "microg", "artifacts": [companion]}]}
+        path.write_text(json.dumps(lock))
+        m.validate_companion_lock(path, CERT_DER)
+        assert_raises(lambda: m.validate_companion_lock(path, CERT_DER + b"x"), "other signer")
+        for artifacts in ([], [companion, companion], [{"id": "other", "apk": None}]):
+            lock["modules"][0]["artifacts"] = artifacts
+            path.write_text(json.dumps(lock))
+            assert_raises(lambda: m.validate_companion_lock(path, CERT_DER), "ambiguous lock")
 
 
 def test_smali_rewrite_fails_closed() -> None:
@@ -324,6 +343,28 @@ def test_tool_pins() -> None:
         assert size > 1_000_000
     # smali 3.0.10 emits a header ART rejects above API 29 (see the comment).
     assert m.ASSEMBLE_API == 29
+
+
+def test_invalid_aot_metadata_is_rejected_before_jar_writes() -> None:
+    stale = "/system/framework/oat/arm64/services.odex"
+    for invalid in ("duplicate", "symlink", "nonregular"):
+        with tempfile.TemporaryDirectory() as tmp:
+            fs = FakeFs(Path(tmp), {
+                "/system/framework/services.jar": b"stock jar", stale: b"aot",
+            })
+            if invalid == "duplicate":
+                fs.info.entries.append(fs.info.entries[-1])
+            elif invalid == "nonregular":
+                fs.info.entries[-1].file_type = "Directory"
+            else:
+                path = Path(tmp) / stale.lstrip("/")
+                path.unlink()
+                path.symlink_to(Path(tmp) / "elsewhere")
+            assert_raises(lambda: m.install_patch(
+                {"system": fs}, CERT_DER, Path("b"), Path("s"), 37,
+                patcher=stub_patcher,
+            ), invalid)
+            assert fs.written == {}, "invalid AOT metadata changed services.jar"
 
 
 def test_fetch_rejects_tampered_download() -> None:
