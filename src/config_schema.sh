@@ -98,6 +98,8 @@ _config_schema_define microg 'ADDITIONALS[MICROG]' build boolean \
   ADDITIONALS array MICROG ADDITIONALS_MICROG false true caller-or-existing-or-default
 _config_schema_define disable_system_updater 'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' build boolean \
   ADDITIONALS array DISABLE_SYSTEM_UPDATER ADDITIONALS_DISABLE_SYSTEM_UPDATER false true caller-or-existing-or-default
+_config_schema_define microg_spoof_patch 'ADDITIONALS[MICROG_SPOOF_PATCH]' build boolean \
+  ADDITIONALS array MICROG_SPOOF_PATCH ADDITIONALS_MICROG_SPOOF_PATCH false true caller-or-existing-or-default
 _config_schema_define lineage_vold_exfat_timeout 'ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]' build boolean \
   ADDITIONALS array LINEAGE_VOLD_EXFAT_TIMEOUT ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT false true caller-or-existing-or-default
 _config_schema_define boot_animation 'ADDITIONALS[BOOT_ANIMATION]' build boolean \

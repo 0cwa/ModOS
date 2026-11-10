@@ -225,6 +225,28 @@ function selection_variant_manifest() {
     printf '%s\n' "shizuku_adapter_sha256=${SELECTION_SHIZUKU_ADAPTER_SHA256}"
   fi
 
+  # The Companion signer patch changes the system image only when enabled.
+  # Omit these fields when disabled to preserve existing unrelated selections.
+  # Unset is treated as disabled so older callers keep their fingerprints.
+  if [[ "${SELECTION_MODULE_MICROG_SPOOF_PATCH:-false}" == 'true' ]]; then
+    for field in \
+      SELECTION_MICROG_SPOOF_PATCH_ADAPTER_SHA256 \
+      SELECTION_MICROG_SPOOF_PATCH_CERT_SHA256; do
+      value="${!field-}"
+      if [[ ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "Error: ${field} must be a SHA-256 digest." >&2
+        return 1
+      fi
+    done
+    printf '%s\n' \
+      "module.microg-spoof-patch=true" \
+      "microg_spoof_patch_adapter_sha256=${SELECTION_MICROG_SPOOF_PATCH_ADAPTER_SHA256}" \
+      "microg_spoof_patch_cert_sha256=${SELECTION_MICROG_SPOOF_PATCH_CERT_SHA256}"
+  elif [[ "${SELECTION_MODULE_MICROG_SPOOF_PATCH:-false}" != 'false' ]]; then
+    echo "Error: SELECTION_MODULE_MICROG_SPOOF_PATCH must be true or false." >&2
+    return 1
+  fi
+
   # The vold patch changes the system image only when enabled. Omit its fields
   # when disabled to preserve existing unrelated selections; unset is disabled.
   if [[ "${SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT:-false}" == 'true' ]]; then

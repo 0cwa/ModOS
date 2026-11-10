@@ -389,6 +389,102 @@ helper pin and compatibility manifests. CI rejects a release selector without
 its matching helper lock. See the helper
 [lock update procedure](https://github.com/0cwa/my-avbroot-setup/blob/master/docs/microg.md).
 
+### microG Companion signer patch (LineageOS)
+
+LineageOS only spoofs signatures for `com.android.vending` and
+`com.google.android.gms` when they carry the official microG certificate, a
+constant compiled into `framework.jar` (`MicrogUtils.REAL_SIGNATURE`). Nothing
+in a ROM overlay or config can add another signer. A Companion APK built from
+source and signed with your own key therefore loses spoofing.
+
+Set `'ADDITIONALS[MICROG_SPOOF_PATCH]' = true` (LineageOS only, default off) to
+patch `/system/framework/services.jar` in the system image so that
+`com.android.vending` signed with **one additional certificate** is accepted as
+well. The official microG certificate stays accepted and `com.google.android.gms`
+is not extended. The patch redirects the two services-side call sites
+(`ComputerEngine.generatePackageInfo` and `AppsFilterImpl`) to a small helper
+class that first asks the stock `MicrogUtils` and only then checks your
+certificate. `framework.jar` is left alone: it is part of the boot image, so
+editing it would invalidate that image.
+
+* Put the **public** signer certificate (PEM or DER) at
+  `custom/microg-companion-signer/cert.pem`, or point `MICROG_COMPANION_CERT`
+  at it. Never place a private key or keystore there. Its SHA-256 and the adapter
+  bytes are part of the build identity. The certificate must match the Companion
+  signer in the selected helper lock; a mismatch stops artifact acquisition.
+  Shipping a build signed with another key requires a reviewed helper lock and
+  adapter identity update as well as its matching certificate.
+* Java is required. baksmali and smali 3.0.10 are downloaded from the official
+  release and verified against pinned SHA-256 digests.
+* The build fails closed if either call site is not found exactly once, so a
+  Lineage release that changes the code is refused rather than half-patched.
+* The stock `services.odex`/`vdex`/`art` no longer match and are removed; ART
+  recompiles from the jar, so the first boot after an update can be slower.
+* It requires `ADDITIONALS[MICROG]`. With both enabled, the locked microG module
+  installs ModOS's own Companion build (the helper's
+  `locks/microg-<release>-modos.json`: the same release plus the billing fix
+  below, signed with the ModOS key, hosted as a release asset of the helper
+  repository) instead of the official one. Services stays the official APK, and
+  the helper accepts exactly two Companion identities (official, or the ModOS
+  signer with its own version code).
+* Scheduled pdx235 builds keep the official Companion and leave this patch off.
+  The manual Lineage workflow exposes an opt-in input for qualification.
+
+#### Building the patched Companion
+
+`patches/microg/` holds ModOS's patches for the Companion. The first one fixes
+Signal's "Signal Login" purchase showing "Unavailable": the Play Billing Library
+passes list-valued flags such as `PRODUCT_TYPES_TO_RETURN_MULTIPLE_OFFERS`, and
+microG sent them as the single string `"[subs, inapp]"` instead of a list.
+
+`tools/build-microg-companion.sh` checks the reviewed microG release tag against
+source commit `32bc8954ff872d0e1a05ddfae81561b6dbecef69`, applies those patches
+with deterministic commit dates, builds the Companion and signs it with your
+key. An unreviewed release or moved tag stops the build. The password is read
+only from a file you pass with `--pass-file`; that file must have no group or
+other-user permissions:
+
+```sh
+tools/build-microg-companion.sh \
+  --keystore .keys/microg-test/keystore.p12 --alias modos-microg-test \
+  --pass-file .keys/microg-test/keystore.pass
+```
+
+It needs git, Python 3, JDK 17+ and an Android SDK (`ANDROID_HOME`, platform 35 and
+build-tools 35.0.0 with licenses you have accepted). Output goes to
+`<git dir>/tmp/microg-companion` with a `build-record.txt` naming the source
+base and patched source commits, source tree, patch digests and signer. Build
+scratch is isolated; a failed build preserves the previous verified output.
+The result is signed with your key, not the
+official microG key, so it is only useful on a ROM built with
+`MICROG_SPOOF_PATCH`. Keep keystores in `.keys/` (gitignored), never in the tree.
+
+The original PR author reports disassembly, reassembly and ART dex2oat
+verification (including soft failures) against a real LineageOS 24.0 (Android 17)
+`services.jar`. The repository tests exercise orchestration and synthetic inputs;
+they do not establish boot, restricted spoofing, an upgrade from the official
+Companion signer, or live Play billing. Confirm the installed Companion signer,
+microG self-check and Signal purchase screen on a device. Loading prices does
+not require making a purchase.
+
+The [November 10 manual build](https://github.com/0cwa/ModOS/actions/runs/42754348737)
+at `d349d72382babd0bdb91a1fce7665d7f94f444f3` already published rootless and
+Magisk OTAs with the ModOS Companion into the canonical pdx235 update feeds.
+The pdx235 schedule preserves that signer selection. Disabling this module
+would select the official Companion and change the installed package's signer;
+such a transition requires an explicit migration review. Successful OTA
+publication is separate from physical-device or billing acceptance.
+
+An independent [November 10 offline patch check](docs/evidence/microg-companion-services-20261110.json)
+used the real November 6 pdx235 `services.jar`: only `classes2.dex` changed,
+DEX 039 and ZIP integrity/alignment were preserved, and re-disassembly showed
+the two intended redirects and new helper. The remaining differences were one
+equivalent jumbo string instruction with adjusted branch labels and omitted
+explicit default field initializers. That check did not run ART or boot a device.
+Whole-file and payload authentication completed for the source OTA, but its
+separate care-map check failed; no OTA acceptance or production-gate exception
+is implied by the extracted-file test.
+
 ### Shizuku module
 
 To patch Shizuku into the system image with automatic startup and no USB or
