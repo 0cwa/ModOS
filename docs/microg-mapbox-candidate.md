@@ -109,9 +109,25 @@ actual Gradle `help` and `buildEnvironment` completed successfully. Although the
 source declares Kotlin/Compose plugin `1.9.22`, Wire `6.4.6` brings Kotlin plugin
 `2.2.21`, whose BOM also selects Compose plugin `2.2.21`. A missing POM for the
 lower declared version is therefore not a configuration failure. No compiler
-upgrade or compatibility patch was needed. Actual candidate APK compilation
-remains an acceptance requirement; this source receipt claims no APK or device
-success.
+upgrade or compatibility patch was needed.
+
+The [hosted candidate build](https://github.com/0cwa/ModOS/actions/runs/42765104829)
+then completed successfully at recipe commit `ef169c54b8d0f0e56d047944ab1eeff57810682f`.
+The unsigned APK is `107824512` bytes, SHA-256
+`d6fc67452a1dbf43ce052ca88485be1bb828fab5662b944ee49b870491b602b4`, with the
+expected package and versionCode. The builder accepted its release/unsigned
+status and ARM64 Mapbox library, and emitted the same prepared commit/tree as
+the source-only preparations. The [build receipt and review evidence](evidence/microg-mapbox-build-20261110.json)
+record the exact workflow, source, toolchain, APK and retained artifact identities.
+The artifact ZIP was downloaded and its checksum independently matched GitHub's
+recorded digest. Physical-device and Skånetrafiken acceptance remain outstanding.
+
+An independent review also found that Git index flags could hide a changed
+tracked source file from ordinary status output. The follow-up rejects both
+`assume-unchanged` and `skip-worktree` before source acceptance and after building.
+Eleven candidate tests now pass, including real Git regressions for both cases.
+That follow-up has its own hosted CI run; it does not change the prepared microG
+source or the native-loader patch.
 
 ## Why this is not yet a production replacement
 
