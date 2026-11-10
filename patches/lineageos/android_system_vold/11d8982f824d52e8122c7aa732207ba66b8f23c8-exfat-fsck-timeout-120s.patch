@@ -1,0 +1,25 @@
+From 11d8982f824d52e8122c7aa732207ba66b8f23c8 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] vold: allow exFAT fsck up to 120 seconds
+
+Large exFAT volumes can take longer than the generic 45-second timeout to
+check. Give exFAT its own two-minute timeout while retaining the existing
+timeout for VFAT and other callers.
+
+This patch is based on the official LineageOS pdx235 build's
+LineageOS/android_system_vold revision
+11d8982f824d52e8122c7aa732207ba66b8f23c8 (lineage-24.0).
+
+diff --git a/Utils.h b/Utils.h
+--- a/Utils.h
++++ b/Utils.h
+@@ -41,2 +41,3 @@
+ static constexpr std::chrono::seconds kUntrustedFsckSleepTime(45);
++static constexpr std::chrono::seconds kUntrustedExfatFsckSleepTime(120);
+ static constexpr std::chrono::seconds kUntrustedMountSleepTime(20);
+diff --git a/fs/Exfat.cpp b/fs/Exfat.cpp
+--- a/fs/Exfat.cpp
++++ b/fs/Exfat.cpp
+@@ -47,2 +47,2 @@
+-    int rc = ForkExecvpTimeout(cmd, kUntrustedFsckSleepTime, sFsckUntrustedContext);
++    int rc = ForkExecvpTimeout(cmd, kUntrustedExfatFsckSleepTime, sFsckUntrustedContext);
+     if (rc == 0) {

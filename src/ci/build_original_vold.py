@@ -344,11 +344,11 @@ def sync(
     verify_checkout(source, manifest, clean=True, selected=selected)
 
 
-def compile_original_vold(
+def prepare_vold_build(
     source: Path, lock: dict, manifest: bytes, jobs: int,
     selected: list[str] | None = None,
-) -> Path:
-    """Do not apply or import the patch. A successful compile is NOT proof."""
+) -> tuple[Path, Path, str, dict[str, str]]:
+    """Verify pinned inputs and prepare a bounded, fresh individual-target build."""
     if source.is_symlink() or not (source / ".repo/manifest.xml").exists():
         raise BuildError("baseline source directory is missing or unsafe")
     source = source.resolve(strict=True)
@@ -399,6 +399,17 @@ def compile_original_vold(
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     # Upstream envsetup intentionally reads unset optional variables; nounset
     # would fail before configuration (for example at USE_LEFTOVERS).
+    return source, artifact, script, environment
+
+
+def compile_original_vold(
+    source: Path, lock: dict, manifest: bytes, jobs: int,
+    selected: list[str] | None = None,
+) -> Path:
+    """Do not apply or import the patch. A successful compile is NOT proof."""
+    source, artifact, script, environment = prepare_vold_build(
+        source, lock, manifest, jobs, selected
+    )
     command(["bash", "-ec", script], source, env=environment)
     verify_checkout(source, manifest, clean=True, selected=selected)
     verify_source_workspace(source, manifest, selected, require_vendor=True)

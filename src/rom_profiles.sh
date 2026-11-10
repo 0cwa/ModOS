@@ -236,6 +236,23 @@ function _boot_animation_payload_digest() {
     sha256sum | awk '{print $1}'
 }
 
+function _lineage_vold_builder_input_digest() {
+  local path digest
+  local -a inputs=()
+  for path in \
+    src/ci/build_lineage_vold.py \
+    src/ci/build_original_vold.py \
+    src/ci/lineage_vold_baseline.py \
+    src/ci/vold_baseline_compare.py \
+    src/ci/prepare_vold_vendor_makefiles.py \
+    locks/lineage-vold-baseline-20261016.json \
+    locks/lineage-vold-vendor-candidate-20261016.json; do
+    digest="$(_locked_input_digest "${path}")" || return 1
+    inputs+=("${path}=${digest}")
+  done
+  printf '%s\n' "${inputs[@]}" | sha256sum | awk '{print $1}'
+}
+
 function module_selection_fingerprint() {
   local executable_tools_lock_digest
   local build_diagnostics_digest
@@ -253,6 +270,13 @@ function module_selection_fingerprint() {
   local exfatprogs_fsck_payload_digest="disabled"
   local exfatprogs_fsck_provenance_digest="disabled"
   local fsck_sysfs_sepolicy_adapter_digest="disabled"
+  local lineage_vold_lock_digest="disabled"
+  local lineage_vold_adapter_digest="disabled"
+  local lineage_vold_builder_digest="disabled"
+  local lineage_vold_verifier_digest="disabled"
+  local lineage_vold_patch_digest="disabled"
+  local lineage_vold_manifest_digest="disabled"
+  local lineage_vold_binary_digest="disabled"
   local entry module
   local -A legacy_module_versions=(
     [ALTERINSTALLER]=disabled
@@ -274,6 +298,7 @@ function module_selection_fingerprint() {
     "shizuku:SHIZUKU"
     "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
     "exfatprogs-fsck:EXFATPROGS_FSCK"
+    "lineage-vold-exfat-timeout:LINEAGE_VOLD_EXFAT_TIMEOUT"
   )
 
   resolve_rom_profile || return 1
@@ -356,6 +381,33 @@ function module_selection_fingerprint() {
       echo "Error: the fsck sysfs SELinux adapter is not clean and checked in." >&2
       return 1
     }
+  fi
+
+  if [[ "${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}" == 'true' ]]; then
+    if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
+      echo "Error: source-built vold is supported only for LineageOS pdx235." >&2
+      return 1
+    fi
+    if [[ -z "${PIXENEOS_VOLD_ARTIFACT_DIR:-}" ||
+      "${PIXENEOS_VOLD_BASE_BUILD_ID:-}" != "lineage-24.0-20261016-nightly-pdx235-signed" ]]; then
+      echo "Error: source-built vold requires the pinned artifact directory and exact base build id." >&2
+      return 1
+    fi
+    lineage_vold_lock_digest="$(_locked_input_digest locks/lineage-vold-exfat-timeout.json)" || return 1
+    lineage_vold_adapter_digest="$(_locked_input_digest src/lineage_vold.py)" || return 1
+    lineage_vold_builder_digest="$(_lineage_vold_builder_input_digest)" || return 1
+    lineage_vold_verifier_digest="$(_locked_input_digest src/ci/check_lineage_vold_artifact.py)" || return 1
+    lineage_vold_patch_digest="$(_locked_input_digest patches/lineageos/android_system_vold/11d8982f824d52e8122c7aa732207ba66b8f23c8-exfat-fsck-timeout-120s.patch)" || return 1
+    lineage_vold_manifest_digest="$(_locked_input_digest locks/lineage-pdx235-20261016-build-manifest.xml)" || return 1
+    lineage_vold_binary_digest="$(python3 src/ci/check_lineage_vold_artifact.py \
+      --artifact-dir "${PIXENEOS_VOLD_ARTIFACT_DIR}" \
+      --scope "${OUTPUT_SCOPE}" \
+      --base-build-id "${PIXENEOS_VOLD_BASE_BUILD_ID}" \
+      --source-target "${GRAPHENEOS[OTA_TARGET]:-}")" || return 1
+    if [[ ! "${lineage_vold_binary_digest}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Error: source-built vold artifact has no valid binary digest." >&2
+      return 1
+    fi
   fi
 
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]]; then
@@ -447,6 +499,14 @@ function module_selection_fingerprint() {
   SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256="${exfatprogs_fsck_provenance_digest}"
   SELECTION_MODULE_FSCK_SYSFS_SEPOLICY="${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}"
   SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256="${fsck_sysfs_sepolicy_adapter_digest}"
+  SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT="${ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]}"
+  SELECTION_LINEAGE_VOLD_LOCK_SHA256="${lineage_vold_lock_digest}"
+  SELECTION_LINEAGE_VOLD_ADAPTER_SHA256="${lineage_vold_adapter_digest}"
+  SELECTION_LINEAGE_VOLD_BUILDER_SHA256="${lineage_vold_builder_digest}"
+  SELECTION_LINEAGE_VOLD_VERIFIER_SHA256="${lineage_vold_verifier_digest}"
+  SELECTION_LINEAGE_VOLD_PATCH_SHA256="${lineage_vold_patch_digest}"
+  SELECTION_LINEAGE_VOLD_MANIFEST_SHA256="${lineage_vold_manifest_digest}"
+  SELECTION_LINEAGE_VOLD_BINARY_SHA256="${lineage_vold_binary_digest}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
 
