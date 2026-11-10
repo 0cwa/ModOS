@@ -12,6 +12,7 @@ set -o nounset -o pipefail -o errexit
 _publish_ci_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${_publish_ci_dir}/pdx235_release_quarantine.sh"
 source "${_publish_ci_dir}/publish_custota_device_alias.sh"
+source "${_publish_ci_dir}/companion_continuity.sh"
 
 die() {
   echo "::error::$*" >&2
@@ -153,11 +154,20 @@ if [[ "${ADDITIONALS_EXFATPROGS_FSCK:-false}" == true ]]; then
     "${GRAPHENEOS_VERSION}" "${EXFAT_SOURCE_BUNDLE_NAME}" "${EXFAT_SOURCE_BUNDLE_SHA256}"
 fi
 
+prepare_companion_publication_snapshot \
+  --rootless "${ROOTLESS_SELECTION_METADATA_PATH}" "${ROOTLESS_OTA_METADATA_PATH}" "${ROOTLESS_OTA_ARTIFACT_PATH}" \
+  --magisk "${MAGISK_SELECTION_METADATA_PATH}" "${MAGISK_OTA_METADATA_PATH}" "${MAGISK_OTA_ARTIFACT_PATH}" \
+  --release-tag "${GRAPHENEOS_VERSION}" || exit 1
+
 git config user.email "${GIT_COMMIT_EMAIL-}"
 git config user.name "${GIT_COMMIT_NAME-}"
 current_commit="$(git rev-parse --short HEAD)"
 
 git checkout gh-pages
+if [[ -n "${COMPANION_FEED_SNAPSHOT:-}" ]]; then
+  [[ "$(git rev-parse HEAD)" == "${COMPANION_FEED_SNAPSHOT}" ]] ||
+    die 'Canonical feed commit changed before publication'
+fi
 mkdir -p \
   rootless \
   magisk \

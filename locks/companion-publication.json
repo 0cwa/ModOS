@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "repository": "0cwa/ModOS",
+  "purpose": "Legacy identity receipts only. These are not signer-migration approvals.",
+  "provenance": {
+    "workflow_run": "https://github.com/0cwa/ModOS/actions/runs/42754348737",
+    "workflow_job": "https://github.com/0cwa/ModOS/actions/runs/42754348737/job/129625127822",
+    "helper_commit": "902ed62e63f6d7d7d332a07619d75409d17fe514",
+    "helper_lock": "locks/microg-v0.3.17.252432-modos.json",
+    "companion_package": "com.android.vending",
+    "companion_version_code": 84022635,
+    "companion_apk_sha256": "f5ebfb43a5a8a1e3cab84a1d528e18e6a4ea91d4cc4af555a6e413bb7a6d9c2a",
+    "runtime_qualification": "not established by this receipt"
+  },
+  "legacy_releases": [
+    {
+      "location_ota": "https://github.com/0cwa/ModOS/releases/download/20261106/pdx235-20261106-rootless-39e15090284bd4067f6dd690590707b85ab188293f1d337ccdceb79e9e9552c5-d349d72.zip",
+      "ota_asset_id": 730090843,
+      "ota_sha256": "ae8ba3f2d7142ac5acf0817001e6ea86e3b7bead30795146a36e79882e08fe8d",
+      "selection_asset_id": 730090842,
+      "selection_sha256": "5e76506ddcc41c81e3c7309f2e502969606861a0d42a7471b5ee527ce72d1b64",
+      "modos_commit": "d349d72382babd0bdb91a1fce7665d7f94f444f3",
+      "companion_signer_sha256": "d30b31d91ed58e786f03f266d9b8fc7a6b22f388b0d632aab563c0f3cdc90bef"
+    },
+    {
+      "location_ota": "https://github.com/0cwa/ModOS/releases/download/20261106/pdx235-20261106-magisk-v30.7-3681613ca8d7d652d0463879bed65dfb657b932a8954aa3b62d2ca97cf130a30-d349d72.zip",
+      "ota_asset_id": 730090840,
+      "ota_sha256": "98350c1ece1495ba4d0a75acccd24d287003c4956f8770f14a91335d09542f61",
+      "selection_asset_id": 730090865,
+      "selection_sha256": "4ab8a1165a71ef3bc6f6bdd5248b83aa9ae900bea325413e35d96a26f069ab54",
+      "modos_commit": "d349d72382babd0bdb91a1fce7665d7f94f444f3",
+      "companion_signer_sha256": "d30b31d91ed58e786f03f266d9b8fc7a6b22f388b0d632aab563c0f3cdc90bef"
+    }
+  ]
+}
