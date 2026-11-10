@@ -58,6 +58,9 @@ jobs:
       - name: Check microG release against immutable helper lock
         run: python3 src/ci/check_microg_helper_lock.py
 
+      - name: Test Companion publication continuity
+        run: python3 tests/companion_continuity_test.py
+
       - name: Test isolated microG candidate preparation
         run: python3 tests/microg_candidate_test.py
 

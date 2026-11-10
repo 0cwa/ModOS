@@ -1,5 +1,6 @@
 {
   "compatibility_version": 1,
+  "report_binding": "verified-output-sha256-v1",
   "repository": "https://github.com/0cwa/my-avbroot-setup",
   "revision": "b553f46a9b94fff3960617830b6072b0f8b054b5",
   "targets": {

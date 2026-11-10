@@ -30,6 +30,7 @@ PATCH_REPLACEMENT = {
     'arguments': ['update_info', 'args.output.name'],
     'to': '{release_url!r}',
 }
+REPORT_BINDING = 'verified-output-sha256-v1'
 SCP_SOURCE = re.compile(
     r'(?P<username>[^@/:]+)@(?P<host>\[[^\]]+\]|[^:/]+):(?P<path>.+)\Z'
 )
@@ -52,6 +53,8 @@ def load_manifest(path: Path) -> dict:
         fail(f'Compatibility manifest {path} must be an object')
     if manifest.get('compatibility_version') != COMPATIBILITY_VERSION:
         fail(f'Unsupported compatibility manifest version in {path}')
+    if manifest.get('report_binding') != REPORT_BINDING:
+        fail(f'Unsupported verified output report binding in {path}')
     if not isinstance(manifest.get('repository'), str) or not manifest['repository']:
         fail(f'Compatibility manifest {path} has no repository')
     revision = manifest.get('revision')
@@ -306,7 +309,30 @@ def rewrite_patch(source: bytes, relative: str, replacement: dict, release_url: 
     relative_start = argument_start - call_start
     relative_end = argument_end - call_start
     rewritten_call = call_source[:relative_start] + new_argument + call_source[relative_end:]
-    return source[:call_start] + rewritten_call + source[call_end:]
+    rewritten = source[:call_start] + rewritten_call + source[call_end:]
+    # The pinned helper has already verified EVERY output before this report
+    # write. Bind its verified selection to those exact bytes in the helper.
+    report_anchor = b'''    if locked_report is not None:
+        write_patch_report(
+'''
+    if rewritten.count(report_anchor) != 1:
+        fail(f'Expected exactly one final locked report write in {relative}')
+    report_binding = b'''    if locked_report is not None:
+        import hashlib as _modos_report_hashlib
+        _modos_verified_outputs = []
+        for _modos_output, _ in _patch_output_plans(args):
+            with _modos_output.open('rb') as _modos_stream:
+                _modos_digest = _modos_report_hashlib.file_digest(
+                    _modos_stream, 'sha256',
+                ).hexdigest()
+            _modos_verified_outputs.append({
+                'artifact_name': _modos_output.name,
+                'sha256': _modos_digest,
+            })
+        locked_report['modos_verified_outputs'] = _modos_verified_outputs
+        write_patch_report(
+'''
+    return rewritten.replace(report_anchor, report_binding)
 
 
 def stage_file(path: Path, data: bytes, mode: int) -> None:

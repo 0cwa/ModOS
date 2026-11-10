@@ -3,6 +3,12 @@
 set -o nounset -o pipefail -o errexit
 
 die() { echo "::error::$*" >&2; exit 1; }
+[[ "${ROM_FAMILY:-}" == lineageos && "${DEVICE_NAME:-}" == pdx235 ]] ||
+  die 'exfatprogs release publication requires the supported LineageOS pdx235 scope'
+source "$(dirname -- "${BASH_SOURCE[0]}")/companion_continuity.sh"
+# Direct callers must validate the actual upload paths and release tag before
+# creating, replacing or uploading any source-first release assets.
+check_companion_release_inputs "${RELEASE_TAG:?release tag is required}"
 for name in RELEASE_TAG RELEASE_TITLE RELEASE_NOTES EXFAT_SOURCE_BUNDLE_PATH \
   EXFAT_SOURCE_BUNDLE_NAME EXFAT_SOURCE_BUNDLE_SHA256 ROOT_MODE_RESOLVED; do
   [[ -n "${!name-}" ]] || die "${name} is required"
@@ -20,12 +26,12 @@ if [[ "${ROOT_MODE_RESOLVED}" == both ]]; then
   for path in "${OUTPUTS_PATCHED_OTA_ROOTLESS-}" "${OUTPUTS_PATCHED_OTA_ROOTLESS-}.csig" \
     "${SELECTION_METADATA_ROOTLESS-}" "${OUTPUTS_PATCHED_OTA_MAGISK-}" \
     "${OUTPUTS_PATCHED_OTA_MAGISK-}.csig" "${SELECTION_METADATA_MAGISK-}"; do
-    [[ -n "${path}" && -f "${path}" && -s "${path}" ]] || die "paired release asset missing: ${path}"
+    [[ -n "${path}" && -f "${path}" && ! -L "${path}" && -s "${path}" ]] || die "paired release asset missing or unsafe: ${path}"
     assets+=("${path}")
   done
 else
   for path in "${OUTPUTS_PATCHED_OTA-}" "${OUTPUTS_PATCHED_OTA-}.csig" "${SELECTION_METADATA-}"; do
-    [[ -n "${path}" && -f "${path}" && -s "${path}" ]] || die "release asset missing: ${path}"
+    [[ -n "${path}" && -f "${path}" && ! -L "${path}" && -s "${path}" ]] || die "release asset missing or unsafe: ${path}"
     assets+=("${path}")
   done
 fi
