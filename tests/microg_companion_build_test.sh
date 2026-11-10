@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Offline checks for the patched microG Companion build: the patches are
 # well-formed and scoped, and the build script handles credentials safely. The
-# real build needs the Android SDK and network, so it is run by hand.
+# real build needs the Android SDK and network; CI qualifies this PR branch
+# with a disposable signer and retains only non-installable evidence.
 set -euo pipefail
 
 script='tools/build-microg-companion.sh'
@@ -67,6 +68,35 @@ expect_failure() {
   [[ "${status}" -ne 0 ]] || fail "expected failure: ${message}"
   grep -Fq -- "${message}" <<<"${output}" || fail "wrong error for '${message}': ${output}"
 }
+
+# Exercise the actual source checker with real Git index flags and a newline
+# in the tracked filename. Git status alone can hide both modifications.
+bash -n "${script}"
+source <(sed -n '/^check_tracked_microg_source() {$/,/^}$/p' "${script}")
+source_work="${fixture_root}/source-check"
+mkdir -p "${source_work}"
+git -C "${source_work}" init -q
+tracked_name=$'tracked\nsource.txt'
+printf 'reviewed source\n' >"${source_work}/${tracked_name}"
+git -C "${source_work}" add -- "${tracked_name}"
+git -C "${source_work}" -c user.name='Source check test' \
+  -c user.email='source-check@modos.invalid' commit -qm 'reviewed fixture'
+source_commit="$(git -C "${source_work}" rev-parse HEAD)"
+source_tree="$(git -C "${source_work}" rev-parse 'HEAD^{tree}')"
+check_tracked_microg_source "${source_work}" "${source_commit}" "${source_tree}"
+for flag in assume-unchanged skip-worktree; do
+  git -C "${source_work}" update-index "--${flag}" -- "${tracked_name}"
+  printf 'unreviewed source\n' >"${source_work}/${tracked_name}"
+  [[ -z "$(git -C "${source_work}" status --porcelain --untracked-files=no)" ]] ||
+    fail "${flag} fixture did not hide the tracked modification"
+  expect_failure 'hidden index flag on tracked microG source' \
+    check_tracked_microg_source "${source_work}" "${source_commit}" "${source_tree}"
+  git -C "${source_work}" update-index "--no-${flag}" -- "${tracked_name}"
+  expect_failure 'tracked microG source changed during the build' \
+    check_tracked_microg_source "${source_work}" "${source_commit}" "${source_tree}"
+  git -C "${source_work}" checkout -- "${tracked_name}"
+done
+check_tracked_microg_source "${source_work}" "${source_commit}" "${source_tree}"
 
 keystore="${fixture_root}/keystore.p12"
 pass_file="${fixture_root}/keystore.pass"
