@@ -39,6 +39,26 @@ die() {
   exit 1
 }
 
+check_tracked_microg_source() {
+  python3 - "$@" <<'PY'
+import os
+import subprocess
+import sys
+
+work, expected_commit, expected_tree = sys.argv[1:]
+def git(*args):
+    return subprocess.check_output(["git", "-C", work, *args])
+
+for entry in git("ls-files", "-v", "-z").split(b"\0"):
+    if entry and (entry[:1] == b"S" or entry[:1].islower()):
+        raise SystemExit("Error: hidden index flag on tracked microG source: " + repr(os.fsdecode(entry[2:])))
+if (git("rev-parse", "HEAD").decode().strip() != expected_commit
+        or git("rev-parse", "HEAD^{tree}").decode().strip() != expected_tree
+        or git("status", "--porcelain", "--untracked-files=no")):
+    raise SystemExit("Error: tracked microG source changed during the build")
+PY
+}
+
 keystore=''
 alias_name=''
 pass_file=''
@@ -126,6 +146,7 @@ for patch in "${patches[@]}"; do
 done
 patched_commit="$(git -C "${work}" rev-parse HEAD)"
 patched_tree="$(git -C "${work}" rev-parse 'HEAD^{tree}')"
+check_tracked_microg_source "${work}" "${patched_commit}" "${patched_tree}"
 
 echo "Building the Companion (release)..."
 declare -a gradle_args=()
@@ -139,9 +160,7 @@ printf 'sdk.dir=%s\n' "${ANDROID_HOME}" >"${work}/local.properties"
 mapfile -t unsigned_apks < <(find "${work}/vending-app/build/outputs/apk/default/release" -maxdepth 1 -type f -name '*.apk')
 [[ "${#unsigned_apks[@]}" == 1 ]] || die "expected exactly one release APK"
 unsigned="${unsigned_apks[0]}"
-[[ "$(git -C "${work}" rev-parse HEAD)" == "${patched_commit}" &&
-   -z "$(git -C "${work}" status --porcelain --untracked-files=no)" ]] ||
-  die "tracked microG source changed during the build"
+check_tracked_microg_source "${work}" "${patched_commit}" "${patched_tree}"
 
 aligned="${build_dir}/companion-aligned.apk"
 signed="${build_dir}/com.android.vending.apk"
