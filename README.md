@@ -453,10 +453,17 @@ The original PR author reports disassembly, reassembly and ART dex2oat
 verification (including soft failures) against a real LineageOS 24.0 (Android 17)
 `services.jar`. The repository tests exercise orchestration and synthetic inputs;
 they do not establish boot, restricted spoofing, an upgrade from the official
-Companion signer, or live Play billing. Before scheduled rollout, qualify an
-unpublished OTA in both root modes, confirm the installed Companion signer and
-microG self-check, and verify that the Signal purchase screen loads. Loading
-prices does not require making a purchase.
+Companion signer, or live Play billing. Confirm the installed Companion signer,
+microG self-check and Signal purchase screen on a device. Loading prices does
+not require making a purchase.
+
+The [November 10 manual build](https://github.com/0cwa/ModOS/actions/runs/42754348737)
+at `d349d72382babd0bdb91a1fce7665d7f94f444f3` already published rootless and
+Magisk OTAs with the ModOS Companion into the canonical pdx235 update feeds.
+The pdx235 schedule preserves that signer selection. Disabling this module
+would select the official Companion and change the installed package's signer;
+such a transition requires an explicit migration review. Successful OTA
+publication is separate from physical-device or billing acceptance.
 
 An independent [November 10 offline patch check](docs/evidence/microg-companion-services-20261110.json)
 used the real November 6 pdx235 `services.jar`: only `classes2.dex` changed,
