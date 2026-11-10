@@ -1,0 +1,47 @@
+From f7f6f454d24486cc35d90a45e1f547345f060366 Mon Sep 17 00:00:00 2001
+From: 0cwa <1490936+0cwa@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 04:08:03 +0100
+Subject: [PATCH] Vending: Keep list-valued SKU details flags as lists in the
+ request
+
+The Play Billing Library passes list-valued extras such as
+PRODUCT_TYPES_TO_RETURN_MULTIPLE_OFFERS (ArrayList<String>) to
+getSkuDetailsExtraParams. IAPCore.getSkuDetails() only handled
+SKU_SERIALIZED_DOCID_LIST as a list and sent everything else through
+toString(), so the request contained the single string "[subs, inapp]".
+
+Encode any other List value with the existing SkuSerializedDocIds string
+list container, preserving contents and order.
+---
+ .../org/microg/vending/billing/core/IAPCore.kt    | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/vending-app/src/main/java/org/microg/vending/billing/core/IAPCore.kt b/vending-app/src/main/java/org/microg/vending/billing/core/IAPCore.kt
+index a8e0cdc..7110434 100644
+--- a/vending-app/src/main/java/org/microg/vending/billing/core/IAPCore.kt
++++ b/vending-app/src/main/java/org/microg/vending/billing/core/IAPCore.kt
+@@ -60,6 +60,21 @@ class IAPCore(
+ 
+             val multiOfferSkuDetailTemp: MutableList<MultiOfferSkuDetail> = mutableListOf()
+             params.multiOfferSkuDetail.forEach {
++                val listValue = it.value
++                if (it.key != "SKU_SERIALIZED_DOCID_LIST" && listValue is List<*>) {
++                    // The Billing Library sends flags such as PRODUCT_TYPES_TO_RETURN_MULTIPLE_OFFERS as
++                    // ArrayList<String>. Keep them as a list (in order) instead of letting toString() turn
++                    // them into the single string "[subs, inapp]".
++                    multiOfferSkuDetailTemp.add(
++                        MultiOfferSkuDetail.Builder().apply {
++                            key = it.key
++                            skuSerializedDocIds = SkuSerializedDocIds.Builder().apply {
++                                docIds = listValue.map { element -> element.toString() }
++                            }.build()
++                        }.build()
++                    )
++                    return@forEach
++                }
+                 multiOfferSkuDetailTemp.add(
+                     if (it.key == "SKU_SERIALIZED_DOCID_LIST") {
+                         val multiOfferSkuDetailBuilder = MultiOfferSkuDetail.Builder()
+-- 
+2.56.0
+

@@ -184,6 +184,7 @@ jobs:
           bash tests/disable_system_updater_registration_test.sh
           python3 tests/microg_spoof_patch_test.py
           bash tests/microg_spoof_patch_registration_test.sh
+          bash tests/microg_companion_build_test.sh
           bash tests/secrets_scan_test.sh
           bash tests/verifier_test.sh
 

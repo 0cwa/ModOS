@@ -407,8 +407,34 @@ editing it would invalidate that image.
   Lineage release that changes the code is refused rather than half-patched.
 * The stock `services.odex`/`vdex`/`art` no longer match and are removed; ART
   recompiles from the jar, so the first boot after an update can be slower.
-* This only adds trust. Installing the self-built, self-signed Companion itself
-  is a separate step; the locked microG module still installs the official one.
+* This only adds trust. The locked microG module still installs the official
+  Companion; shipping the self-signed one in the ROM needs the pinned helper's
+  microG lock and adapter to accept your signer, which is a separate change.
+
+#### Building the patched Companion
+
+`patches/microg/` holds ModOS's patches for the Companion. The first one fixes
+Signal's "Signal Login" purchase showing "Unavailable": the Play Billing Library
+passes list-valued flags such as `PRODUCT_TYPES_TO_RETURN_MULTIPLE_OFFERS`, and
+microG sent them as the single string `"[subs, inapp]"` instead of a list.
+
+`tools/build-microg-companion.sh` clones the reviewed microG release tag (from
+`VERSION[MICROG]`), applies those patches, builds the Companion and signs it with
+your key. The password is read only from a file you pass with `--pass-file` and
+is never accepted on the command line:
+
+```sh
+agent-heavy -- tools/build-microg-companion.sh \
+  --keystore .keys/microg-test/keystore.p12 --alias modos-microg-test \
+  --pass-file .keys/microg-test/keystore.pass
+```
+
+It needs git, JDK 17+ and an Android SDK (`ANDROID_HOME`, platform 35 and
+build-tools 35.0.0 with licenses you have accepted). Output goes to
+`<git dir>/tmp/microg-companion` with a `build-record.txt` naming the source
+commit, patch digests and signer. The result is signed with your key, not the
+official microG key, so it is only useful on a ROM built with
+`MICROG_SPOOF_PATCH`. Keep keystores in `.keys/` (gitignored), never in the tree.
 
 The patch has been verified to disassemble, reassemble and pass ART's dex2oat
 verification (including soft failures) against a real LineageOS 24.0 (Android 17)
