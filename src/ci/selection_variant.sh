@@ -247,6 +247,22 @@ function selection_variant_manifest() {
     return 1
   fi
 
+  # The vold patch changes the system image only when enabled. Omit its fields
+  # when disabled to preserve existing unrelated selections; unset is disabled.
+  if [[ "${SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT:-false}" == 'true' ]]; then
+    value="${SELECTION_LINEAGE_VOLD_ADAPTER_SHA256-}"
+    if [[ ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Error: SELECTION_LINEAGE_VOLD_ADAPTER_SHA256 must be a SHA-256 digest." >&2
+      return 1
+    fi
+    printf '%s\n' \
+      "module.lineage-vold-exfat-timeout=true" \
+      "lineage_vold_adapter_sha256=${value}"
+  elif [[ "${SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT:-false}" != 'false' ]]; then
+    echo "Error: SELECTION_MODULE_LINEAGE_VOLD_EXFAT_TIMEOUT must be true or false." >&2
+    return 1
+  fi
+
   printf '%s\n' \
     "module.fsck-sysfs-sepolicy=${SELECTION_MODULE_FSCK_SYSFS_SEPOLICY}" \
     "fsck_sysfs_sepolicy_adapter_sha256=${SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256}"

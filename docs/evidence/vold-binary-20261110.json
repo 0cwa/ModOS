@@ -1,0 +1,147 @@
+{
+  "binary": {
+    "call_address": "0xbce84",
+    "call_target": "0x5a740",
+    "changed_byte_offsets": [
+      773748,
+      773749
+    ],
+    "independent_literal_byte_reconstruction_matches": true,
+    "intervening_instructions": [
+      {
+        "address": "0xbce78",
+        "assembly": "ldr x8, [x8, #3360]",
+        "word": "f9469108"
+      },
+      {
+        "address": "0xbce7c",
+        "assembly": "str x19, [sp, #24]",
+        "word": "f9000ff3"
+      },
+      {
+        "address": "0xbce80",
+        "assembly": "ldr x2, [x8]",
+        "word": "f9400102"
+      }
+    ],
+    "metadata": {
+      "file_type": "RegularFile",
+      "gid": 2000,
+      "mode": "0755",
+      "selinux": "u:object_r:vold_exec:s0",
+      "uid": 0
+    },
+    "original_instruction_le_hex": "a1058052",
+    "original_sha256": "fcf867312c1bd32ee5d5a5b689ea6314231cf88ae52a531a64c86a6074dd4024",
+    "patch_offset_hex": "0xbce74",
+    "patched_elf_header_valid": true,
+    "patched_instruction_le_hex": "010f8052",
+    "patched_sha256": "b4c98a1d30907c918a13f90a92ee5dd758a59ebc9cf54043b985963ada00b80d",
+    "path_in_system_image": "/system/bin/vold",
+    "size": 1062048,
+    "vfat_check_address": "0xb79a0",
+    "vfat_check_bytes_unchanged": true,
+    "vfat_check_size": 1828
+  },
+  "date": "2026-11-10",
+  "execution_note": "Used committed executable locks, authenticated installs and sealed file-descriptor execution. The sandbox has no /tmp; this read-only qualification runner supplied a fixed private workspace TMPDIR. No repository execution guard or publication policy was changed.",
+  "kind": "lineage-vold-binary-patch-qualification",
+  "schema_version": 1,
+  "source": {
+    "build_id": "lineage-24.0-20261106-nightly-pdx235-signed",
+    "full_avbroot_verification_exit_status": 1,
+    "full_avbroot_verification_passed": false,
+    "metadata_url": "https://download.lineageos.org/api/v2/devices/pdx235/builds",
+    "official_api_and_download_sha256": "3104003df66aa467fd2e50912dd21f966ce078ae6ef0b2c760129555900adaa8",
+    "ota_size": 1270008261,
+    "ota_url": "https://mirrorbits.lineageos.org/full/pdx235/20261106/lineage-24.0-20261106-nightly-pdx235-signed.zip",
+    "partition_hashes_and_avb_signatures_verified": true,
+    "publisher_pin_and_unique_certificate_member_checked": true,
+    "publisher_pin_source": "https://github.com/LineageOS/update_verifier/blob/9ffcf56a0fe152467da2971f0e6b2b79a42f7890/lineageos_pubkey",
+    "publisher_spki_sha256": "0848ca38cb604887cea216a7f39d7dd62bad20b513cfdeff357ece4e731d6372",
+    "source_warnings": [
+      "Signed vbmeta header without independently provided AVB root key",
+      "Public AOSP AVB test keys",
+      "vbmeta insecure flags 0x3"
+    ],
+    "verification_error": "Care map does not match: source ext4 ranges and several per-partition Sony fingerprints differ from the verifier-generated map.",
+    "verification_log": "vold-binary-20261110-source-verification.txt",
+    "verification_log_sha256": "5c7d31374e298cfad869128810e099472f1d1c9698038285c2cd900d564fa488",
+    "whole_file_and_payload_signatures_verified": true
+  },
+  "tools": [
+    {
+      "arch": "x86_64-unknown-linux-gnu",
+      "archive_sha256": "dfe37b6d1ab4f892352fc94e57b9efe7a13ff5ee618f863a8f9b49ed0d4369ad",
+      "archive_size": 1770721,
+      "id": "afsr",
+      "layout": [
+        {
+          "mode": "0755",
+          "path": "afsr",
+          "sha256": "6f8aae1d17e44e74812dc31943dcf45a4a94d35f25f49d950de2f9fa32014d46",
+          "size": 3840656,
+          "type": "file"
+        }
+      ],
+      "signature": {
+        "identity": "chenxiaolong",
+        "namespace": "file",
+        "sha256": "40164618124b1f0c3c4bd636a861796183ac6781f49b88d0c3c54efc6963ace3",
+        "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+        "type": "ssh",
+        "verified": true
+      },
+      "version": "2.1.0"
+    },
+    {
+      "arch": "x86_64-unknown-linux-gnu",
+      "archive_sha256": "13d6e4b67857c87c686e831de5609e03bb706b1e73c10397274489bfbebc99e7",
+      "archive_size": 4106604,
+      "id": "avbroot",
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "size": 35149,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "README.md",
+          "sha256": "398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6",
+          "size": 33214,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "avbroot",
+          "sha256": "79309323de07045cc6343ff7416e33c340e524ee70cad82928b777837770a923",
+          "size": 10474928,
+          "type": "file"
+        }
+      ],
+      "signature": {
+        "identity": "chenxiaolong",
+        "namespace": "file",
+        "sha256": "a1412dcd4204134f93b45d61de589714012bbfda07dd81b409c75e5c625341cb",
+        "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+        "type": "ssh",
+        "verified": true
+      },
+      "version": "3.39.0"
+    }
+  ],
+  "validation": {
+    "adapter_sha256": "0caddf1952b80f1a36b71161859f2120ce73959a8c91761a92b73d7f0c774562",
+    "ota_with_patched_vold_built": false,
+    "ota_with_patched_vold_verified": false,
+    "physical_device_boot_tested": false,
+    "physical_device_storage_and_timeout_tested": false,
+    "real_intervening_sequence_regression_passed": true,
+    "real_vold_test_passed": true,
+    "release_enablement_qualified": false,
+    "synthetic_register_clobber_and_register_read_regressions_passed": true
+  }
+}

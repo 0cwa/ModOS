@@ -1,0 +1,105 @@
+  0.000s  INFO Verifying whole-file signature
+  3.299s  INFO Verifying payload
+  4.946s  INFO Extracting partition images to temporary directory
+  4.946s  INFO Extracting from the payload: boot, dtbo, odm, product, system, system_ext, vbmeta, vbmeta_system, vendor, vendor_boot, vendor_dlkm
+ 13.421s  INFO Successfully extracted images from payload
+ 13.421s  INFO Verifying partition hashes
+ 15.703s  INFO Verifying AVB signatures
+ 15.704s  WARN vbmeta has a signed vbmeta header, but parent does not list a trusted key
+ 15.704s  WARN vbmeta is signed with public AOSP test key
+ 15.704s  WARN vbmeta has insecure flags: 0x3
+ 15.705s  INFO vbmeta_system has a signed vbmeta header
+ 15.705s  WARN vbmeta_system is signed with public AOSP test key
+ 15.705s  INFO Verifying hash descriptor for: boot
+ 15.705s  INFO Verifying hash tree descriptor for: system
+ 15.705s  INFO Verifying hash tree descriptor for: vendor
+ 15.705s  INFO Verifying hash descriptor for: vendor_boot
+ 15.705s  INFO Verifying hash tree descriptor for: product
+ 15.705s  INFO Verifying hash tree descriptor for: odm
+ 15.705s  INFO Verifying hash tree descriptor for: system_ext
+ 15.705s  INFO Verifying hash descriptor for: dtbo
+ 15.710s  INFO Verifying hash tree descriptor for: vendor_dlkm
+ 22.876s  INFO Checking recovery ramdisk's otacerts.zip
+ 22.956s  INFO Verifying care map
+ 22.959s ERROR Care map does not match:
+Actual: CareMap {
+    partitions: [
+        PartitionInfo {
+            name: "odm",
+            ranges: "2,0,508",
+            id: "ro.odm.build.fingerprint",
+            fingerprint: "Sony/XQ-DC72/XQ-DC72:15/68.2.A.3.107/068002A003010700521798587:user/release-keys",
+        },
+        PartitionInfo {
+            name: "product",
+            ranges: "18,0,46,510,32771,33278,65537,66044,98307,98814,129401,163840,163843,229376,229379,294912,294915,589824,589825",
+            id: "ro.product.build.fingerprint",
+            fingerprint: "Sony/XQ-DC72/XQ-DC72:15/68.2.A.3.107/068002A003010700521798587:user/release-keys",
+        },
+        PartitionInfo {
+            name: "system",
+            ranges: "20,0,222,503,32771,33271,65537,66037,98307,98807,131073,131573,163843,164343,196609,197109,229379,229879,262145,262645,263495",
+            id: "ro.system.build.fingerprint",
+            fingerprint: "Sony/lineage_pdx235/pdx235:17/CP2A.260605.016/7cc459a450:userdebug/release-keys",
+        },
+        PartitionInfo {
+            name: "system_ext",
+            ranges: "12,0,240,457,32771,33225,65537,65991,98307,98761,121059,131072,131073",
+            id: "ro.system_ext.build.fingerprint",
+            fingerprint: "Sony/XQ-DC72/XQ-DC72:15/68.2.A.3.107/068002A003010700521798587:user/release-keys",
+        },
+        PartitionInfo {
+            name: "vendor",
+            ranges: "2,0,190015",
+            id: "ro.vendor.build.fingerprint",
+            fingerprint: "Sony/XQ-DC72/XQ-DC72:15/68.2.A.3.107/068002A003010700521798587:user/release-keys",
+        },
+        PartitionInfo {
+            name: "vendor_dlkm",
+            ranges: "2,0,6581",
+            id: "ro.vendor_dlkm.build.fingerprint",
+            fingerprint: "Sony/XQ-DC72/XQ-DC72:15/68.2.A.3.107/068002A003010700521798587:user/release-keys",
+        },
+    ],
+}
+Expected: CareMap {
+    partitions: [
+        PartitionInfo {
+            name: "odm",
+            ranges: "2,0,508",
+            id: "ro.odm.build.fingerprint",
+            fingerprint: "Sony/lineage_pdx235/pdx235:17/CP2A.260605.016/7cc459a450:userdebug/release-keys",
+        },
+        PartitionInfo {
+            name: "product",
+            ranges: "2,0,615036",
+            id: "ro.product.build.fingerprint",
+            fingerprint: "Sony/lineage_pdx235/pdx235:17/CP2A.260605.016/7cc459a450:userdebug/release-keys",
+        },
+        PartitionInfo {
+            name: "system",
+            ranges: "2,0,286858",
+            id: "ro.system.build.fingerprint",
+            fingerprint: "Sony/lineage_pdx235/pdx235:17/CP2A.260605.016/7cc459a450:userdebug/release-keys",
+        },
+        PartitionInfo {
+            name: "system_ext",
+            ranges: "2,0,144664",
+            id: "ro.system_ext.build.fingerprint",
+            fingerprint: "Sony/lineage_pdx235/pdx235:17/CP2A.260605.016/7cc459a450:userdebug/release-keys",
+        },
+        PartitionInfo {
+            name: "vendor",
+            ranges: "2,0,190015",
+            id: "ro.vendor.build.fingerprint",
+            fingerprint: "Sony/lineage_pdx235/pdx235:17/CP2A.260605.016/7cc459a450:userdebug/release-keys",
+        },
+        PartitionInfo {
+            name: "vendor_dlkm",
+            ranges: "2,0,6581",
+            id: "ro.vendor_dlkm.build.fingerprint",
+            fingerprint: "Sony/lineage_pdx235/pdx235:17/CP2A.260605.016/7cc459a450:userdebug/release-keys",
+        },
+    ],
+}
+ 23.079s ERROR Encountered 1 error(s) during verification

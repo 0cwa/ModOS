@@ -335,6 +335,16 @@ any new OTA assets. Local-unpublished builds do not require source publication.
 The recorded signed APT metadata is audit provenance; builds verify the lock's
 package URL, size, and SHA-256, but do not repeat the APT signature check.
 
+### LineageOS vold exFAT timeout (opt-in)
+
+Set `'ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]' = true` on a LineageOS build to
+raise the exFAT filesystem-check limit in vold from 45 to 120 seconds. ModOS
+changes one instruction of the OTA's own `/system/bin/vold` (the seconds
+argument `exfat::Check` passes to `ForkExecvpTimeout`) and fails the build
+unless that call site is found exactly once; no source build is involved. It is
+default-off, not wired into scheduled builds, and not boot-tested. See
+[the design and limits](docs/lineage-vold-exfat-timeout.md).
+
 ### Custom boot animation (enabled by default)
 
 All builds use the checked-in `custom/boot-animation/bootanimation.zip` by

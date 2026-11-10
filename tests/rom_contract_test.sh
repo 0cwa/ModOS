@@ -736,9 +736,72 @@ test_official_key_extraction_rejects_missing_root_key() (
   fi
 )
 
+test_lineage_vold_exfat_timeout_is_lineage_only_and_fingerprinted_when_enabled() (
+  local fixture_repo="${TEST_ROOT}/lineage-vold-contract"
+  local disabled enabled adapter_digest manifest changed
+
+  load_contract
+  set_selection_fixture
+  ROM_FAMILY="lineageos"
+  resolve_rom_profile
+  ROOT_MODE="rootless"
+  mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
+  cp locks/executable-tools-v1.json "${fixture_repo}/locks/"
+  cp src/build_diagnostics.py src/lineage_vold.py "${fixture_repo}/src/"
+  git -C "${fixture_repo}" init -q
+  git -C "${fixture_repo}" config user.email fixture@example.invalid
+  git -C "${fixture_repo}" config user.name fixture
+  git -C "${fixture_repo}" add locks src
+  git -C "${fixture_repo}" commit -q -m 'Original vold adapter'
+  cd "${fixture_repo}"
+
+  disabled="$(fingerprint)"
+  module_selection_fingerprint >/dev/null
+  unset SELECTION_LINEAGE_VOLD_ADAPTER_SHA256
+  assert_equals "${disabled}" "$(selection_variant_fingerprint)" \
+    "disabled vold patch must not require its identity field"
+  manifest="$(selection_variant_manifest)"
+  if grep -q 'lineage.vold' <<<"${manifest}"; then
+    fail "disabled vold patch changed the serialized selection contract"
+  fi
+
+  ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]="true"
+  enabled="$(fingerprint)"
+  [[ "${enabled}" != "${disabled}" ]] ||
+    fail "enabling the vold patch did not change the fingerprint"
+  module_selection_fingerprint >/dev/null
+  adapter_digest="$(sha256sum src/lineage_vold.py | awk '{print $1}')"
+  assert_equals "${adapter_digest}" "${SELECTION_LINEAGE_VOLD_ADAPTER_SHA256}" \
+    "vold patch must bind its actual adapter bytes"
+  manifest="$(selection_variant_manifest)"
+  grep -qx "lineage_vold_adapter_sha256=${adapter_digest}" <<<"${manifest}" ||
+    fail "enabled vold patch did not serialize its adapter digest"
+  unset SELECTION_LINEAGE_VOLD_ADAPTER_SHA256
+  if selection_variant_fingerprint >/dev/null 2>&1; then
+    fail "enabled vold patch unexpectedly accepted a missing adapter digest"
+  fi
+  SELECTION_LINEAGE_VOLD_ADAPTER_SHA256=invalid
+  if selection_variant_fingerprint >/dev/null 2>&1; then
+    fail "enabled vold patch unexpectedly accepted an invalid adapter digest"
+  fi
+
+  printf '\n# changed\n' >>src/lineage_vold.py
+  git add src/lineage_vold.py
+  git commit -q -m 'Change vold adapter'
+  changed="$(fingerprint)"
+  [[ "${changed}" != "${enabled}" ]] ||
+    fail "changing the vold adapter did not change the fingerprint"
+
+  ROM_FAMILY="grapheneos"
+  resolve_rom_profile
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "GrapheneOS unexpectedly accepted the vold patch"
+  fi
+)
+
 test_microg_spoof_patch_is_lineage_only_and_fingerprinted_when_enabled() (
   local fixture_repo="${TEST_ROOT}/microg-spoof-contract"
-  local disabled enabled cert_changed manifest cert_digest adapter_digest
+  local disabled enabled combined cert_changed manifest cert_digest adapter_digest
   local cert_one="${TEST_ROOT}/spoof-cert-one.pem"
   local cert_two="${TEST_ROOT}/spoof-cert-two.pem"
 
@@ -760,7 +823,7 @@ PY
   ROOT_MODE="rootless"
   mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
   cp locks/executable-tools-v1.json "${fixture_repo}/locks/"
-  cp src/build_diagnostics.py src/microg_spoof_patch.py "${fixture_repo}/src/"
+  cp src/build_diagnostics.py src/microg_spoof_patch.py src/lineage_vold.py "${fixture_repo}/src/"
   git -C "${fixture_repo}" init -q
   git -C "${fixture_repo}" config user.email fixture@example.invalid
   git -C "${fixture_repo}" config user.name fixture
@@ -798,6 +861,20 @@ PY
   grep -qx "microg_spoof_patch_cert_sha256=${cert_digest}" <<<"${manifest}" ||
     fail "enabled signer patch did not serialize its certificate digest"
 
+  ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]="true"
+  combined="$(fingerprint)"
+  [[ "${combined}" != "${enabled}" ]] ||
+    fail "adding vold alongside the signer patch did not change the fingerprint"
+  module_selection_fingerprint >/dev/null
+  manifest="$(selection_variant_manifest)"
+  grep -qx 'module.microg-spoof-patch=true' <<<"${manifest}" ||
+    fail "combined selection dropped the signer patch"
+  grep -qx 'module.lineage-vold-exfat-timeout=true' <<<"${manifest}" ||
+    fail "combined selection dropped the vold patch"
+  ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]="false"
+  assert_equals "${enabled}" "$(fingerprint)" \
+    "disabling vold must restore the same Companion-only identity"
+
   MICROG_COMPANION_CERT="${cert_two}"
   cert_changed="$(fingerprint)"
   [[ "${cert_changed}" != "${enabled}" ]] ||
@@ -833,6 +910,7 @@ test_selected_legacy_module_versions_are_fingerprinted
 test_shizuku_selection_follows_supported_rom_profiles
 test_shizuku_adapter_is_required_and_fingerprinted_only_when_enabled
 test_microg_spoof_patch_is_lineage_only_and_fingerprinted_when_enabled
+test_lineage_vold_exfat_timeout_is_lineage_only_and_fingerprinted_when_enabled
 test_bcr_family_policy_and_effective_identity
 test_fsck_sysfs_sepolicy_is_pdx235_scoped_and_fingerprinted
 test_grapheneos_rejects_pdx235_fsck_modules

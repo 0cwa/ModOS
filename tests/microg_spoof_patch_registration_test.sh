@@ -152,4 +152,28 @@ append_enabled_module_arguments module_args
 printf '%s\n' "${module_args[@]}" | grep -Fxq -- '--module-microg-spoof-patch'
 printf '%s\n' "${module_args[@]}" | grep -Fxq -- '--module-microg-spoof-patch-sig'
 
+# Both local adapters must coexist in the same helper registry. Re-register
+# after adding vold to catch a merge that overwrites either complete function.
+ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]=true
+prepare_lineage_vold_exfat_timeout_module "${helper_root}"
+prepare_microg_spoof_patch_module "${helper_root}"
+prepare_lineage_vold_exfat_timeout_module "${helper_root}"
+PYTHONPATH="${helper_root}" "${real_python}" - <<'PY'
+from lib.modules import all_modules
+
+modules = all_modules()
+assert len(modules) == 2
+assert {module.NAME for module in modules} == {
+    "microg-spoof-patch", "lineage-vold-exfat-timeout"
+}
+for module_type in modules:
+    assert module_type().requirements().ext_images == {"system"}
+PY
+declare -a combined_module_args=()
+append_enabled_module_arguments combined_module_args
+for module_name in microg-spoof-patch lineage-vold-exfat-timeout; do
+  printf '%s\n' "${combined_module_args[@]}" | grep -Fxq -- "--module-${module_name}"
+  printf '%s\n' "${combined_module_args[@]}" | grep -Fxq -- "--module-${module_name}-sig"
+done
+
 echo "microG Companion signer patch helper registration behavior passed"

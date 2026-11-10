@@ -188,6 +188,8 @@ jobs:
           python3 tests/microg_spoof_patch_test.py
           bash tests/microg_spoof_patch_registration_test.sh
           bash tests/microg_companion_build_test.sh
+          python3 tests/lineage_vold_test.py
+          bash tests/lineage_vold_registration_test.sh
           bash tests/secrets_scan_test.sh
           bash tests/verifier_test.sh
 
@@ -204,7 +206,8 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (startsWith(github.head_ref, 'integration/') ||
-       github.head_ref == 'feature/lineage24-care-map-qualification-20261015')
+       github.head_ref == 'feature/lineage24-care-map-qualification-20261015' ||
+       github.head_ref == 'feat/vold-exfat-timeout-binary-patch')
     permissions:
       contents: read
     uses: ./.github/workflows/build-rom.yml
@@ -218,6 +221,9 @@ jobs:
       compatible-sepolicy-patching: true
       allow-unauthorized-adb: false
       microg: true
+      # The vold PR exercises both patches in the same verified OTA pair.
+      microg-spoof-patch: ${{ github.head_ref == 'feat/vold-exfat-timeout-binary-patch' }}
+      lineage-vold-exfat-timeout: ${{ github.head_ref == 'feat/vold-exfat-timeout-binary-patch' }}
       bcr: true
       # MSD v2.6's physical-device HAL mapping is not yet qualified on pdx235.
       msd: false

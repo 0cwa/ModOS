@@ -206,6 +206,7 @@ reset_fixture() {
   ADDITIONALS[ALTERINSTALLER]="true"
   ADDITIONALS[DISABLE_SYSTEM_UPDATER]="false"
   ADDITIONALS[MICROG_SPOOF_PATCH]="false"
+  ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]="false"
   ADDITIONALS[BOOT_ANIMATION]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
   ADDITIONALS[MICROG]="false"
@@ -471,6 +472,16 @@ test_microg_spoof_patch_module_is_optional() {
   run_patch
   assert_pair     "--module-microg-spoof-patch"     "${WORKDIR}/modules/microg-spoof-patch.zip"     "microg spoof patch"
   assert_pair     "--module-microg-spoof-patch-sig"     "${WORKDIR}/signatures/microg-spoof-patch.zip.sig"     "microg spoof patch"
+}
+
+test_lineage_vold_exfat_timeout_module_is_optional() {
+  reset_fixture lineage-vold-enabled
+  ADDITIONALS[LINEAGE_VOLD_EXFAT_TIMEOUT]="true"
+  prepare_lineage_vold_exfat_timeout_module() { :; }
+
+  run_patch
+  assert_pair     "--module-lineage-vold-exfat-timeout"     "${WORKDIR}/modules/lineage-vold-exfat-timeout.zip"     "lineage vold exfat timeout"
+  assert_pair     "--module-lineage-vold-exfat-timeout-sig"     "${WORKDIR}/signatures/lineage-vold-exfat-timeout.zip.sig"     "lineage vold exfat timeout"
 }
 
 test_boot_animation_module_is_optional_and_ordered() {
@@ -1089,6 +1100,7 @@ test_module_argument_failure_prevents_helper_execution
 test_special_cases_remain_available
 test_disable_system_updater_module_is_optional
 test_microg_spoof_patch_module_is_optional
+test_lineage_vold_exfat_timeout_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
 test_microg_signer_patch_selects_the_modos_companion_lock

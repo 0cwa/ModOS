@@ -77,6 +77,11 @@ on:
         required: false
         type: boolean
         default: false
+      lineage-vold-exfat-timeout:
+        description: Extend the vold exFAT check timeout (LineageOS only)
+        required: false
+        type: boolean
+        default: false
       update-channel:
         required: true
         type: string
@@ -158,6 +163,7 @@ env:
   ADDITIONALS_SHIZUKU: ${{ inputs.shizuku }}
   ADDITIONALS_EXFATPROGS_FSCK: ${{ inputs.exfatprogs-fsck }}
   ADDITIONALS_FSCK_SYSFS_SEPOLICY: ${{ inputs.fsck-sysfs-sepolicy }}
+  ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT: ${{ inputs.lineage-vold-exfat-timeout }}
   ADDITIONALS_BOOT_ANIMATION: ${{ inputs.boot-animation }}
 
 # Publishing inherits the caller job's permission ceiling. A reusable
@@ -205,6 +211,11 @@ jobs:
               echo "::error::pdx235 fsck.exfat/SELinux modules require LineageOS pdx235"
               exit 1
             fi
+          fi
+          if [[ "${ADDITIONALS_LINEAGE_VOLD_EXFAT_TIMEOUT:-false}" == true &&
+                "${ROM_FAMILY:-}" != lineageos ]]; then
+            echo "::error::vold exFAT timeout patch requires LineageOS"
+            exit 1
           fi
           root_mode="${ROOT_MODE_INPUT}"
           if [[ -z "${root_mode}" ]]; then
