@@ -116,7 +116,9 @@ def _is_safe_argument_setup(word: int) -> bool:
         return rd != 1 and rn != 1
     if word & 0x1F000000 == 0x10000000:  # adr / adrp
         return rd != 1
-    if word & 0xFFC00000 in (0xB9400000, 0xF9400000):  # ldr Wt/Xt, [Xn,#imm]
+    if word & 0xFFC00000 in (0xB9000000, 0xF9000000, 0xB9400000, 0xF9400000):
+        # str/ldr Wt/Xt,[Xn,#imm], without writeback. Stores must not read x1
+        # either as their value or as the address base.
         return rd != 1 and rn != 1
     return False
 

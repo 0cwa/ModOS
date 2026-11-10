@@ -288,7 +288,7 @@ class LogContractTest(unittest.TestCase):
 
 
 class SelinuxDiagnosticsTest(unittest.TestCase):
-    # Header and fallback spellings are from the pinned MSD v2.5 sepatch.rs.
+    # Header and fallback spellings are from the pinned MSD v2.6 sepatch.rs.
     # Detail text is synthetic: these tests do not exercise a real policy.
     def test_policy_load_and_save_warning_blocks_are_not_reported_as_clean(self):
         for operation in ('loading', 'saving'):

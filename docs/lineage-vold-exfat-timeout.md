@@ -55,11 +55,19 @@ python3 src/lineage_vold.py patch /path/to/vold /path/to/vold.patched
 
 Unit tests use a synthetic ELF and cover timeout-register overwrites, copying
 the timeout into another argument, changed function signatures, and malformed
-ELF headers. The PR author's initial implementation was run against the vold
-installed on a LineageOS 24.0 pdx235 (`24.0-20261106-NIGHTLY`): it found one
-call site and changed one instruction. That real-binary check must be repeated
-with the reviewed argument-setup checks. **No OTA containing the patch has been
-built or flashed, and the longer timeout has not been observed on a device.**
+ELF headers. On 2026-11-10 the reviewed patcher was also checked against vold
+extracted from the official LineageOS 24.0 pdx235 20261106 OTA. The download
+matched the official API's SHA-256, and its publisher key and whole-file/payload
+signatures were verified. The patch changes only two bytes of the instruction
+at `0xbce74`; the full `vfat::Check` function is unchanged. The actual intervening
+load/store instructions are covered by a regression test. See the
+[binary qualification evidence](evidence/vold-binary-20261110.json) for exact
+input/output hashes, the instruction sequence and authenticated tool versions.
+
+The source OTA's full avbroot verification still reports its care-map mismatch;
+that is recorded separately from signature authentication and was not waived
+for production. **No OTA containing the patch has been built or flashed, and
+the longer timeout has not been observed on a device.**
 
 Before enabling this module for releases, validate the current patcher against
 an authenticated OTA's vold, build and verify nonpublishing OTAs for each

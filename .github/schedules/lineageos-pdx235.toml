@@ -11,7 +11,7 @@ MAGISK_PREINIT = "sda47"
 'ADDITIONALS[ALTERINSTALLER]' = true
 'ADDITIONALS[BCR]' = true
 'ADDITIONALS[CUSTOTA]' = true
-# MSD v2.5 falls back to the emulator's su domain on this device. Re-enable
+# MSD v2.6 falls back to the emulator's su domain on this device. Re-enable
 # only after the actual gadget HAL domain and MSD behavior are qualified.
 'ADDITIONALS[MSD]' = false
 'ADDITIONALS[OEMUNLOCKONBOOT]' = true

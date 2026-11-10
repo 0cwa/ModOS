@@ -203,6 +203,7 @@ def test_timeout_must_reach_only_the_timeout_argument() -> None:
         0xF9400101,                 # ldr x1,[x8]: overwrites timeout
         0xF9400022,                 # ldr x2,[x1]: uses timeout as an address
         0xF90003E1,                 # str x1,[sp]: saves a changed value elsewhere
+        0xF9000033,                 # str x19,[x1]: uses timeout as a store address
         0x52C00002,                 # unallocated movz Wd with a 32-bit shift
         0x00000000,                 # unknown instruction
     ):
@@ -223,10 +224,18 @@ def test_reviewed_independent_argument_setup_is_supported() -> None:
         0x90000002,                 # adrp x2,.
         0xB9400102,                 # ldr w2,[x8]
         0xF9400102,                 # ldr x2,[x8]
+        0xF9000FF3,                 # str x19,[sp,#24]
     ):
         original = build_vold(setup_words=[instruction])
         patched = m.patch_vold(original)
         assert len(m.find_call_sites(patched, 120)) == 1
+
+
+def test_authenticated_pdx235_20261106_argument_setup() -> None:
+    # Exact three intervening words from the authenticated official 20261106
+    # pdx235 vold. Keep the call address synthetic and exercise the real setup.
+    original = build_vold(setup_words=[0xF9469108, 0xF9000FF3, 0xF9400102])
+    assert len(m.find_call_sites(m.patch_vold(original), 120)) == 1
 
 
 def test_function_signature_change_is_rejected() -> None:
