@@ -157,6 +157,11 @@ def inspect_apk(apk: Path, lock: dict, build_tools: Path) -> dict:
 
 
 def check_prepared_source(source: Path, receipt: dict) -> None:
+    # Git status deliberately omits changes hidden by these index flags.
+    # Parse NUL records so unusual filenames cannot disguise an entry.
+    for entry in git(source, 'ls-files', '-v', '-z').split('\0'):
+        if entry and (entry[0].islower() or entry[0] == 'S'):
+            raise CandidateError('Prepared source has assume-unchanged or skip-worktree entries')
     if git(source, 'rev-parse', 'HEAD') != receipt['prepared_commit'] or \
             git(source, 'rev-parse', 'HEAD^{tree}') != receipt['prepared_tree'] or \
             git(source, 'status', '--porcelain', '--untracked-files=all'):
@@ -175,6 +180,7 @@ def build(lock: dict, patch: Path, output: Path, *, prepare_only: bool = False,
         stage = Path(temporary)
         source = stage / 'src'
         receipt = prepare_source(lock, patch, source, source_repository)
+        check_prepared_source(source, receipt)
         receipt['state'] = 'source-prepared'
         if not prepare_only:
             sdk, build_tools, java_version = toolchain

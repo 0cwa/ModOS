@@ -80,6 +80,18 @@ class CandidateTests(unittest.TestCase):
         with self.assertRaisesRegex(candidate.CandidateError, 'Prepared source changed'):
             candidate.check_prepared_source(source, receipt)
 
+    def test_git_index_flags_cannot_hide_source_changes(self):
+        for flag in ('--assume-unchanged', '--skip-worktree'):
+            with self.subTest(flag=flag):
+                name = flag[2:]
+                receipt = self.prepare(name)
+                source = self.root / name / 'src'
+                candidate.git(source, 'update-index', flag, 'loader.txt')
+                (source / 'loader.txt').write_text('hidden build-time modification\n')
+                self.assertEqual(candidate.git(source, 'status', '--porcelain'), '')
+                with self.assertRaisesRegex(candidate.CandidateError, 'assume-unchanged or skip-worktree'):
+                    candidate.check_prepared_source(source, receipt)
+
     def test_patch_tampering_is_rejected_before_preparation(self):
         self.patch.write_text(self.patch.read_text() + 'unreviewed change\n')
         with self.assertRaisesRegex(candidate.CandidateError, 'patch SHA-256'):
