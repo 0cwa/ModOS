@@ -5,6 +5,25 @@ build structure and integrates pinned components from their maintained upstream
 projects. Local code should express a ModOS requirement at its owning boundary,
 with a clear reason to remove it when upstream provides the same behavior.
 
+## November 10, 2026 upstream sync
+
+The five PixeneOS commits through `7b8a012f8a86f5076bd43ac986ccd00a4e6f0415`
+are integrated with AFSR 2.1.0, official avbroot 3.39.0, Custota/tool 6.9,
+MSD 2.6, and the immutable Renovate 46.3.13 action. The executable lock and
+validator were updated together after verifying the unchanged publisher signer,
+archive digests and complete executable layouts. See the
+[source reviews and host qualification receipt](evidence/upstream-tools-20261110.json).
+
+The maintained helper already contains its official upstream head `394725b`.
+Its existing guarded avbroot 3.37.1 source engine remains in use on paths that
+require expected-care-map and AVB authentication checks. Updating the official
+host executable does not retire that local verification boundary.
+
+MSD 2.6 adds a MediaProvider FUSE permission, but retains the same USB HAL lookup
+and unsupported `su` fallback. The production fallback guard and the disabled
+pdx235 selection therefore remain necessary. Host and synthetic tests do not
+establish physical-device compatibility.
+
 ## Current boundaries
 
 | Boundary | Local requirement | Path toward a smaller fork |

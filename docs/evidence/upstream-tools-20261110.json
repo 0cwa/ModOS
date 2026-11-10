@@ -1,0 +1,528 @@
+{
+  "artifacts": [
+    {
+      "layout": [
+        {
+          "mode": "0755",
+          "path": "afsr",
+          "sha256": "6f8aae1d17e44e74812dc31943dcf45a4a94d35f25f49d950de2f9fa32014d46",
+          "size": 3840656,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "complete executable archive",
+      "name": "afsr-2.1.0-x86_64-unknown-linux-gnu.zip",
+      "release_digest_matches": true,
+      "sha256": "dfe37b6d1ab4f892352fc94e57b9efe7a13ff5ee618f863a8f9b49ed0d4369ad",
+      "signature_sha256": "40164618124b1f0c3c4bd636a861796183ac6781f49b88d0c3c54efc6963ace3",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 1770721,
+      "url": "https://github.com/chenxiaolong/afsr/releases/download/v2.1.0/afsr-2.1.0-x86_64-unknown-linux-gnu.zip"
+    },
+    {
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "size": 35149,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "README.md",
+          "sha256": "398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6",
+          "size": 33214,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "avbroot",
+          "sha256": "79309323de07045cc6343ff7416e33c340e524ee70cad82928b777837770a923",
+          "size": 10474928,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "complete executable archive",
+      "name": "avbroot-3.39.0-x86_64-unknown-linux-gnu.zip",
+      "release_digest_matches": true,
+      "sha256": "13d6e4b67857c87c686e831de5609e03bb706b1e73c10397274489bfbebc99e7",
+      "signature_sha256": "a1412dcd4204134f93b45d61de589714012bbfda07dd81b409c75e5c625341cb",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 4106604,
+      "url": "https://github.com/chenxiaolong/avbroot/releases/download/v3.39.0/avbroot-3.39.0-x86_64-unknown-linux-gnu.zip"
+    },
+    {
+      "layout": [
+        {
+          "mode": "0755",
+          "path": "custota-tool",
+          "sha256": "6de8a52c17f5b56f4f1f2217a4bf43f4e12bec21abfec9f955400a5fabb60cd5",
+          "size": 5350544,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "complete executable archive",
+      "name": "custota-tool-6.9-x86_64-unknown-linux-gnu.zip",
+      "release_digest_matches": true,
+      "sha256": "ff63f9d2a00992d0939a2d6912e5dbdc418de1a3536bb24c4fcfceb2a07ac151",
+      "signature_sha256": "ac6550e406901565b6c595f0cd46060fde6741f2242ba0ca16beddd7081a25a7",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 2314946,
+      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.9/custota-tool-6.9-x86_64-unknown-linux-gnu.zip"
+    },
+    {
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "custota-selinux.arm64-v8a",
+          "sha256": "2c93fb11111cc2b066e7cdb645d22d01b777bdd7e3b3292e07230b175465ae42",
+          "size": 920240,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "custota-selinux.x86_64",
+          "sha256": "403fb56e99973a6867175ee8eb6464f3ab3e7fa13c37384fa272bd0e67e17d5e",
+          "size": 986528,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "plat_seapp_contexts",
+          "sha256": "ba7cf38226cff4ef72328d9e9478d621c724d56e0b4bd525a39cec04a25aed55",
+          "size": 102,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/permissions/privapp-permissions-com.chiller3.custota.xml",
+          "sha256": "303c3599f4e5d6f08d072e519a7c4dfc2abc5fd2af06c65186598f93a9ea82e5",
+          "size": 510,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/sysconfig/config-com.chiller3.custota.xml",
+          "sha256": "16c897fb40c9280db450a34cab5ec2eebedb9fb5ee439849f9917fb65a305161",
+          "size": 182,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/priv-app/com.chiller3.custota/app-release.apk",
+          "sha256": "503a95beb7b78aa02a7f11847c767c1e1afe66076d0c67557b69cb656bd656d0",
+          "size": 4473581,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "helper-consumed files; archive scripts are not executed by the adapter",
+      "name": "Custota-6.9-release.zip",
+      "release_digest_matches": true,
+      "sha256": "d51daecd287f066429b87d9e71ed4db31c1de4e6c7e143c034ee5b5089427c16",
+      "signature_sha256": "e09f64268828565a9163ac2a8a3f54b562de4a67466b1aa390e40e8d983efcff",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 3332115,
+      "url": "https://github.com/chenxiaolong/Custota/releases/download/v6.9/Custota-6.9-release.zip"
+    },
+    {
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "msd-tool.arm64-v8a",
+          "sha256": "aa07a1af4870d16ea564d7d9980d6faf9d9edaa40f9f4709ff9048e58ba120dc",
+          "size": 1321328,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "msd-tool.armeabi-v7a",
+          "sha256": "6290a77d0a07a77a78f956876ad585bdeafb4d76ee78f8d23cb814482f1bc7e6",
+          "size": 925712,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "msd-tool.x86_64",
+          "sha256": "84c80c2538c0fb468317d84331b80ab0021ca95971d314e252803136e6956a60",
+          "size": 1417952,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "plat_seapp_contexts",
+          "sha256": "1d210cdd45b070896ec682f7846870e1284665808777b9572c8615540105ea0d",
+          "size": 94,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/etc/sysconfig/config-com.chiller3.msd.xml",
+          "sha256": "b61e3085b588dba9d442c2cbc552b6edd1f80423a48acffa76c6dd9f7d585a8e",
+          "size": 186,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "system/priv-app/com.chiller3.msd/app-release.apk",
+          "sha256": "61b57bcdc15f5657e827d67141e79cc0e820d45d83541997a54cf276a48f2acf",
+          "size": 3867039,
+          "type": "file"
+        }
+      ],
+      "layout_scope": "helper-consumed files; archive scripts are not executed by the adapter",
+      "name": "MSD-2.6-release.zip",
+      "release_digest_matches": true,
+      "sha256": "f9e6c254a71db38473248a7bba2c354a59d74f89345bfa2570feab2c72dddc23",
+      "signature_sha256": "8a6bf76e8456d2aa03e55f6abbb367c621b8a319aabcf82a0508bf08449ff66c",
+      "signature_verified": true,
+      "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+      "size": 3834316,
+      "url": "https://github.com/chenxiaolong/MSD/releases/download/v2.6/MSD-2.6-release.zip"
+    }
+  ],
+  "checks": {
+    "afsr_round_trip": "Created an ext4 fixture with bundled mke2fs; pack/unpack retained file content, mode0640, UID1234, GID2345 and encoded SELinux xattr. This is a small filesystem fixture, not a ROM image.",
+    "archive_regressions": "21 tests passed with system Python3.13.5.",
+    "authenticated_install": "The production bootstrap downloaded, verified, inspected and installed all three executable archives from the committed new lock.",
+    "avbroot_cli": "ota patch/verify retain consumed rootless, Magisk/preinit, replacement, AVB key and OTA certificate flags. The existing guarded source engine remains selected where required.",
+    "bootstrap_regressions": "13 tests passed with system Python3.13.5 and a private workspace TMPDIR.",
+    "compatibility_and_selection": "Strict pinned-source compatibility, upstream integration, module selection, ROM contract and workflow contract suites passed.",
+    "custota_metadata": "gen-update-info produced version2 full OTA/CSIG URLs; gen-csig retains the helper input/key/cert/passphrase options. No OTA signing performed in this qualification.",
+    "diagnostics_and_device_audit": "45 diagnostic tests and23 device-audit fixture tests passed; those are synthetic tests, not physical-device observations.",
+    "lock_and_routing": "Offline validator, executable_tool_lock_test.sh and executable_tool_routing_test.sh passed.",
+    "sealed_execution": [
+      "afsr 2.1.0",
+      "avbroot 3.39.0",
+      "custota-tool v6.9"
+    ],
+    "ssh_signatures": "All five ZIPs accepted by ssh-keygen -Y verify with the unchanged repository trust binding; independently recomputed sizes/digests match GitHub release metadata."
+  },
+  "date": "2026-11-10",
+  "helper": {
+    "guarded_source_avbroot_version": "3.37.1",
+    "official_upstream_head": "394725b276a585bc93443dd49438b5ad3ae93588",
+    "official_upstream_missing_commits": 0,
+    "retained_revision": "b553f46a9b94fff3960617830b6072b0f8b054b5"
+  },
+  "limitations": [
+    "No new signing key or signer trust accepted.",
+    "MSD remains disabled on pdx235 pending USB HAL qualification.",
+    "No full OTA build or physical-device validation was performed locally for this dependency sync.",
+    "The helper guarded source avbroot3.37.1 is retained; official3.39.0 is not substituted for that verifier.",
+    "Local Python runtime lacked descriptor-execution support; the system Python3.13.5 passed the sealed-execution tests.",
+    "Temporary directories were kept inside the writable workspace because the sandbox does not provide /tmp."
+  ],
+  "purpose": "Qualify the five PixeneOS upstream commits through 7b8a012f8a86f5076bd43ac986ccd00a4e6f0415 for ModOS. Host/interface checks do not establish device acceptance.",
+  "schema_version": 1,
+  "source_reviews": [
+    {
+      "base_commit": "1bcb86849c5ac1ab33fccceaddd04d29f983c617",
+      "base_ref": "v2.0.0",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        "CHANGELOG.md",
+        "Cargo.lock",
+        "Cargo.toml",
+        "README.md",
+        "src/cli.rs",
+        "src/ext.rs",
+        "src/pack.rs",
+        "src/unpack.rs",
+        "src/wrappers/mke2fs.rs",
+        "src/wrappers/mkfs_erofs.rs",
+        "xtask/Cargo.toml",
+        "xtask/src/main.rs",
+        "xtask/src/version.rs"
+      ],
+      "commits": [
+        {
+          "sha": "f823046bbad76840f234ff9569840c6a54ec0711",
+          "subject": "README.md: Add contributing section"
+        },
+        {
+          "sha": "e7fdcf287a7ccc7443eb51cd271a997424293077",
+          "subject": "Update dependencies"
+        },
+        {
+          "sha": "a25a2c89c549ebddffeb3100db5cceb9711fae1a",
+          "subject": "CHANGELOG.md: Add entry for PR #27"
+        },
+        {
+          "sha": "c0a73e07a708059b2ede20b8405db8d30884b52d",
+          "subject": "Switch to winnow-args for CLI arg parsing"
+        },
+        {
+          "sha": "3b569d0b5358c5eee06c827054295f643330f7df",
+          "subject": "CHANGELOG.md: Add entry for PR #28"
+        },
+        {
+          "sha": "c4439a2ed38f18072d55c36dcc0a5f3096057464",
+          "subject": "Update dependencies"
+        },
+        {
+          "sha": "54566a6363957a52300105e9a06c96d3367e1014",
+          "subject": "CHANGELOG.md: Add entry for PR #29"
+        },
+        {
+          "sha": "2a750693f39eee84c8c3bf00e0929c52c19e7fe0",
+          "subject": "Version 2.1.0"
+        }
+      ],
+      "head_commit": "2a750693f39eee84c8c3bf00e0929c52c19e7fe0",
+      "head_ref": "v2.1.0",
+      "repository": "chenxiaolong/afsr",
+      "review": "CLI parser changes retain the consumed pack/unpack flags and AFSR v2 metadata schema. The only ext filesystem source change is a lint annotation. Signed executable passed a real ext4 pack/unpack round trip preserving payload, mode, UID/GID and SELinux xattr."
+    },
+    {
+      "base_commit": "88362620a21377b160ae7500f64f144a2262a281",
+      "base_ref": "v3.37.1",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        "CHANGELOG.md",
+        "Cargo.lock",
+        "Cargo.toml",
+        "avbroot/Cargo.toml",
+        "avbroot/src/cli/args.rs",
+        "avbroot/src/cli/avb.rs",
+        "avbroot/src/cli/boot.rs",
+        "avbroot/src/cli/completion.rs",
+        "avbroot/src/cli/cpio.rs",
+        "avbroot/src/cli/fec.rs",
+        "avbroot/src/cli/hashtree.rs",
+        "avbroot/src/cli/key.rs",
+        "avbroot/src/cli/lp.rs",
+        "avbroot/src/cli/ota.rs",
+        "avbroot/src/cli/payload.rs",
+        "avbroot/src/cli/sparse.rs",
+        "avbroot/src/cli/zip.rs",
+        "avbroot/src/crypto.rs",
+        "avbroot/src/format/avb.rs",
+        "avbroot/src/format/bootimage.rs",
+        "avbroot/src/format/ota.rs",
+        "avbroot/tests/bootimage.rs",
+        "deny.toml",
+        "e2e/Cargo.toml",
+        "e2e/e2e.toml",
+        "e2e/src/cli.rs",
+        "e2e/src/main.rs",
+        "xtask/Cargo.toml",
+        "xtask/src/main.rs",
+        "xtask/src/version.rs"
+      ],
+      "commits": [
+        {
+          "sha": "ddddae031463636f2342157ac29a16490024cdde",
+          "subject": "ci.yml: Switch to ubuntu-26.04-arm"
+        },
+        {
+          "sha": "241518688d4ac666601e964830cc34dc780a5c9f",
+          "subject": "Update dependencies"
+        },
+        {
+          "sha": "f7a67e02243ec7e1119c5ba9bbd04448aa1b1cf3",
+          "subject": "CHANGELOG.md: Add entry for PR #665"
+        },
+        {
+          "sha": "69c977d68867bb97e3c1978e300d907331d4640a",
+          "subject": "Switch to winnow-args for CLI arg parsing"
+        },
+        {
+          "sha": "c8a8e73f88d0f40ebe1123b4aa65588e5c009cc1",
+          "subject": "Avoid using winnow-args default_fn"
+        },
+        {
+          "sha": "27a60162e85d2a1c1ac7f2962a42912230a79bbe",
+          "subject": "Update winnow-args to 0.6.1 for ValueEnum::name()"
+        },
+        {
+          "sha": "0946026d3e1f869763dde55999d4b14b4c2e11b1",
+          "subject": "CHANGELOG.md: Add entry for PR #664"
+        },
+        {
+          "sha": "bf3587bce50d92e43f3b03403941961455eee59b",
+          "subject": "Update dependencies"
+        },
+        {
+          "sha": "4cd64b3268fd0a49f1c7930e66b7d2af047b01ff",
+          "subject": "CHANGELOG.md: Add entry for PR #666"
+        },
+        {
+          "sha": "3fde164b884cf134c198dedd49415883e4e7dd7e",
+          "subject": "cli/boot: Make --debug the default"
+        },
+        {
+          "sha": "a5727da2c6c8c5c7c6d00629ba1378300b5e1fbb",
+          "subject": "CHANGELOG.md: Add entry for PR #667"
+        },
+        {
+          "sha": "91464839145a289162036e9ec4034983694cb64e",
+          "subject": "Version 3.38.0"
+        },
+        {
+          "sha": "abbffc3ce040679c17d98cab747b3b1794a2e577",
+          "subject": "format/bootimage: Recompute SHA1 ID if original was SHA1"
+        },
+        {
+          "sha": "c509bc52b4bf65c19575f0783951916ea5c72386",
+          "subject": "CHANGELOG.md: Add entry for PR #669"
+        },
+        {
+          "sha": "c7b99cb35463f6a03b86906ca08810574353a48e",
+          "subject": "Version 3.39.0"
+        }
+      ],
+      "head_commit": "c7b99cb35463f6a03b86906ca08810574353a48e",
+      "head_ref": "v3.39.0",
+      "repository": "chenxiaolong/avbroot",
+      "review": "CLI parser migration and boot-v0-v2 SHA-1 ID regeneration reviewed. Consumed OTA, key and replacement flags remain present. ModOS does not use ignore-prepatched-compat, whose upstream CLI requirement changes. This official executable does not replace the existing guarded source engine or establish equivalence to its expected-care-map/AVB checks."
+    },
+    {
+      "base_commit": "4e9c2bca3b95f2cbc4e5a1a2a4a2f24e18f890c0",
+      "base_ref": "v6.8",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        "CHANGELOG.md",
+        "Cargo.lock",
+        "README.md",
+        "app/module/updates/release/changelog.txt",
+        "app/module/updates/release/info.json",
+        "custota-selinux/Cargo.toml",
+        "custota-selinux/src/main.rs",
+        "custota-tool/Cargo.toml",
+        "custota-tool/src/main.rs",
+        "deny.toml",
+        "gradle/libs.versions.toml",
+        "gradle/verification-metadata.xml",
+        "gradle/wrapper/gradle-wrapper.jar",
+        "gradle/wrapper/gradle-wrapper.properties"
+      ],
+      "commits": [
+        {
+          "sha": "588a2383e552b138341eea7f5035d5b08c6eeeb4",
+          "subject": "app/module/updates: Update release metadata for version 6.8"
+        },
+        {
+          "sha": "f7bb0bbc6ab26391e03d8edc1ff84ca095591db0",
+          "subject": "Switch to winnow-args for CLI arg parsing"
+        },
+        {
+          "sha": "81be5d7ca4053eb4b8da5f2a729abaf4152ebd90",
+          "subject": "CHANGELOG.md: Add entry for PR #229"
+        },
+        {
+          "sha": "c27395527c06bda01b0bc26cf3bbbe3489ed26a6",
+          "subject": "Update dependencies"
+        },
+        {
+          "sha": "a604c26ce6dc1a9c98cc309a9a730f9b0a25d14e",
+          "subject": "CHANGELOG.md: Add entry for PR #230"
+        },
+        {
+          "sha": "16c5302e08fe7959bb911484cd95178aebe3f54a",
+          "subject": "custota-tool: Add support for tab completion"
+        },
+        {
+          "sha": "156309df7241666ad20a13a283877f5f758f3b64",
+          "subject": "CHANGELOG.md: Add entry for PR #231"
+        },
+        {
+          "sha": "9da6f6836e0bbd4662e1c8a9ef459ded26a2344b",
+          "subject": "Version 6.9"
+        }
+      ],
+      "head_commit": "9da6f6836e0bbd4662e1c8a9ef459ded26a2344b",
+      "head_ref": "v6.9",
+      "repository": "chenxiaolong/Custota",
+      "review": "CLI parser migration and tab completion; no Android app source, app-context, permission XML or SELinux policy-rule change. The consumed gen-csig/gen-update-info flags remain; signed tool produced version-2 full URLs. APK/XML/context layout remains helper-compatible."
+    },
+    {
+      "base_commit": "bce6a5a45228b6567287f63909295a6291499f3c",
+      "base_ref": "v2.5",
+      "changed_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        "CHANGELOG.md",
+        "Cargo.lock",
+        "README.md",
+        "app/module/updates/release/changelog.txt",
+        "app/module/updates/release/info.json",
+        "app/src/main/java/com/chiller3/msd/settings/DeviceDialog.kt",
+        "app/src/main/java/com/chiller3/msd/settings/ErrorDetailsDialog.kt",
+        "app/src/main/java/com/chiller3/msd/settings/SettingsScreen.kt",
+        "app/src/main/java/com/chiller3/msd/settings/SettingsViewModel.kt",
+        "app/src/main/java/com/chiller3/msd/standalone/ClearPackageManagerCaches.kt",
+        "app/src/main/java/com/chiller3/msd/ui/Preferences.kt",
+        "app/src/main/java/com/chiller3/msd/ui/SegmentedList.kt",
+        "gradle/libs.versions.toml",
+        "gradle/verification-metadata.xml",
+        "gradle/wrapper/gradle-wrapper.jar",
+        "gradle/wrapper/gradle-wrapper.properties",
+        "gradlew.bat",
+        "msd-tool/Cargo.toml",
+        "msd-tool/src/client.rs",
+        "msd-tool/src/daemon.rs",
+        "msd-tool/src/main.rs",
+        "msd-tool/src/sepatch.rs"
+      ],
+      "commits": [
+        {
+          "sha": "ce2e404fbb22d631dea81a5346176b2e12c17f65",
+          "subject": "app/module/updates: Update release metadata for version 2.5"
+        },
+        {
+          "sha": "7bd728fcb09908a636c034b7430401bcb7e4bdb3",
+          "subject": "Allow MediaProvider to use daemon FDs during FUSE passthrough"
+        },
+        {
+          "sha": "6a7bb1557e8f0a226886f5620fc24c9991c50533",
+          "subject": "CHANGELOG.md: Add entry for PR #130"
+        },
+        {
+          "sha": "6ec8bbc4c61b8bc95d9fbb0a5735804476504c3f",
+          "subject": "README.md: Add link to AI policy"
+        },
+        {
+          "sha": "36609d00bca13a3c61bb4118c3117ecd92aa8b7d",
+          "subject": "Switch to winnow-args for CLI arg parsing"
+        },
+        {
+          "sha": "573de041323493cbc8fdd49db0d65323cf22d9ae",
+          "subject": "CHANGELOG.md: Add entry for PR #134"
+        },
+        {
+          "sha": "63bbacfc0e624e2c5eefb00ad8d239a3917ea1c4",
+          "subject": "Update dependencies"
+        },
+        {
+          "sha": "1167fdd3f1ba6c7f0e11630a4f49f167216d9d4a",
+          "subject": "CHANGELOG.md: Add entry for PR #135"
+        },
+        {
+          "sha": "93fa3264950f8359ff0f066fbfe13a4b6c7d7739",
+          "subject": "Version 2.6"
+        }
+      ],
+      "head_commit": "93fa3264950f8359ff0f066fbfe13a4b6c7d7739",
+      "head_ref": "v2.6",
+      "repository": "chenxiaolong/MSD",
+      "review": "Adds mediaprovider_app-to-msd_daemon fd use for FUSE passthrough and migrates CLI parsing. Helper-consumed APK/XML/context/tool paths remain. hal_usb_gadget_impl lookup and the unsupported su fallback are unchanged, so the existing diagnostic refusal and pdx235 disabled default remain."
+    }
+  ],
+  "upstream_base": "8c95fdfc43ca0ad6b67f668d184d4483f2cdd085",
+  "upstream_head": "7b8a012f8a86f5076bd43ac986ccd00a4e6f0415",
+  "upstream_lead": [
+    "https://github.com/pixincreate/PixeneOS/pull/378",
+    "https://github.com/pixincreate/PixeneOS/pull/379",
+    "https://github.com/pixincreate/PixeneOS/pull/380",
+    "https://github.com/pixincreate/PixeneOS/pull/381",
+    "https://github.com/pixincreate/PixeneOS/pull/382"
+  ]
+}
