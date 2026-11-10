@@ -42,6 +42,15 @@ EXPECTED_LABEL = "u:object_r:vold_exec:s0"
 
 EXFAT_CHECK_PREFIX = "_ZN7android4vold5exfat5CheckE"
 FORK_EXEC_PREFIX = "_ZN7android4vold17ForkExecvpTimeoutE"
+EXFAT_CHECK_SYMBOL = (
+    EXFAT_CHECK_PREFIX
+    + "RKNSt3__112basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEE"
+)
+FORK_EXEC_SYMBOL = (
+    FORK_EXEC_PREFIX
+    + "RKNSt3__16vectorINS1_12basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEENS6_IS8_EEEE"
+    + "NS1_6chrono8durationIxNS1_5ratioILl1ELl1EEEEEPc"
+)
 
 # How many instructions after `mov w1, #45` may precede the `bl` to
 # ForkExecvpTimeout. The compiler schedules the argument setup in between.
@@ -85,6 +94,33 @@ def _is_other_branch(word: int) -> bool:
     )
 
 
+def _is_safe_argument_setup(word: int) -> bool:
+    """Accept only decoded instructions that neither read nor write x1/w1.
+
+    Branch proximity alone is not a data-flow proof: a later instruction can
+    overwrite the timeout or copy it into another argument. Keep this whitelist
+    deliberately small. A new compiler sequence must be reviewed before it is
+    allowed, even if its branch target and symbol names have stayed the same.
+    """
+    rd = word & 31
+    rn = (word >> 5) & 31
+    rm = (word >> 16) & 31
+    if word == 0xD503201F:  # nop
+        return True
+    if word & 0x7FE0FFE0 == 0x2A0003E0:  # mov Wd,Wm / mov Xd,Xm (orr with ZR)
+        return rd != 1 and rm != 1
+    if word & 0x7F800000 in (0x12800000, 0x52800000, 0x72800000):  # movn/z/k
+        valid_shift = bool(word & 0x80000000) or (word >> 21) & 3 < 2
+        return valid_shift and rd != 1
+    if word & 0x7F800000 in (0x11000000, 0x51000000):  # add/sub immediate, no flags
+        return rd != 1 and rn != 1
+    if word & 0x1F000000 == 0x10000000:  # adr / adrp
+        return rd != 1
+    if word & 0xFFC00000 in (0xB9400000, 0xF9400000):  # ldr Wt/Xt, [Xn,#imm]
+        return rd != 1 and rn != 1
+    return False
+
+
 class _Elf:
     """The few ELF64 little-endian facts this patch needs, parsed defensively."""
 
@@ -112,6 +148,11 @@ class _Elf:
         ) = struct.unpack_from("<16sHHIQQQIHHHHHH", data)
         if self.machine != 183 or version != 1 or ehsize != 64:
             raise VoldModuleError("ELF is not an AArch64 object")
+        if self.phnum and (
+            self.phentsize != 56 or self.phnum > 128
+            or self.phoff + self.phentsize * self.phnum > len(data)
+        ):
+            raise VoldModuleError("ELF program headers are invalid or truncated")
         if self.shentsize != 64 or not 0 < self.shnum <= 4096:
             raise VoldModuleError("ELF section-header shape is unsupported")
         if self.shoff + self.shentsize * self.shnum > len(data):
@@ -143,7 +184,10 @@ class _Elf:
         end = table.find(b"\0", index)
         if end < 0:
             raise VoldModuleError("ELF string is unterminated")
-        return table[index:end].decode("ascii", errors="strict")
+        try:
+            return table[index:end].decode("ascii", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise VoldModuleError("ELF string is not ASCII") from exc
 
     def section_bytes(self, section: dict[str, Any]) -> bytes:
         if section["type"] == 8:  # NOBITS
@@ -218,11 +262,14 @@ def _load(binary: bytes) -> _Elf:
     return elf
 
 
-def _only_symbol(symbols: list[tuple[str, int, int]], prefix: str) -> tuple[int, int]:
-    found = [(value, size) for name, value, size in symbols if name.startswith(prefix)]
+def _only_symbol(symbols: list[tuple[str, int, int]], prefix: str, expected: str) -> tuple[int, int]:
+    found = [(name, value, size) for name, value, size in symbols if name.startswith(prefix)]
     if len(found) != 1:
         raise VoldModuleError(f"expected exactly one {prefix} symbol, found {len(found)}")
-    return found[0]
+    name, value, size = found[0]
+    if name != expected:
+        raise VoldModuleError(f"unsupported function signature for {prefix}")
+    return value, size
 
 
 def find_call_sites(binary: bytes, seconds: int) -> list[int]:
@@ -232,17 +279,22 @@ def find_call_sites(binary: bytes, seconds: int) -> list[int]:
     if debug is None:
         raise VoldModuleError("vold has no .gnu_debugdata symbols to locate exfat::Check")
     try:
-        decompressor = lzma.LZMADecompressor()
+        decompressor = lzma.LZMADecompressor(memlimit=128 * 1024 * 1024)
         inner = decompressor.decompress(elf.section_bytes(debug), MAX_DEBUGDATA_SIZE + 1)
     except lzma.LZMAError as exc:
         raise VoldModuleError("vold .gnu_debugdata is not valid XZ data") from exc
     if len(inner) > MAX_DEBUGDATA_SIZE or not decompressor.eof:
         raise VoldModuleError("vold .gnu_debugdata has an unexpected size")
     symbols = _Elf(inner, MAX_DEBUGDATA_SIZE).symbols()
-    check_address, check_size = _only_symbol(symbols, EXFAT_CHECK_PREFIX)
-    fork_address, _ = _only_symbol(symbols, FORK_EXEC_PREFIX)
-    if check_size % 4 or not 0 < check_size <= 16 * 1024:
+    check_address, check_size = _only_symbol(symbols, EXFAT_CHECK_PREFIX, EXFAT_CHECK_SYMBOL)
+    fork_address, fork_size = _only_symbol(symbols, FORK_EXEC_PREFIX, FORK_EXEC_SYMBOL)
+    if check_address % 4 or check_size % 4 or not 0 < check_size <= 16 * 1024:
         raise VoldModuleError("exfat::Check has an unexpected size")
+    if fork_address % 4 or fork_size % 4:
+        raise VoldModuleError("ForkExecvpTimeout has an unexpected alignment")
+    elf.file_offset(fork_address, fork_size)
+    if not (fork_address + fork_size <= check_address or check_address + check_size <= fork_address):
+        raise VoldModuleError("vold function symbols overlap")
 
     start = elf.file_offset(check_address, check_size)
     words = struct.unpack_from(f"<{check_size // 4}I", binary, start)
@@ -259,6 +311,8 @@ def find_call_sites(binary: bytes, seconds: int) -> list[int]:
                     sites.append(start + index * 4)
                 break
             if _is_other_branch(candidate):
+                break
+            if not _is_safe_argument_setup(candidate):
                 break
     return sites
 

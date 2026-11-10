@@ -885,11 +885,6 @@ function prepare_microg() {
     echo "Error: microG is supported only for LineageOS." >&2
     return 1
   fi
-  # With the signer patch, ship ModOS's own Companion build (same release plus
-  # the billing fix, ModOS signer). Services stays the official APK.
-  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]:-false}" == 'true' ]]; then
-    lock_path="${helper_root}/locks/microg-${VERSION[MICROG]}-modos.json"
-  fi
   if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
     ! -f "${module_tool}" || -L "${module_tool}" ]]; then
     echo "Error: pinned helper lacks the reviewed microG lock/module tool." >&2

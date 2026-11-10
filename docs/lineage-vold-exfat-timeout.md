@@ -19,9 +19,13 @@ pinned, and no Java or Android build tree is needed.
 Android builds ship compressed mini-debuginfo in vold's `.gnu_debugdata`
 section. The adapter reads the symbols there and requires:
 
-- exactly one `exfat::Check` symbol and one `ForkExecvpTimeout` symbol;
+- exactly one `exfat::Check` symbol and one `ForkExecvpTimeout` symbol, with
+  the reviewed C++ signatures so the timeout is still the second argument;
 - exactly one `mov w1, #45` inside `exfat::Check` that is followed, with no
-  other branch in between, by a `bl` whose target is `ForkExecvpTimeout`.
+  other branch in between, by a `bl` whose target is `ForkExecvpTimeout`;
+- only decoded, independent argument setup between those instructions. No
+  intervening instruction may read or overwrite `w1`/`x1`. Unknown instructions
+  are refused until reviewed.
 
 It does not use a fixed offset or hash, so it applies to any LineageOS build
 whose vold has this structure, including newer nightlies. If anything differs
@@ -49,10 +53,19 @@ python3 src/lineage_vold.py patch /path/to/vold /path/to/vold.patched
 
 ## Status
 
-Unit tests use a synthetic ELF. The patcher was also run against the vold
+Unit tests use a synthetic ELF and cover timeout-register overwrites, copying
+the timeout into another argument, changed function signatures, and malformed
+ELF headers. The PR author's initial implementation was run against the vold
 installed on a LineageOS 24.0 pdx235 (`24.0-20261106-NIGHTLY`): it found one
-call site and changed one instruction. **No OTA containing the patch has been
+call site and changed one instruction. That real-binary check must be repeated
+with the reviewed argument-setup checks. **No OTA containing the patch has been
 built or flashed, and the longer timeout has not been observed on a device.**
+
+Before enabling this module for releases, validate the current patcher against
+an authenticated OTA's vold, build and verify nonpublishing OTAs for each
+supported root mode, and check physical-device boot, encrypted storage,
+mounting, and an exFAT check that exceeds 45 seconds. A passing synthetic test
+suite does not establish those outcomes.
 
 This replaces the source-built approach (a pinned 1,243-project manifest, a
 full `m vold` build and a byte-identical baseline proof). The separate

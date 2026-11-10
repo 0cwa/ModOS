@@ -89,6 +89,8 @@ def build_vold(
     exfat_symbols: int = 1,
     branch_between: bool = False,
     interpreter: str = "/system/bin/linker64",
+    setup_words: list[int] | None = None,
+    fork_symbol: str = FORK,
 ) -> bytes:
     text_base = 0x1000
     fork_at = text_base
@@ -98,7 +100,7 @@ def build_vold(
     for _ in range(sites):
         index = len(body)
         body.append(m._mov_w1(check_seconds))
-        body.append(0xAA1F03E2)  # mov x2, xzr (unrelated argument setup)
+        body.extend([0xAA1F03E2] if setup_words is None else setup_words)
         if branch_between:
             body.append(0x14000002)  # b .+8
         body.append(NOP)
@@ -112,7 +114,7 @@ def build_vold(
     text = struct.pack(f"<{len(words)}I", *words)
     check_size = 4 * len(body)
 
-    entries = [(FORK, fork_at, 16)]
+    entries = [(fork_symbol, fork_at, 16)]
     entries += [(EXFAT_CHECK + ("" if i == 0 else f"{i}"), check_at, check_size) for i in range(exfat_symbols)]
     entries.append((VFAT_CHECK, vfat_at, 12))
     sym, strtab = symtab(entries)
@@ -187,6 +189,58 @@ def test_verify_rejects_extra_changes() -> None:
     assert_raises(lambda: m.verify_patched(original, bytes(patched)), "more than one")
     assert_raises(lambda: m.verify_patched(original, original), "more than one")
     assert_raises(lambda: m.verify_patched(original, original[:-1]), "different size")
+
+
+def test_timeout_must_reach_only_the_timeout_argument() -> None:
+    # These would previously pass while either leaving the call's timeout
+    # unchanged or also changing the context pointer / another argument.
+    for instruction in (
+        m._mov_w1(60),              # mov w1,#60: overwrites the intended timeout
+        0xAA0203E1,                 # mov x1,x2: overwrites x1 (same physical register)
+        0xAA0103E2,                 # mov x2,x1: copies timeout into context pointer
+        0x2A0103E2,                 # mov w2,w1: also reads the timeout
+        0x91000020,                 # add x0,x1,#0: timeout reaches another argument
+        0xF9400101,                 # ldr x1,[x8]: overwrites timeout
+        0xF9400022,                 # ldr x2,[x1]: uses timeout as an address
+        0xF90003E1,                 # str x1,[sp]: saves a changed value elsewhere
+        0x52C00002,                 # unallocated movz Wd with a 32-bit shift
+        0x00000000,                 # unknown instruction
+    ):
+        assert_raises(lambda: m.patch_vold(build_vold(setup_words=[instruction])), "found 0")
+
+
+def test_reviewed_independent_argument_setup_is_supported() -> None:
+    for instruction in (
+        NOP,
+        0x2A0303E2,                 # mov w2,w3
+        0xAA0303E2,                 # mov x2,x3
+        0x12800002,                 # movn w2,#0
+        0x52800002,                 # movz w2,#0
+        0xF2E00022,                 # movk x2,#1,lsl#48
+        0x910003E0,                 # add x0,sp,#0
+        0xD1004100,                 # sub x0,x8,#16
+        0x10000000,                 # adr x0,.
+        0x90000002,                 # adrp x2,.
+        0xB9400102,                 # ldr w2,[x8]
+        0xF9400102,                 # ldr x2,[x8]
+    ):
+        original = build_vold(setup_words=[instruction])
+        patched = m.patch_vold(original)
+        assert len(m.find_call_sites(patched, 120)) == 1
+
+
+def test_function_signature_change_is_rejected() -> None:
+    # The name prefix alone does not establish that seconds are passed in x1.
+    assert_raises(
+        lambda: m.patch_vold(build_vold(fork_symbol=m.FORK_EXEC_PREFIX + "ii")),
+        "unsupported function signature",
+    )
+
+
+def test_invalid_program_headers_are_rejected() -> None:
+    binary = bytearray(build_vold())
+    struct.pack_into("<Q", binary, 32, len(binary) + 56)
+    assert_raises(lambda: m.patch_vold(bytes(binary)), "program headers")
 
 
 class FakeFs:
