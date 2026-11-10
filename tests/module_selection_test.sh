@@ -509,6 +509,7 @@ enable_microg_fixture() {
   RESOLVED_ROOT_MODE=""
   mkdir -p "${WORKDIR}/tools/my-avbroot-setup/locks"
   touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json"
+  touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}-modos.json"
 }
 
 test_microg_locked_preparation_and_arguments() {
@@ -533,6 +534,19 @@ test_microg_locked_preparation_and_arguments() {
     fail "microG profile lacks product priv-app capability"
   grep -Fxq "api_level = 36" "${WORKDIR}/locked-profiles/microg.toml" ||
     fail "microG profile lost the fixture's source SDK"
+}
+
+test_microg_signer_patch_selects_the_modos_companion_lock() {
+  reset_fixture microg-modos-lock
+  enable_microg_fixture
+  ADDITIONALS[MICROG_SPOOF_PATCH]="true"
+  prepare_microg_spoof_patch_module() { :; }
+
+  run_patch
+
+  assert_pair "--module-lock" "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}-modos.json" "ModOS Companion lock"
+  assert_pair "--module-profile" "${WORKDIR}/locked-profiles/microg.toml" "ModOS Companion lock"
+  assert_pair "--module-microg-spoof-patch" "${WORKDIR}/modules/microg-spoof-patch.zip" "signer patch"
 }
 
 test_microg_profile_uses_selected_source_sdk() (
@@ -1048,6 +1062,7 @@ test_disable_system_updater_module_is_optional
 test_microg_spoof_patch_module_is_optional
 test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
+test_microg_signer_patch_selects_the_modos_companion_lock
 test_microg_profile_uses_selected_source_sdk
 test_microg_rejects_missing_or_invalid_source_sdk
 test_disabled_microg_does_not_require_source_sdk

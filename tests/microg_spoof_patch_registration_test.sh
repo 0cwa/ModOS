@@ -76,6 +76,15 @@ class ExtFs:
 PY
 
 ADDITIONALS[MICROG_SPOOF_PATCH]=true
+ADDITIONALS[MICROG]=true
+
+# The ModOS Companion needs microG itself.
+ADDITIONALS[MICROG]=false
+if prepare_microg_spoof_patch_module "${helper_root}" 2>/dev/null; then
+  echo "Error: the signer patch without microG must be rejected" >&2
+  exit 1
+fi
+ADDITIONALS[MICROG]=true
 
 # Only LineageOS is supported.
 ROM_FAMILY=grapheneos

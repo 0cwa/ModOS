@@ -6,7 +6,7 @@ require_pdx235_repaired_helper() {
   local family="$1" device="$2" mode="$3" revision="$4"
   [[ "${family}" == lineageos && "${device}" == pdx235 ]] || return 0
   [[ "${mode}" == magisk ]] && return 0
-  [[ "${revision}" == b553f46a9b94fff3960617830b6072b0f8b054b5 ]] && return 0
+  [[ "${revision}" == 902ed62e63f6d7d7d332a07619d75409d17fe514 ]] && return 0
   echo 'Error: pdx235 rootless requires the reviewed microG native-library and DUMP helper revision.' >&2
   return 1
 }

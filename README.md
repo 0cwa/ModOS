@@ -407,9 +407,14 @@ editing it would invalidate that image.
   Lineage release that changes the code is refused rather than half-patched.
 * The stock `services.odex`/`vdex`/`art` no longer match and are removed; ART
   recompiles from the jar, so the first boot after an update can be slower.
-* This only adds trust. The locked microG module still installs the official
-  Companion; shipping the self-signed one in the ROM needs the pinned helper's
-  microG lock and adapter to accept your signer, which is a separate change.
+* It requires `ADDITIONALS[MICROG]`. With both enabled, the locked microG module
+  installs ModOS's own Companion build (the helper's
+  `locks/microg-<release>-modos.json`: the same release plus the billing fix
+  below, signed with the ModOS key, hosted as a release asset of the helper
+  repository) instead of the official one. Services stays the official APK, and
+  the helper accepts exactly two Companion identities (official, or the ModOS
+  signer with its own version code).
+* The scheduled pdx235 build enables both.
 
 #### Building the patched Companion
 

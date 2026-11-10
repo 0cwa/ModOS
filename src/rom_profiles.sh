@@ -380,6 +380,10 @@ function module_selection_fingerprint() {
       echo "Error: the microG Companion signer patch is supported only by the LineageOS profile." >&2
       return 1
     fi
+    if [[ "${ADDITIONALS[MICROG]}" != 'true' ]]; then
+      echo "Error: the microG Companion signer patch requires ADDITIONALS[MICROG]=true." >&2
+      return 1
+    fi
     microg_spoof_patch_adapter_digest="$(_locked_input_digest src/microg_spoof_patch.py)" || {
       echo "Error: the microG Companion signer patch adapter is not clean and checked in." >&2
       return 1

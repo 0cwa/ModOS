@@ -51,7 +51,12 @@ on:
         type: boolean
         default: false
       microg:
-        description: Include locked official microG Services and Companion
+        description: Include locked microG Services and Companion
+        required: false
+        type: boolean
+        default: false
+      microg-spoof-patch:
+        description: Patch services.jar to keep spoofing for the ModOS-signed microG Companion (needs microG)
         required: false
         type: boolean
         default: false
@@ -150,6 +155,7 @@ jobs:
       oemunlockonboot: ${{ steps.definition.outputs.oemunlockonboot }}
       disable_system_updater: ${{ steps.definition.outputs.disable_system_updater }}
       microg: ${{ steps.definition.outputs.microg }}
+      microg_spoof_patch: ${{ steps.definition.outputs.microg_spoof_patch }}
       fdroid_privileged_extension: ${{ steps.definition.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
@@ -217,6 +223,7 @@ jobs:
       oemunlockonboot: ${{ needs.schedule_config.outputs.oemunlockonboot == 'true' }}
       disable-system-updater: ${{ needs.schedule_config.outputs.disable_system_updater == 'true' }}
       microg: ${{ needs.schedule_config.outputs.microg == 'true' }}
+      microg-spoof-patch: ${{ needs.schedule_config.outputs.microg_spoof_patch == 'true' }}
       shizuku: false
       fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
@@ -243,6 +250,7 @@ jobs:
       compatible-sepolicy-patching: ${{ inputs.compatible-sepolicy-patching }}
       allow-unauthorized-adb: ${{ inputs.allow-unauthorized-adb }}
       microg: ${{ inputs.microg }}
+      microg-spoof-patch: ${{ inputs.microg-spoof-patch }}
       bcr: ${{ inputs.bcr }}
       msd: ${{ inputs.msd }}
       shizuku: ${{ inputs.shizuku }}

@@ -422,6 +422,10 @@ function prepare_microg_spoof_patch_module() {
     echo "Error: the microG Companion signer patch is supported only for LineageOS." >&2
     return 1
   fi
+  if [[ "${ADDITIONALS[MICROG]}" != 'true' ]]; then
+    echo "Error: the microG Companion signer patch requires ADDITIONALS[MICROG]=true." >&2
+    return 1
+  fi
   if ! command -v java >/dev/null 2>&1; then
     echo "Error: the microG Companion signer patch requires java to run baksmali/smali." >&2
     return 1
@@ -909,6 +913,11 @@ function prepare_microg() {
   if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
     echo "Error: microG is supported only for LineageOS." >&2
     return 1
+  fi
+  # With the signer patch, ship ModOS's own Companion build (same release plus
+  # the billing fix, ModOS signer). Services stays the official APK.
+  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]:-false}" == 'true' ]]; then
+    lock_path="${helper_root}/locks/microg-${VERSION[MICROG]}-modos.json"
   fi
   if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
     ! -f "${module_tool}" || -L "${module_tool}" ]]; then

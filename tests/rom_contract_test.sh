@@ -780,6 +780,10 @@ PY
 
   ADDITIONALS[MICROG_SPOOF_PATCH]="true"
   MICROG_COMPANION_CERT="${cert_one}"
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "the signer patch unexpectedly worked without microG"
+  fi
+  ADDITIONALS[MICROG]="true"
   enabled="$(fingerprint)"
   [[ "${enabled}" != "${disabled}" ]] ||
     fail "enabling the signer patch did not change the fingerprint"
