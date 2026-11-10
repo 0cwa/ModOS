@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "full": {
+    "location_ota": "https://github.com/0cwa/ModOS/releases/download/2026110700/shiba-2026110700-rootless-6c4359e6c718b3593f2a2d6d4f8385ae33fd99b4df02f86acf2e46e52a1f8f7e-5d6f520.zip",
+    "location_csig": "https://github.com/0cwa/ModOS/releases/download/2026110700/shiba-2026110700-rootless-6c4359e6c718b3593f2a2d6d4f8385ae33fd99b4df02f86acf2e46e52a1f8f7e-5d6f520.zip.csig"
+  }
+}
