@@ -60,21 +60,21 @@ MODE = re.compile(r"0[0-7]{3}\Z")
 
 TOOL_POLICY = {
     "afsr": {
-        "version": "2.0.0",
+        "version": "2.1.0",
         "repository": "afsr",
-        "artifact_name": "afsr-2.0.0-x86_64-unknown-linux-gnu.zip",
+        "artifact_name": "afsr-2.1.0-x86_64-unknown-linux-gnu.zip",
         "layout": {"afsr": "0755"},
     },
     "avbroot": {
-        "version": "3.37.1",
+        "version": "3.39.0",
         "repository": "avbroot",
-        "artifact_name": "avbroot-3.37.1-x86_64-unknown-linux-gnu.zip",
+        "artifact_name": "avbroot-3.39.0-x86_64-unknown-linux-gnu.zip",
         "layout": {"LICENSE": "0644", "README.md": "0644", "avbroot": "0755"},
     },
     "custota-tool": {
-        "version": "6.8",
+        "version": "6.9",
         "repository": "Custota",
-        "artifact_name": "custota-tool-6.8-x86_64-unknown-linux-gnu.zip",
+        "artifact_name": "custota-tool-6.9-x86_64-unknown-linux-gnu.zip",
         "layout": {"custota-tool": "0755"},
     },
 }

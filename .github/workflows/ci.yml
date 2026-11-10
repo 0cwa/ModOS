@@ -222,7 +222,7 @@ jobs:
       allow-unauthorized-adb: false
       microg: true
       bcr: true
-      # MSD v2.5's physical-device HAL mapping is not yet qualified on pdx235.
+      # MSD v2.6's physical-device HAL mapping is not yet qualified on pdx235.
       msd: false
       exfatprogs-fsck: true
       fsck-sysfs-sepolicy: true

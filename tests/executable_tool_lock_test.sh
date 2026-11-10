@@ -179,19 +179,27 @@ if set(data) != {"schema_version", "tools"}:
 
 expected = {
     "afsr": {
-        "version": "2.0.0",
-        "artifact": "afsr-2.0.0-x86_64-unknown-linux-gnu.zip",
+        "version": "2.1.0",
+        "artifact": "afsr-2.1.0-x86_64-unknown-linux-gnu.zip",
+        "archive_size": 1770721,
+        "archive_sha256": "dfe37b6d1ab4f892352fc94e57b9efe7a13ff5ee618f863a8f9b49ed0d4369ad",
         "layout": {"afsr": "0755"},
+        "members": {
+            "afsr": {
+                "size": 3840656,
+                "sha256": "6f8aae1d17e44e74812dc31943dcf45a4a94d35f25f49d950de2f9fa32014d46",
+            },
+        },
         "url": (
             "https://github.com/chenxiaolong/afsr/releases/download/"
-            "v2.0.0/afsr-2.0.0-x86_64-unknown-linux-gnu.zip"
+            "v2.1.0/afsr-2.1.0-x86_64-unknown-linux-gnu.zip"
         ),
     },
     "avbroot": {
-        "version": "3.37.1",
-        "artifact": "avbroot-3.37.1-x86_64-unknown-linux-gnu.zip",
-        "archive_size": 4293699,
-        "archive_sha256": "ca8e1e02bc33f5569d5228f312ce1351d0244fecd2d2163cb5a3c1a283a6e4a3",
+        "version": "3.39.0",
+        "artifact": "avbroot-3.39.0-x86_64-unknown-linux-gnu.zip",
+        "archive_size": 4106604,
+        "archive_sha256": "13d6e4b67857c87c686e831de5609e03bb706b1e73c10397274489bfbebc99e7",
         "layout": {
             "LICENSE": "0644",
             "README.md": "0644",
@@ -207,30 +215,30 @@ expected = {
                 "sha256": "398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6",
             },
             "avbroot": {
-                "size": 10974384,
-                "sha256": "6233bd83e9a3c85012cdb4c406ec72750dd51c26829369a1abe29ca2a99e6315",
+                "size": 10474928,
+                "sha256": "79309323de07045cc6343ff7416e33c340e524ee70cad82928b777837770a923",
             },
         },
         "url": (
             "https://github.com/chenxiaolong/avbroot/releases/download/"
-            "v3.37.1/avbroot-3.37.1-x86_64-unknown-linux-gnu.zip"
+            "v3.39.0/avbroot-3.39.0-x86_64-unknown-linux-gnu.zip"
         ),
     },
     "custota-tool": {
-        "version": "6.8",
-        "artifact": "custota-tool-6.8-x86_64-unknown-linux-gnu.zip",
-        "archive_size": 2421143,
-        "archive_sha256": "7c7e6cb64f3fe0993969813d26b4a66b7ea1689af47579e6543391a55ca40ecb",
+        "version": "6.9",
+        "artifact": "custota-tool-6.9-x86_64-unknown-linux-gnu.zip",
+        "archive_size": 2314946,
+        "archive_sha256": "ff63f9d2a00992d0939a2d6912e5dbdc418de1a3536bb24c4fcfceb2a07ac151",
         "layout": {"custota-tool": "0755"},
         "members": {
             "custota-tool": {
-                "size": 5644336,
-                "sha256": "2ec3f2f23cafd21137f380e1aaac120a08495f640d26cdffe90e17d43a75a49f",
+                "size": 5350544,
+                "sha256": "6de8a52c17f5b56f4f1f2217a4bf43f4e12bec21abfec9f955400a5fabb60cd5",
             },
         },
         "url": (
             "https://github.com/chenxiaolong/Custota/releases/download/"
-            "v6.8/custota-tool-6.8-x86_64-unknown-linux-gnu.zip"
+            "v6.9/custota-tool-6.9-x86_64-unknown-linux-gnu.zip"
         ),
     },
 }
