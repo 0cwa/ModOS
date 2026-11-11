@@ -61,6 +61,9 @@ jobs:
       - name: Test Companion publication continuity
         run: python3 tests/companion_continuity_test.py
 
+      - name: Test dependency auto-merge safety policy
+        run: python3 tests/renovate_automerge_policy_test.py
+
       - name: Verify pinned exfatprogs package with image adapter
         run: python3 src/ci/check_exfatprogs_artifact.py
 

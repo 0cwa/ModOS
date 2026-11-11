@@ -27,6 +27,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check auto-merge safety prerequisites
+        id: automerge_policy
+        env:
+          GH_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+        run: python3 src/ci/renovate_automerge_policy.py >> "${GITHUB_OUTPUT}"
 
       - name: Self-hosted Renovate
         # Match the upstream release while retaining an immutable action revision.
@@ -36,5 +44,8 @@ jobs:
           # https://docs.renovatebot.com/modules/platform/github/#running-using-a-fine-grained-token
           token: ${{ secrets.RENOVATE_TOKEN }}
         env:
+          # `force` overrides even per-package automerge settings. Missing or
+          # unreadable protection stays proposal-only without broader access.
+          RENOVATE_FORCE: ${{ steps.automerge_policy.outputs.force || '{"automerge":false}' }}
           LOG_LEVEL: ${{ github.event.inputs.logLevel || 'info' }}
           RENOVATE_REPOSITORIES: ${{ github.repository }}
