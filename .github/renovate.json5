@@ -9,7 +9,47 @@
   gitAuthor: "Renovate Bot <renovatebot@non-existent-email.com>",
   assignees: ["0cwa"],
   labels: ["dependencies"],
+  // Prefer compatible ranges/major Action tags, keeping lockfiles and existing
+  // immutable Action revisions. Do not turn authenticated OTA inputs into
+  // floating downloads. See docs/dependency-updates.md.
+  enabledManagers: ["github-actions", "cargo", "custom.regex"],
+  automerge: false,
+  automergeType: "pr",
+  automergeStrategy: "squash",
+  platformAutomerge: true,
+  ignoreTests: false,
+  assignAutomerge: true,
   packageRules: [
+    {
+      description: "Keep Cargo compatibility ranges and update their reproducible lockfile",
+      matchManagers: ["cargo"],
+      rangeStrategy: "update-lockfile",
+    },
+    {
+      description: "Group routine Action updates; the workflow safety gate controls automerge",
+      matchManagers: ["github-actions"],
+      matchPackageNames: [
+        "actions/checkout", "actions/setup-python", "actions/upload-artifact",
+        "gitleaks/gitleaks-action", "softprops/action-gh-release",
+      ],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "compatible GitHub Actions",
+      automerge: true,
+    },
+    {
+      description: "Group compatible stable Cargo updates; retain exact Cargo.lock checksums",
+      matchManagers: ["cargo"],
+      matchCurrentVersion: ">=1.0.0",
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "compatible Cargo dependencies",
+      automerge: true,
+    },
+    {
+      description: "Pre-1.0 Cargo releases stay review-only, even for patch updates",
+      matchManagers: ["cargo"],
+      matchCurrentVersion: "<1.0.0",
+      automerge: false,
+    },
     {
       description: "Propose microG releases; require verified helper lock update before merge",
       matchPackageNames: ["microg/GmsCore"],
