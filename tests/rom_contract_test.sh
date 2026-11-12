@@ -282,10 +282,13 @@ test_executable_lock_is_required_and_fingerprinted() (
   mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
   cp locks/executable-tools-v1.json "${fixture_repo}/locks/"
   cp src/build_diagnostics.py "${fixture_repo}/src/"
+  mkdir -p "${fixture_repo}/tools/modules"
+  cp tools/modules/build_adapter_extension.py tools/modules/adapter_extension.json \
+    tools/modules/compose_locked_inputs.py "${fixture_repo}/tools/modules/"
   git -C "${fixture_repo}" init -q
   git -C "${fixture_repo}" config user.email fixture@example.invalid
   git -C "${fixture_repo}" config user.name fixture
-  git -C "${fixture_repo}" add locks/executable-tools-v1.json src/build_diagnostics.py
+  git -C "${fixture_repo}" add locks/executable-tools-v1.json src/build_diagnostics.py tools/modules
   git -C "${fixture_repo}" commit -q -m 'Original executable lock'
   cd "${fixture_repo}"
 
@@ -498,10 +501,13 @@ test_shizuku_adapter_is_required_and_fingerprinted_only_when_enabled() (
   mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
   cp locks/executable-tools-v1.json locks/shizuku-v13.6.0.json "${fixture_repo}/locks/"
   cp src/shizuku.py src/build_diagnostics.py "${fixture_repo}/src/"
+  mkdir -p "${fixture_repo}/tools/modules"
+  cp tools/modules/build_adapter_extension.py tools/modules/adapter_extension.json \
+    tools/modules/compose_locked_inputs.py "${fixture_repo}/tools/modules/"
   git -C "${fixture_repo}" init -q
   git -C "${fixture_repo}" config user.email fixture@example.invalid
   git -C "${fixture_repo}" config user.name fixture
-  git -C "${fixture_repo}" add locks src
+  git -C "${fixture_repo}" add locks src tools/modules
   git -C "${fixture_repo}" commit -q -m 'Original Shizuku adapter'
   cd "${fixture_repo}"
 

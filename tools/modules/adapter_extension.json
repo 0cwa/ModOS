@@ -7,12 +7,12 @@
     {
       "source_path": "tools/modules/catalog/shizuku.toml",
       "source": "manifests/shizuku.toml",
-      "sha256": "4181e3df30b5ae57251c8304804568726956a842df02a5039ce936ac49719c1d"
+      "sha256": "35adfc16a76f6fa9b4d96ad651b6056e0812e5b30ab357b2059a6f7ef7bd7a58"
     },
     {
       "source_path": "tools/modules/catalog/exfatprogs-fsck.toml",
       "source": "manifests/exfatprogs-fsck.toml",
-      "sha256": "75b0c0670f7cf1d80c244514783744672b1958a14e78fe4c990849734233134a"
+      "sha256": "2dc3cae89af2b69d9f27890aac06cf476f1b69457f4c2639c953bf84a334799c"
     }
   ],
   "adapters": [
@@ -47,7 +47,7 @@
       "kind": "catalog-legacy",
       "source_path": "src/shizuku.py",
       "source": "adapters/shizuku.py",
-      "sha256": "834a1c795603f6c7a5152b082abf48e4fe47a8d0f872b93b592aca6e0a07b2f4",
+      "sha256": "e03eeee57cadf161dfdc827e914b51407149ca2fdae525a481fb545dee8c7068",
       "target": "_module_class",
       "verification_schemes": [
         "sha256",
@@ -76,7 +76,7 @@
       "kind": "catalog-legacy",
       "source_path": "src/exfatprogs_fsck.py",
       "source": "adapters/exfatprogs_fsck.py",
-      "sha256": "02cd819c01f505b5691c2e99cccbccdc83dc7786e20931fa4346ff310a009908",
+      "sha256": "7bc615465dbc734550e22b0b1da5dce5ee6cabf293a8d3851b08ec1eac14becf",
       "target": "_module_class",
       "verification_schemes": [
         "sha256"
