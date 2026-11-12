@@ -23,6 +23,7 @@ from typing import Any
 
 
 APK_SHA256 = "6e273ab0e991c4e79bc8b1bbb9b9dd739ccac1a8712a541a214078886b7b790f"
+APK_SIZE = 2571773
 APK_ENVIRONMENT = "PIXENEOS_SHIZUKU_APK_PATH"
 ROOT_MODE_ENVIRONMENT = "PIXENEOS_SHIZUKU_ROOT_MODE"
 ROM_FAMILY_ENVIRONMENT = "PIXENEOS_ROM_FAMILY"
@@ -55,16 +56,19 @@ def root_mode_from_environment() -> str:
     return mode
 
 
-def _read_payload(path: Path) -> tuple[bytes, dict[str, dict[str, bytes]]]:
-    try:
-        metadata = path.lstat()
-        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
-            raise ShizukuModuleError("locked Shizuku APK is not a safe regular file")
-        apk_bytes = path.read_bytes()
-    except ShizukuModuleError:
-        raise
-    except OSError as exc:
-        raise ShizukuModuleError("locked Shizuku APK is unavailable") from exc
+def _read_payload(path: Path | None, *, verified_bytes: bytes | None = None) -> tuple[bytes, dict[str, dict[str, bytes]]]:
+    if verified_bytes is None:
+        try:
+            metadata = path.lstat()
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                raise ShizukuModuleError("locked Shizuku APK is not a safe regular file")
+            apk_bytes = path.read_bytes()
+        except ShizukuModuleError:
+            raise
+        except OSError as exc:
+            raise ShizukuModuleError("locked Shizuku APK is unavailable") from exc
+    else:
+        apk_bytes = verified_bytes
     if hashlib.sha256(apk_bytes).hexdigest() != APK_SHA256:
         raise ShizukuModuleError("Shizuku APK does not match its locked SHA-256")
 
@@ -175,9 +179,11 @@ def validate_target(rom_family: str) -> None:
 def inject_payload(
     rom_family: str,
     root_mode: str,
-    apk_path: Path,
+    apk_path: Path | None,
     ext_fs: dict[str, Any],
     install_request: type[Any],
+    *,
+    verified_bytes: bytes | None = None,
 ) -> tuple[str, ...]:
     validate_target(rom_family)
     if root_mode not in {"rootless", "magisk"}:
@@ -217,7 +223,7 @@ def inject_payload(
                 "standard shell_exec label"
             )
 
-    apk_bytes, native_libraries = _read_payload(apk_path)
+    apk_bytes, native_libraries = _read_payload(apk_path, verified_bytes=verified_bytes)
     product = ext_fs["product"]
     requests: list[Any] = []
 
@@ -290,6 +296,20 @@ def inject_payload(
     return tuple(str(result.path) for result in installed)
 
 
+
+def _context_payload(context: Any) -> bytes:
+    """Consume the locked inode, never a separately selected environment path."""
+    artifact = context.artifact("manager-apk")
+    if (context.module_id != "shizuku" or artifact.role != "injection-input"
+            or artifact.sha256 != APK_SHA256 or artifact.size != APK_SIZE):
+        raise ShizukuModuleError("catalog Shizuku artifact differs from the reviewed payload")
+    with artifact.open() as source:
+        payload = source.read(APK_SIZE + 1)
+    if len(payload) != APK_SIZE or hashlib.sha256(payload).hexdigest() != APK_SHA256:
+        raise ShizukuModuleError("catalog Shizuku payload changed after verification")
+    return payload
+
+
 def _module_class() -> type[Any]:
     # Helper imports stay lazy so validation utilities can be imported alone.
     from lib.filesystem import CpioFs, ExtFs, ExtInstallRequest
@@ -329,15 +349,21 @@ def _module_class() -> type[Any]:
         ) -> None:
             del boot_fs, sepolicies, compatible_sepolicy
             root_mode = root_mode_from_environment()
+            context = getattr(self, "context", None)
+            payload = _context_payload(context) if context is not None else None
             apk_value = os.environ.get(APK_ENVIRONMENT, "")
-            if not apk_value:
+            if context is None and not apk_value:
                 raise ShizukuModuleError("locked Shizuku APK path is not configured")
+            rom_family = os.environ.get(ROM_FAMILY_ENVIRONMENT, "")
+            if context is not None and context.rom_family != rom_family:
+                raise ShizukuModuleError("catalog Shizuku ROM differs from the selected target")
             inject_payload(
                 os.environ.get(ROM_FAMILY_ENVIRONMENT, ""),
                 root_mode,
-                Path(apk_value),
+                Path(apk_value) if apk_value else None,
                 ext_fs,
                 ExtInstallRequest,
+                verified_bytes=payload,
             )
 
     return ShizukuMod

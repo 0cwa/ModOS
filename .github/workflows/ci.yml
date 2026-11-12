@@ -184,6 +184,7 @@ jobs:
           bash tests/boot_animation_registration_test.sh
           python3 tests/boot_animation_test.py
           python3 tests/shizuku_adapter_test.py
+          python3 tests/catalog_payload_context_test.py
           python3 tests/shizuku_post_boot_check_test.py
           python3 tests/disable_system_updater_test.py
           bash tests/disable_system_updater_registration_test.sh

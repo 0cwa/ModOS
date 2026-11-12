@@ -260,8 +260,10 @@ def _elf_details(binary: bytes) -> dict[str, Any]:
     }
 
 
-def _system_image_binary(package_path: Path) -> bytes:
-    package = _read_package(package_path)
+def _system_image_binary(package_path: Path | None, *, verified_bytes: bytes | None = None) -> bytes:
+    package = _read_package(package_path) if verified_bytes is None else verified_bytes
+    if len(package) != PACKAGE_SIZE or _sha256(package) != PACKAGE_SHA256:
+        raise ExfatFsckError("exfatprogs payload differs from the reviewed package")
     original = _extract_expected_binary(package)
     details = _elf_details(original)
     if details["runpath"] != TERMUX_RUNPATH:
@@ -416,6 +418,20 @@ def _require_target_profile(rom_family: str, device: str) -> None:
             raise ExfatFsckError("published exfatprogs source bundle digest does not match verification")
 
 
+
+def _context_payload(context: Any) -> bytes:
+    """Consume the already verified artifact capability, not a cache pathname."""
+    artifact = context.artifact("exfatprogs-aarch64-deb")
+    if (context.module_id != MODULE_NAME or artifact.role != "injection-input"
+            or artifact.sha256 != PACKAGE_SHA256 or artifact.size != PACKAGE_SIZE):
+        raise ExfatFsckError("catalog exfatprogs artifact differs from the reviewed package")
+    with artifact.open() as source:
+        payload = source.read(PACKAGE_SIZE + 1)
+    if len(payload) != PACKAGE_SIZE or _sha256(payload) != PACKAGE_SHA256:
+        raise ExfatFsckError("catalog exfatprogs payload changed after verification")
+    return payload
+
+
 def _module_class() -> type[Any]:
     from lib.filesystem import CpioFs, ExtFs
     from lib.modules import LegacyCliModule, MissingArgs, ModuleRequirements
@@ -457,13 +473,21 @@ def _module_class() -> type[Any]:
                 os.environ.get("PIXENEOS_ROM_FAMILY", ""),
                 os.environ.get("PIXENEOS_DEVICE_NAME", ""),
             )
+            context = getattr(self, "context", None)
+            payload = _context_payload(context) if context is not None else None
+            if context is not None and (
+                context.rom_family != os.environ.get("PIXENEOS_ROM_FAMILY", "")
+                or context.output_scope != os.environ.get("PIXENEOS_OUTPUT_SCOPE", "")
+            ):
+                raise ExfatFsckError("catalog exfatprogs target/scope differs from selected policy")
             package_path = os.environ.get("PIXENEOS_EXFATPROGS_PACKAGE_PATH", "")
-            if not package_path:
+            if context is None and not package_path:
                 raise ExfatFsckError("locked exfatprogs package path is not configured")
             system_fs = ext_fs.get("system")
             if system_fs is None:
                 raise ExfatFsckError("system image is unavailable for the exFAT checker")
-            _inject_system_binary(system_fs, _system_image_binary(Path(package_path)))
+            _inject_system_binary(system_fs, _system_image_binary(
+                Path(package_path) if package_path else None, verified_bytes=payload))
 
     return ExfatprogsFsckMod
 
