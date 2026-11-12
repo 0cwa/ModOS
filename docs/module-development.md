@@ -19,18 +19,35 @@ workflow, health and fingerprint consumers. It is a checked index, not a new
 resolver or permission to execute an adapter. The helper catalog remains the
 owner of module semantics and artifact trust.
 
-The existing delivery routes are distinct:
+The current delivery routes are distinct:
 
 - Signed module ZIPs retain their upstream verification and helper CLI path.
 - F-Droid and microG use helper catalog resolution and locked artifact bundles.
-- Local adapters express reviewed image changes and target preconditions.
+- Shizuku and exfatprogs use ModOS schema-v2 catalog manifests, reviewed lock
+  records, and `catalog-legacy` adapters. The helper validates the selection
+  through its normal catalog, compatibility, lock, and artifact paths; both
+  adapters consume payloads through the verified artifact context. Their API
+  24 minimums are build/install evidence: Shizuku's comes from the locked
+  [v13.6.0 source tag's `minSdk`](https://github.com/RikkaApps/Shizuku/blob/v13.6.0/build.gradle),
+  and exfatprogs' from the locked executable's Android ELF note recorded in
+  [`locks/exfatprogs-termux-v1.4.3-provenance.json`](../locks/exfatprogs-termux-v1.4.3-provenance.json).
+  Device startup, filesystem behavior, and OTA persistence remain separate
+  acceptance checks and stay marked experimental.
+- Boot animation, updater removal, and fsck policy use explicitly registered
+  `legacy-cli` adapters from a digest-pinned extension staged outside the helper
+  source checkout. The local files remain in ModOS.
 - AFSR is a locked host executable, not a catalog module ZIP.
 
 Keep local adapter code and ROM/device defaults in ModOS. Add only reusable
-mechanisms to the helper. Preserve existing helper CLI ordering and schema
-migration when adding an optional interface. Keep a bounded, checked consumer
-adaptation until an equivalent native interface is pinned and tested; ownership
-of the fork alone is not evidence that a guard can be removed.
+mechanisms to the helper. The extension contract is checked in
+[`tools/modules/adapter_extension.json`](../tools/modules/adapter_extension.json)
+and built by [`build_adapter_extension.py`](../tools/modules/build_adapter_extension.py).
+It pins each exact source and manifest digest, rejects modified/untracked inputs,
+and writes only to `WORKDIR` outside the helper checkout. The helper's native
+`--adapter-extension` and `--release-url` options are covered by the exact
+revision in the compatibility contract; the consumer validator checks pristine
+source and never rewrites it. Preserve existing legacy CLI argument order and
+catalog schema migration.
 
 For a selectable module, update the index and the actual consumers together:
 typed configuration, workflow defaults/forwarding, acquisition and preparation,
@@ -38,6 +55,11 @@ ROM applicability, helper arguments and output identity. Include payload,
 adapter, lock and output-affecting policy identities where relevant. A module's
 health coverage must be registered or its absence recorded explicitly; neither
 is a claim of device acceptance.
+
+The output identity includes the extension builder, registration index and
+locked-profile composer when any extension adapter or catalog module is enabled. This is an intentional fingerprint migration:
+the new identity binds registration policy and source digests that were
+previously absent from some local-adapter selections.
 
 The consistency check intentionally understands the current explicit shell and
 workflow declarations. If those declarations change shape, update the checker

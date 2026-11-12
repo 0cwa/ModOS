@@ -25,7 +25,7 @@ physical-device boot, billing or source-build reproducibility.
 
 ## Publication check
 
-The existing pinned helper compatibility transform binds its locked module
+The existing pinned helper patch-report API binds its locked module
 report to the exact primary and secondary OTA filenames and SHA-256 values
 only after every output has passed verification. New LineageOS pdx235 selection
 metadata takes the Companion identity from that report and requires its output

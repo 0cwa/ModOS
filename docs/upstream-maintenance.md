@@ -29,25 +29,37 @@ establish physical-device compatibility.
 | Boundary | Local requirement | Path toward a smaller fork |
 | --- | --- | --- |
 | ROM profiles and release entry points | Device selection, publisher trust, signing and publication policy for GrapheneOS and LineageOS. | Keep the shared build workflow and typed profile configuration; consume upstream build fixes there instead of copying the pipeline per ROM. |
-| Helper compatibility transform | Custota update metadata needs the actual release URL. | Use an upstream helper option for that URL when available, then remove the source transform. |
+| Native helper options and extension | Custota metadata needs the release URL; ModOS needs explicit hash-bound external adapter registration. | Keep the additive options pinned and tested. Consider each generic helper change for upstream separately; preserve the consumer boundary until an equivalent interface is reviewed. |
 | Build diagnostics | Distinguish source-OTA warnings from output verification, and reject MSD's emulator/debug HAL fallback on production inputs. | Keep reporting in the consumer. Retire the MSD-specific fallback guard once a reviewed upstream implementation supports explicit HAL-domain selection, rejects unsupported production policies, and is validated for each supported device. |
 | Local image adapters | Optional ModOS additions such as boot animation, updater removal, Shizuku and exFAT support. | Use the helper's module API; contribute generally useful extensions upstream rather than maintaining another patch engine. |
 | Guarded avbroot source engine | Signed AVB-header enforcement and expected care-map verification. | Retain the measured checks until an upstream release satisfies those same authentication and map invariants. |
 | Vendored sepatch closure | A read-only query checks the exact allow bit after policy serialization. | Replace the local delta when upstream supplies equivalent read-only validation. Retain source provenance and licenses while it is vendored. |
 
-The current consumer-side helper transform changes only the release-URL argument
-in `patch.py`. The old module `Path` import workaround is retired. Production and
-the explicit care-map development profiles use one
+The native contract pins helper
+`21b8318ab43908dbc6d9c797cffabf99a86f9d5b`, a reviewed descendant of the exact
+repaired helper commit `b553f46a9b94fff3960617830b6072b0f8b054b5`. The intervening
+helper changes add the extension interface, native release URL, source-byte
+loading hardening, and structured locked-adapter results; legacy module argument
+order and default update-info behavior remain covered by helper tests. The helper
+comparison is documented against immutable upstream base
+`394725b276a585bc93443dd49438b5ad3ae93588` in the helper's dated
+[`upstream-maintenance.md`](https://github.com/0cwa/my-avbroot-setup/blob/21b8318ab43908dbc6d9c797cffabf99a86f9d5b/docs/upstream-maintenance.md);
+ModOS does not duplicate its delta-report script.
+
+Production and the explicit care-map development profiles use one
 [compatibility manifest](../tools/compat/avbroot_setup_compat.json), so a helper
 update cannot leave a duplicate development manifest behind. Development still
 requires its existing device and unpublished-output scope, and refuses missing,
 uncommitted or modified manifest bytes.
 
-The [compatibility transformer](../tools/compat/avbroot_setup_compat.py) checks the
-repository, exact revision, original blob hash, working-tree state and source
-shape before applying its bounded change. It compiles staged Python and preserves
-idempotence and rollback. A new upstream version is a deliberate contract update,
-not permission to apply the old patch to an unknown source tree.
+The [native helper validator](../tools/compat/avbroot_setup_compat.py) checks the
+effective repository origin, exact revision, `patch.py` blob hash, current source
+bytes, and a clean checkout including ignored files. It does not edit helper
+source. `patch.py --help` must expose both native options before OTA patching.
+ModOS keeps the Python environment in `WORKDIR/venvs/my-avbroot-setup` and sets
+`PYTHONDONTWRITEBYTECODE=1` on helper invocations so repeated setup does not
+dirty the pinned source checkout. The validator still rejects all untracked or
+ignored helper files; generated runtime state belongs outside that checkout.
 
 ## Updating dependencies
 
