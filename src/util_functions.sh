@@ -519,7 +519,10 @@ function prepare_locked_catalog_modules() {
   api_level="${ROM_OTA_API_LEVEL}"
   resolve_root_mode >/dev/null || return 1
   root_mode="${RESOLVED_ROOT_MODE}"
-  [[ "${root_mode}" != both ]] || root_mode=rootless
+  case "${root_mode}" in
+    magisk) root_mode=rooted ;;
+    both) root_mode=rootless ;;
+  esac
 
   repository_root="$(git rev-parse --show-toplevel)" || return 1
   module_tool="${helper_root}/module-tool.py"

@@ -676,6 +676,18 @@ test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices() {
   done
 }
 
+test_shizuku_magisk_composes_rooted_catalog_profile() {
+  reset_fixture shizuku-magisk-catalog
+  enable_shizuku_fixture
+  ROOT_MODE=magisk
+  run_patch
+  grep -Fxq 'root_mode = "rooted"' "${WORKDIR}/locked-profiles/selected-modules.toml" ||
+    fail 'Magisk selection did not compose a rooted catalog profile'
+  [[ "${PIXENEOS_SHIZUKU_ROOT_MODE}" == magisk ]] ||
+    fail 'Catalog root mode translation changed the Shizuku startup mode'
+  assert_contains --patch-arg=--magisk 'Magisk selection retained the root patch route'
+}
+
 test_shizuku_rejects_shared_rootless_magisk_product_image() {
   reset_fixture shizuku-both-modes
   ADDITIONALS[SHIZUKU]="true"
@@ -1112,6 +1124,7 @@ test_microg_profile_uses_selected_source_sdk
 test_microg_rejects_missing_or_invalid_source_sdk
 test_disabled_microg_does_not_require_source_sdk
 test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices
+test_shizuku_magisk_composes_rooted_catalog_profile
 test_shizuku_rejects_shared_rootless_magisk_product_image
 test_lineage_both_modes_clear_vbmeta_flags
 test_care_map_compatibility_scope
