@@ -346,7 +346,7 @@ def _module_class() -> type[Any]:
             ext_fs: dict[str, ExtFs],
             sepolicies: Iterable[Path],
             compatible_sepolicy: bool = False,
-        ) -> None:
+        ) -> Any:
             del boot_fs, sepolicies, compatible_sepolicy
             root_mode = root_mode_from_environment()
             context = getattr(self, "context", None)
@@ -357,7 +357,7 @@ def _module_class() -> type[Any]:
             rom_family = os.environ.get(ROM_FAMILY_ENVIRONMENT, "")
             if context is not None and context.rom_family != rom_family:
                 raise ShizukuModuleError("catalog Shizuku ROM differs from the selected target")
-            inject_payload(
+            injected = inject_payload(
                 os.environ.get(ROM_FAMILY_ENVIRONMENT, ""),
                 root_mode,
                 Path(apk_value) if apk_value else None,
@@ -365,6 +365,16 @@ def _module_class() -> type[Any]:
                 ExtInstallRequest,
                 verified_bytes=payload,
             )
+            if context is None:
+                return None
+            from lib.modules.report import AdapterPatchResult
+
+            if not injected:
+                raise ShizukuModuleError(
+                    "catalog Shizuku injection completed without reporting installed paths"
+                )
+            paths = tuple(sorted(f"/product{path}" for path in injected))
+            return AdapterPatchResult(paths)
 
     return ShizukuMod
 

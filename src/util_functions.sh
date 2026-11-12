@@ -259,75 +259,43 @@ function append_enabled_module_arguments() {
   done
 }
 
+# Stage the exact reviewed extension inputs outside the pinned helper source.
+# The builder requires every source, catalog manifest and its own policy to be
+# clean committed ModOS inputs with the digest declared by the extension index.
+function prepare_adapter_extension() {
+  local helper_root="${1}"
+  local repository_root output_dir
+  if [[ "${ADDITIONALS[BOOT_ANIMATION]}" != true &&
+    "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" != true &&
+    "${ADDITIONALS[SHIZUKU]}" != true &&
+    "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" != true &&
+    "${ADDITIONALS[EXFATPROGS_FSCK]}" != true ]]; then
+    ADAPTER_EXTENSION_PATH=''
+    return 0
+  fi
+  repository_root="$(git rev-parse --show-toplevel)" || return 1
+  output_dir="${WORKDIR}/adapter-extension"
+  ADAPTER_EXTENSION_PATH="$(python3 tools/modules/build_adapter_extension.py \
+    --repository-root "${repository_root}" \
+    --helper-root "${helper_root}" \
+    --output "${output_dir}")" || return 1
+  export ADAPTER_EXTENSION_PATH
+}
+
 # Validate and register the optional local boot-animation module before any
 # patch command runs, using the pinned helper's LegacyCliModule registry.
 function prepare_boot_animation_module() {
-  local helper_root="${1}"
-  local payload_path dark_payload_path init_file registry_file module_source
-
   if [[ "${ADDITIONALS[BOOT_ANIMATION]}" != 'true' ]]; then
     return 0
   fi
-
   _resolve_boot_animation_payloads || return 1
-  payload_path="${BOOT_ANIMATION_LIGHT_PAYLOAD}"
-  dark_payload_path="${BOOT_ANIMATION_DARK_PAYLOAD}"
-
+  local payload_path="${BOOT_ANIMATION_LIGHT_PAYLOAD}"
+  local dark_payload_path="${BOOT_ANIMATION_DARK_PAYLOAD}"
   if ! python3 src/boot_animation.py validate "${payload_path}" >/dev/null ||
     ! python3 src/boot_animation.py validate "${dark_payload_path}" >/dev/null; then
     echo "Error: boot animation validation failed; refusing to patch." >&2
     return 1
   fi
-
-  init_file="${helper_root}/lib/modules/__init__.py"
-  registry_file="${helper_root}/lib/modules/registry.py"
-  module_source="${helper_root}/lib/modules/boot_animation.py"
-  if [[ ! -f "${init_file}" || -L "${init_file}" ]]; then
-    echo "Error: pinned patch helper lacks its module registry." >&2
-    return 1
-  fi
-  if [[ ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ]]; then
-    echo "Error: pinned patch helper has no safe module directory." >&2
-    return 1
-  fi
-  if [[ ! -f "${registry_file}" || -L "${registry_file}" ]]; then
-    echo "Error: pinned patch helper lacks its legacy module registry." >&2
-    return 1
-  fi
-  if [[ -L "${module_source}" ]]; then
-    echo "Error: pinned patch helper has an unsafe boot-animation module path." >&2
-    return 1
-  fi
-
-  cp -- src/boot_animation.py "${module_source}" || return 1
-  if ! grep -Fq 'def all_modules' "${init_file}" ||
-    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
-    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
-    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
-    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
-    echo "Error: unsupported pinned helper module registry API." >&2
-    return 1
-  fi
-
-  if ! grep -Fq 'from lib.modules.boot_animation import BootAnimationMod' "${registry_file}"; then
-    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
-      print
-      print "    from lib.modules.boot_animation import BootAnimationMod"
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-  if ! grep -Fq '    result.append(BootAnimationMod)' "${registry_file}"; then
-    awk '/^    return tuple\(result\)$/ {
-      print "    result.append(BootAnimationMod)"
-      print
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/boot-animation.zip"
   : >"${WORKDIR}/signatures/boot-animation.zip.sig"
@@ -339,13 +307,9 @@ function prepare_boot_animation_module() {
 # This mirrors the existing boot-animation registration and deliberately avoids
 # carrying a fork-only adapter inside my-avbroot-setup.
 function prepare_disable_system_updater_module() {
-  local helper_root="${1}"
-  local init_file registry_file module_source
-
   if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" != 'true' ]]; then
     return 0
   fi
-
   case "${ROM_FAMILY}" in
     grapheneos|lineageos) ;;
     *)
@@ -353,51 +317,6 @@ function prepare_disable_system_updater_module() {
       return 1
       ;;
   esac
-
-  init_file="${helper_root}/lib/modules/__init__.py"
-  registry_file="${helper_root}/lib/modules/registry.py"
-  module_source="${helper_root}/lib/modules/disable_system_updater.py"
-
-  if [[ ! -f "${init_file}" || -L "${init_file}" ||
-    ! -f "${registry_file}" || -L "${registry_file}" ||
-    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ]]; then
-    echo "Error: pinned patch helper lacks a safe module registry." >&2
-    return 1
-  fi
-  if [[ -L "${module_source}" ]]; then
-    echo "Error: pinned patch helper has an unsafe updater module path." >&2
-    return 1
-  fi
-
-  cp -- src/disable_system_updater.py "${module_source}" || return 1
-  if ! grep -Fq 'def all_modules' "${init_file}" ||
-    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
-    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
-    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
-    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
-    echo "Error: unsupported pinned helper module registry API." >&2
-    return 1
-  fi
-
-  if ! grep -Fq 'from lib.modules.disable_system_updater import DisableSystemUpdaterMod' "${registry_file}"; then
-    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
-      print
-      print "    from lib.modules.disable_system_updater import DisableSystemUpdaterMod"
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-  if ! grep -Fq '    result.append(DisableSystemUpdaterMod)' "${registry_file}"; then
-    awk '/^    return tuple\(result\)$/ {
-      print "    result.append(DisableSystemUpdaterMod)"
-      print
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/disable-system-updater.zip"
   : >"${WORKDIR}/signatures/disable-system-updater.zip.sig"
@@ -408,83 +327,25 @@ function prepare_disable_system_updater_module() {
 # The adapter checks APK bytes and ExtFs checks product file-context labels;
 # no privileged permission allowlist or custom SELinux policy is added.
 function prepare_shizuku_module() {
-  local helper_root="${1}"
-  local repository_root
-  local lock_path
-  local cache_path="${WORKDIR}/locked-artifacts"
-  local expected_apk="${cache_path}/sha256/6e/6e273ab0e991c4e79bc8b1bbb9b9dd739ccac1a8712a541a214078886b7b790f"
-  local module_tool="${helper_root}/module-tool.py"
-  local init_file="${helper_root}/lib/modules/__init__.py"
-  local registry_file="${helper_root}/lib/modules/registry.py"
-  local module_source="${helper_root}/lib/modules/shizuku.py"
-
+  local root_mode
   if [[ "${ADDITIONALS[SHIZUKU]}" != 'true' ]]; then
     return 0
   fi
-  repository_root="$(git rev-parse --show-toplevel)" || return 1
-  lock_path="${repository_root}/locks/shizuku-v13.6.0.json"
   resolve_root_mode || return 1
   if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
     echo "Error: Shizuku cannot distinguish rootless and Magisk server startup in ROOT_MODE=both." >&2
     return 1
   fi
-  if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
-    echo "Error: the pinned helper lacks the locked module tool." >&2
-    return 1
-  fi
-  if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
+  if [[ ! -f locks/shizuku-v13.6.0.json || -L locks/shizuku-v13.6.0.json ||
     ! -f src/shizuku.py || -L src/shizuku.py ]]; then
     echo "Error: the Shizuku lock or adapter path is missing or unsafe." >&2
     return 1
   fi
-  if [[ ! -f "${init_file}" || -L "${init_file}" ||
-    ! -f "${registry_file}" || -L "${registry_file}" ||
-    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
-    -L "${module_source}" ]]; then
-    echo "Error: the pinned helper lacks a safe module registry path." >&2
-    return 1
-  fi
-  if ! python "${module_tool}" artifacts fetch \
-    --lock "${lock_path}" \
-    --cache "${cache_path}" \
-    --module shizuku >/dev/null; then
-    echo "Error: locked Shizuku artifact acquisition failed." >&2
-    return 1
-  fi
-
-  cp -- src/shizuku.py "${module_source}" || return 1
-  if ! grep -Fq 'def all_modules' "${init_file}" ||
-    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
-    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
-    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
-    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
-    echo "Error: unsupported pinned helper module registry API." >&2
-    return 1
-  fi
-  if ! grep -Fq 'from lib.modules.shizuku import ShizukuMod' "${registry_file}"; then
-    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
-      print
-      print "    from lib.modules.shizuku import ShizukuMod"
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-  if ! grep -Fq '    result.append(ShizukuMod)' "${registry_file}"; then
-    awk '/^    return tuple\(result\)$/ {
-      print "    result.append(ShizukuMod)"
-      print
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-
+  root_mode="${RESOLVED_ROOT_MODE}"
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/shizuku.zip"
   : >"${WORKDIR}/signatures/shizuku.zip.sig"
-  export PIXENEOS_SHIZUKU_APK_PATH="${expected_apk}"
-  export PIXENEOS_SHIZUKU_ROOT_MODE="${RESOLVED_ROOT_MODE}"
+  export PIXENEOS_SHIZUKU_ROOT_MODE="${root_mode}"
   export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
 }
 
@@ -553,13 +414,7 @@ function build_exfatprogs_policy_patcher() {
 # Register the independent SELinux fix module for the pdx235 image. This keeps
 # the policy repair selectable without replacing the fsck.exfat executable.
 function prepare_fsck_sysfs_sepolicy_module() {
-  local helper_root="${1}"
-  local repository_root
-  local init_file="${helper_root}/lib/modules/__init__.py"
-  local registry_file="${helper_root}/lib/modules/registry.py"
-  local module_source="${helper_root}/lib/modules/fsck_sysfs_sepolicy.py"
-  local patcher_path
-
+  local repository_root patcher_path
   if [[ "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" != 'true' ]]; then
     return 0
   fi
@@ -568,12 +423,8 @@ function prepare_fsck_sysfs_sepolicy_module() {
     return 1
   fi
   repository_root="$(git rev-parse --show-toplevel)" || return 1
-  if [[ ! -f src/fsck_sysfs_sepolicy.py || -L src/fsck_sysfs_sepolicy.py ||
-    ! -f "${init_file}" || -L "${init_file}" ||
-    ! -f "${registry_file}" || -L "${registry_file}" ||
-    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
-    -L "${module_source}" ]]; then
-    echo "Error: the fsck sysfs SELinux adapter or helper registry path is missing or unsafe." >&2
+  if [[ ! -f src/fsck_sysfs_sepolicy.py || -L src/fsck_sysfs_sepolicy.py ]]; then
+    echo "Error: the fsck sysfs SELinux adapter is missing or unsafe." >&2
     return 1
   fi
   if [[ -z "${EXFATPROGS_POLICY_PATCHER_PATH:-}" ]] &&
@@ -581,35 +432,6 @@ function prepare_fsck_sysfs_sepolicy_module() {
     return 1
   fi
   patcher_path="${EXFATPROGS_POLICY_PATCHER_PATH}"
-
-  cp -- src/fsck_sysfs_sepolicy.py "${module_source}" || return 1
-  if ! grep -Fq 'def all_modules' "${init_file}" ||
-    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
-    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
-    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
-    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
-    echo "Error: unsupported pinned helper module registry API." >&2
-    return 1
-  fi
-  if ! grep -Fq 'from lib.modules.fsck_sysfs_sepolicy import FsckSysfsSePolicyMod' "${registry_file}"; then
-    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
-      print
-      print "    from lib.modules.fsck_sysfs_sepolicy import FsckSysfsSePolicyMod"
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-  if ! grep -Fq '    result.append(FsckSysfsSePolicyMod)' "${registry_file}"; then
-    awk '/^    return tuple\(result\)$/ {
-      print "    result.append(FsckSysfsSePolicyMod)"
-      print
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/fsck-sysfs-sepolicy.zip"
   : >"${WORKDIR}/signatures/fsck-sysfs-sepolicy.zip.sig"
@@ -622,21 +444,9 @@ function prepare_fsck_sysfs_sepolicy_module() {
 # LineageOS device. The package lock pins the exact aarch64 .deb; the adapter
 # extracts only fsck.exfat and runs no package scripts.
 function prepare_exfatprogs_fsck_module() {
-  local helper_root="${1}"
-  local repository_root
-  local lock_path
-  local cache_path="${WORKDIR}/locked-artifacts"
-  local package_sha256='b177a2254245170dac3dab200e972e8dc7ac06777713d033da8e1516e32685e9'
-  local expected_package="${cache_path}/sha256/${package_sha256:0:2}/${package_sha256}"
-  local module_tool="${helper_root}/module-tool.py"
-  local init_file="${helper_root}/lib/modules/__init__.py"
-  local registry_file="${helper_root}/lib/modules/registry.py"
-  local module_source="${helper_root}/lib/modules/exfatprogs_fsck.py"
-
   if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" != 'true' ]]; then
     return 0
   fi
-
   if [[ "${ROM_FAMILY}" != 'lineageos' || "${DEVICE_NAME:-}" != 'pdx235' ]]; then
     echo "Error: exfatprogs fsck replacement is supported only for LineageOS pdx235." >&2
     return 1
@@ -648,68 +458,13 @@ function prepare_exfatprogs_fsck_module() {
   if [[ "${OUTPUT_SCOPE:-}" == published ]]; then
     require_verified_exfat_source_bundle || return 1
   fi
-  repository_root="$(git rev-parse --show-toplevel)" || return 1
-  lock_path="${repository_root}/locks/exfatprogs-termux-v1.4.3.json"
-  if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
-    echo "Error: the pinned helper lacks the locked module tool." >&2
-    return 1
-  fi
-  if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
+  if [[ ! -f locks/exfatprogs-termux-v1.4.3.json || -L locks/exfatprogs-termux-v1.4.3.json ||
     ! -f src/exfatprogs_fsck.py || -L src/exfatprogs_fsck.py ]]; then
     echo "Error: the exfatprogs lock or adapter path is missing or unsafe." >&2
     return 1
   fi
-  if [[ ! -f "${init_file}" || -L "${init_file}" ||
-    ! -f "${registry_file}" || -L "${registry_file}" ||
-    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ||
-    -L "${module_source}" ]]; then
-    echo "Error: the pinned helper lacks a safe module registry path." >&2
-    return 1
-  fi
-  if ! python "${module_tool}" lock verify --lock "${lock_path}" >/dev/null; then
-    echo "Error: the exfatprogs package lock failed validation." >&2
-    return 1
-  fi
-  if ! python "${module_tool}" artifacts fetch \
-    --lock "${lock_path}" \
-    --cache "${cache_path}" \
-    --module exfatprogs-fsck >/dev/null; then
-    echo "Error: locked exfatprogs package acquisition failed." >&2
-    return 1
-  fi
-  if ! python3 src/exfatprogs_fsck.py verify-package "${expected_package}" >/dev/null; then
-    echo "Error: locked exfatprogs package failed extraction or ELF validation." >&2
-    return 1
-  fi
-
-  cp -- src/exfatprogs_fsck.py "${module_source}" || return 1
-  if ! grep -Fq 'def all_modules' "${init_file}" ||
-    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
-    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
-    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
-    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
-    echo "Error: unsupported pinned helper module registry API." >&2
-    return 1
-  fi
-  if ! grep -Fq 'from lib.modules.exfatprogs_fsck import ExfatprogsFsckMod' "${registry_file}"; then
-    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
-      print
-      print "    from lib.modules.exfatprogs_fsck import ExfatprogsFsckMod"
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-  if ! grep -Fq '    result.append(ExfatprogsFsckMod)' "${registry_file}"; then
-    awk '/^    return tuple\(result\)$/ {
-      print "    result.append(ExfatprogsFsckMod)"
-      print
-      next
-    }
-    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
-    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
-  fi
-
+  local package_sha256='b177a2254245170dac3dab200e972e8dc7ac06777713d033da8e1516e32685e9'
+  local expected_package="${WORKDIR}/locked-artifacts/sha256/${package_sha256:0:2}/${package_sha256}"
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/exfatprogs-fsck.zip"
   : >"${WORKDIR}/signatures/exfatprogs-fsck.zip.sig"
@@ -722,128 +477,173 @@ function prepare_exfatprogs_fsck_module() {
 # Resolve and acquire the locked F-Droid inputs before exposing them to the
 # patch command. Artifact URLs and versions belong exclusively to the lock.
 function prepare_fdroid_privileged_extension() {
-  local args_name="${1}"
-  local helper_root="${2}"
-  local -n args_ref="${args_name}"
-  local lock_path="${FDROID_PRIVILEGED_EXTENSION_LOCK}"
-  local profile_path="${FDROID_PRIVILEGED_EXTENSION_PROFILE}"
-  local cache_path="${FDROID_PRIVILEGED_EXTENSION_CACHE:-${WORKDIR}/locked-artifacts}"
-  local report_path="${FDROID_PRIVILEGED_EXTENSION_PATCH_REPORT:-${OUTPUTS[PATCHED_OTA]}.patch-report.json}"
-  local module_tool="${helper_root}/module-tool.py"
-
   if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" != 'true' ]]; then
     return 0
   fi
-
-  if ! verify_fdroid_privileged_extension_inputs \
-    "${lock_path}" "${profile_path}"; then
+  if ! verify_fdroid_privileged_extension_inputs     "${FDROID_PRIVILEGED_EXTENSION_LOCK}" "${FDROID_PRIVILEGED_EXTENSION_PROFILE}"; then
     return 1
   fi
-  if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
-    echo "Error: the pinned patch helper lacks the locked module tool." >&2
+  if [[ ! -f "${FDROID_PRIVILEGED_EXTENSION_LOCK}" ||
+    -L "${FDROID_PRIVILEGED_EXTENSION_LOCK}" ||
+    ! -f "${FDROID_PRIVILEGED_EXTENSION_PROFILE}" ||
+    -L "${FDROID_PRIVILEGED_EXTENSION_PROFILE}" ]]; then
+    echo "Error: the F-Droid lock or profile is missing or unsafe." >&2
     return 1
   fi
-
-  if ! python "${module_tool}" resolve \
-    --profile "${profile_path}" \
-    --lock "${lock_path}" \
-    --format json >/dev/null; then
-    echo "Error: F-Droid locked profile resolution failed." >&2
-    return 1
-  fi
-  if ! python "${module_tool}" artifacts fetch \
-    --lock "${lock_path}" \
-    --cache "${cache_path}" \
-    --module fdroid-privileged-extension >/dev/null; then
-    echo "Error: F-Droid locked artifact fetch failed." >&2
-    return 1
-  fi
-  if ! python "${module_tool}" artifacts verify \
-    --lock "${lock_path}" \
-    --cache "${cache_path}" \
-    --module fdroid-privileged-extension >/dev/null; then
-    echo "Error: F-Droid locked artifact verification failed." >&2
-    return 1
-  fi
-
-  args_ref+=(
-    "--module-lock" "${lock_path}"
-    "--module-profile" "${profile_path}"
-    "--module-cache" "${cache_path}"
-    "--patch-report" "${report_path}"
-  )
 }
 
-function write_microg_resolution_profile() {
-  local profile_path="${1}"
-  local root_mode='rootless'
-  local api_level="${ROM_OTA_API_LEVEL:-}"
-
-  if [[ ! "${api_level}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Error: microG resolution requires the selected source OTA's positive integer SDK level." >&2
-    return 1
-  fi
-
-  resolve_root_mode >/dev/null || return 1
-  [[ "${RESOLVED_ROOT_MODE}" != 'magisk' ]] || root_mode='rooted'
-
-  mkdir -p -- "$(dirname -- "${profile_path}")" || return 1
-  cat >"${profile_path}" <<EOF
-schema_version = 1
-id = 'lineageos-microg-${root_mode}'
-rom_family = 'lineageos'
-root_mode = '${root_mode}'
-abi = 'arm64-v8a'
-api_level = ${api_level}
-output_scope = '${OUTPUT_SCOPE}'
-enabled_modules = ['microg']
-acknowledgements = []
-experimental_acknowledgements = []
-
-[capabilities]
-root_providers = []
-zygisk_providers = []
-selective_signature_spoofing = true
-product_priv_app = true
-custom_init_selinux = false
-EOF
-}
-
-function prepare_microg() {
+function prepare_locked_catalog_modules() {
   local args_name="${1}"
   local helper_root="${2}"
+  local repository_root module_tool cache_path plan_dir combined_lock profile_path
+  local modules_path report_path api_level root_mode module lock
   local -n args_ref="${args_name}"
-  local lock_path="${helper_root}/locks/microg-${VERSION[MICROG]}.json"
-  local cache_path="${WORKDIR}/locked-artifacts"
-  local profile_path="${WORKDIR}/locked-profiles/microg.toml"
-  local report_path="${OUTPUTS[PATCHED_OTA]}.microg-patch-report.json"
-  local module_tool="${helper_root}/module-tool.py"
+  local -a lock_paths=() selected_modules=()
+  local -a enabled_modules=()
 
-  if [[ "${ADDITIONALS[MICROG]}" != 'true' ]]; then
-    return 0
-  fi
-  if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
-    echo "Error: microG is supported only for LineageOS." >&2
+  [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]] && selected_modules+=(fdroid-privileged-extension)
+  [[ "${ADDITIONALS[MICROG]}" == true ]] && selected_modules+=(microg)
+  [[ "${ADDITIONALS[SHIZUKU]}" == true ]] && selected_modules+=(shizuku)
+  [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == true ]] && selected_modules+=(exfatprogs-fsck)
+  ((${#selected_modules[@]})) || return 0
+
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true &&
+    "${ADDITIONALS[MICROG]}" == true ]]; then
+    echo "Error: F-Droid Privileged Extension and microG cannot be selected together." >&2
     return 1
   fi
-  if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
-    ! -f "${module_tool}" || -L "${module_tool}" ]]; then
-    echo "Error: pinned helper lacks the reviewed microG lock/module tool." >&2
+  if [[ ! "${ROM_OTA_API_LEVEL:-}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: locked catalog resolution requires the selected source OTA SDK level." >&2
     return 1
   fi
-  write_microg_resolution_profile "${profile_path}" || return 1
-  python "${module_tool}" artifacts fetch \
-    --lock "${lock_path}" \
-    --cache "${cache_path}" \
-    --module microg >/dev/null || return 1
+  api_level="${ROM_OTA_API_LEVEL}"
+  resolve_root_mode >/dev/null || return 1
+  root_mode="${RESOLVED_ROOT_MODE}"
+  [[ "${root_mode}" != both ]] || root_mode=rootless
 
+  repository_root="$(git rev-parse --show-toplevel)" || return 1
+  module_tool="${helper_root}/module-tool.py"
+  if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
+    echo "Error: the pinned helper lacks the locked module tool." >&2
+    return 1
+  fi
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]]; then
+    prepare_fdroid_privileged_extension || return 1
+    lock_paths+=("${FDROID_PRIVILEGED_EXTENSION_LOCK}")
+  fi
+  if [[ "${ADDITIONALS[MICROG]}" == true ]]; then
+    lock="${helper_root}/locks/microg-${VERSION[MICROG]}.json"
+    if [[ ! -f "${lock}" || -L "${lock}" ]]; then
+      echo "Error: pinned helper lacks the reviewed microG lock." >&2
+      return 1
+    fi
+    lock_paths+=("${lock}")
+  fi
+  if [[ "${ADDITIONALS[SHIZUKU]}" == true ]]; then
+    lock="${repository_root}/locks/shizuku-v13.6.0.json"
+    if [[ "${ROM_FAMILY}" != lineageos && "${ROM_FAMILY}" != grapheneos ]]; then
+      echo "Error: Shizuku is unsupported for ROM family ${ROM_FAMILY}." >&2
+      return 1
+    fi
+    resolve_root_mode || return 1
+    if [[ "${RESOLVED_ROOT_MODE}" == both ]]; then
+      echo "Error: Shizuku cannot distinguish rootless and Magisk server startup in ROOT_MODE=both." >&2
+      return 1
+    fi
+    lock_paths+=("${lock}")
+  fi
+  if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == true ]]; then
+    lock="${repository_root}/locks/exfatprogs-termux-v1.4.3.json"
+    if [[ "${ROM_FAMILY}" != lineageos || "${DEVICE_NAME:-}" != pdx235 ]]; then
+      echo "Error: exfatprogs fsck replacement is supported only for LineageOS pdx235." >&2
+      return 1
+    fi
+    if [[ "${OUTPUT_SCOPE:-}" != local-unpublished && "${OUTPUT_SCOPE:-}" != published ]]; then
+      echo "Error: exfatprogs fsck supports local-unpublished or source-verified published output only." >&2
+      return 1
+    fi
+    [[ "${OUTPUT_SCOPE}" != published ]] || require_verified_exfat_source_bundle || return 1
+    lock_paths+=("${lock}")
+  fi
+
+  cache_path="${WORKDIR}/locked-artifacts"
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true &&
+    -n "${FDROID_PRIVILEGED_EXTENSION_CACHE:-}" ]]; then
+    cache_path="${FDROID_PRIVILEGED_EXTENSION_CACHE}"
+  fi
+  plan_dir="${WORKDIR}/locked-profiles"
+  combined_lock="${plan_dir}/selected-modules.json"
+  profile_path="${plan_dir}/selected-modules.toml"
+  modules_path="${plan_dir}/selected-modules.txt"
+  mkdir -p -- "${plan_dir}" || return 1
+  for lock in "${lock_paths[@]}"; do
+    if [[ ! -f "${lock}" || -L "${lock}" ]] ||
+      ! PYTHONDONTWRITEBYTECODE=1 python "${module_tool}" lock verify --lock "${lock}" >/dev/null; then
+      echo "Error: a locked module input failed helper lock validation: ${lock}" >&2
+      return 1
+    fi
+  done
+
+  local -a compose_args=(
+    --lock-output "${combined_lock}"
+    --profile-output "${profile_path}"
+    --modules-output "${modules_path}"
+    --rom-family "${ROM_FAMILY}"
+    --root-mode "${root_mode}"
+    --abi arm64-v8a
+    --api-level "${api_level}"
+    --output-scope "${OUTPUT_SCOPE}"
+  )
+  for lock in "${lock_paths[@]}"; do compose_args+=(--lock "${lock}"); done
+  for module in "${selected_modules[@]}"; do compose_args+=(--selected "${module}"); done
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]]; then
+    compose_args+=(--profile-base "${FDROID_PRIVILEGED_EXTENSION_PROFILE}")
+  fi
+  if ! python3 tools/modules/compose_locked_inputs.py "${compose_args[@]}"; then
+    echo "Error: selected locked module inputs could not be composed." >&2
+    return 1
+  fi
+
+  local -a resolve_args=(resolve --profile "${profile_path}" --lock "${combined_lock}" --format json)
+  [[ -z "${ADAPTER_EXTENSION_PATH:-}" ]] || resolve_args+=(--adapter-extension "${ADAPTER_EXTENSION_PATH}")
+  if ! PYTHONDONTWRITEBYTECODE=1 python "${module_tool}" "${resolve_args[@]}" >/dev/null; then
+    echo "Error: selected locked catalog profile resolution failed." >&2
+    return 1
+  fi
+  mapfile -t enabled_modules <"${modules_path}"
+  for module in "${enabled_modules[@]}"; do
+    if ! PYTHONDONTWRITEBYTECODE=1 python "${module_tool}" artifacts fetch \
+      --lock "${combined_lock}" --cache "${cache_path}" --module "${module}" >/dev/null ||
+      ! PYTHONDONTWRITEBYTECODE=1 python "${module_tool}" artifacts verify \
+      --lock "${combined_lock}" --cache "${cache_path}" --module "${module}" >/dev/null; then
+      echo "Error: locked artifact acquisition or verification failed for ${module}." >&2
+      return 1
+    fi
+  done
+  if [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == true ]]; then
+    local package_sha256='b177a2254245170dac3dab200e972e8dc7ac06777713d033da8e1516e32685e9'
+    local package_path="${cache_path}/sha256/${package_sha256:0:2}/${package_sha256}"
+    if ! python3 src/exfatprogs_fsck.py verify-package "${package_path}" >/dev/null; then
+      echo "Error: locked exfatprogs package failed extraction or ELF validation." >&2
+      return 1
+    fi
+  fi
+
+  report_path="${OUTPUTS[PATCHED_OTA]}.locked-modules-patch-report.json"
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]]; then
+    report_path="${FDROID_PRIVILEGED_EXTENSION_PATCH_REPORT:-${OUTPUTS[PATCHED_OTA]}.patch-report.json}"
+  elif [[ "${ADDITIONALS[MICROG]}" == true ]]; then
+    report_path="${OUTPUTS[PATCHED_OTA]}.microg-patch-report.json"
+  fi
   args_ref+=(
-    "--module-lock" "${lock_path}"
-    "--module-profile" "${profile_path}"
-    "--module-cache" "${cache_path}"
-    "--patch-report" "${report_path}"
+    --module-lock "${combined_lock}"
+    --module-profile "${profile_path}"
+    --module-cache "${cache_path}"
+    --patch-report "${report_path}"
   )
 }
+
+
 
 # Function to create and make the release called by main script
 function create_and_make_release() {
@@ -868,10 +668,10 @@ function create_ota() {
 
   # Generate output file names
   generate_ota_info || return 1
-  # Setup environment variables, apply the pinned compatibility transform, and
-  # install the helper's Python dependencies.
+  # Set up the native helper contract and install its Python dependencies in
+  # the work directory, outside the pristine helper source checkout.
   env_setup || return 1
-  # Smoke-test the transformed helper before touching the OTA.
+  # Check the native extension and release URL options before touching the OTA.
   helper_contract_preflight || return 1
   # Patch OTA with avbroot and afsr by leveraging my-avbroot-setup
   patch_ota
@@ -958,23 +758,28 @@ function patch_ota() {
 
   # Activate the virtual environment
   if [ -z "${VIRTUAL_ENV:-}" ]; then
-    enable_venv || return 1
+    enable_venv "${my_avbroot_setup}" || return 1
   fi
 
   if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
     "${ADDITIONALS[MICROG]}" == 'true' ]]; then
-    echo "Error: multiple locked module bundles are not supported in one build." >&2
+    echo "Error: F-Droid Privileged Extension and microG cannot be selected together." >&2
     return 1
   fi
 
-  # Locked module artifacts must be resolved, fetched, and verified before any
-  # OTA contents are unpacked. Keep the disabled path on its legacy ordering.
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
-    rm -rf -- "${WORKDIR}/extracted/extracts/"
-    if ! prepare_fdroid_privileged_extension \
-      locked_module_args "${my_avbroot_setup}"; then
-      return 1
+  # Catalog and legacy extension modules are prepared against one reviewed
+  # helper extension. Locked artifacts are resolved and verified before OTA
+  # contents are unpacked.
+  prepare_adapter_extension "${my_avbroot_setup}" || return 1
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ||
+    "${ADDITIONALS[MICROG]}" == 'true' ||
+    "${ADDITIONALS[SHIZUKU]}" == 'true' ||
+    "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ]]; then
+    if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
+      # Preserve the historic F-Droid cleanup before artifact resolution.
+      rm -rf -- "${WORKDIR}/extracted/extracts/"
     fi
+    prepare_locked_catalog_modules locked_module_args "${my_avbroot_setup}" || return 1
   fi
 
   # Extract the official public keys and certificates if not found.
@@ -1098,13 +903,9 @@ function patch_ota() {
       return 1
     fi
     append_enabled_module_arguments args || return 1
-    if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
-      args+=("${locked_module_args[@]}")
-    elif [[ "${ADDITIONALS[MICROG]}" == 'true' ]]; then
-      prepare_microg args "${my_avbroot_setup}" || return 1
-    elif ! prepare_fdroid_privileged_extension args "${my_avbroot_setup}"; then
-      return 1
-    fi
+    [[ -z "${ADAPTER_EXTENSION_PATH:-}" ]] ||
+      args+=(--adapter-extension "${ADAPTER_EXTENSION_PATH}")
+    args+=("${locked_module_args[@]}")
 
     if [[ "${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}" == 'true' ]]; then
       args+=("--patch-arg=--clear-vbmeta-flags")
@@ -1160,6 +961,8 @@ function patch_ota() {
 
     # Keep large helper images on the build filesystem rather than a small
     # host /tmp tmpfs. Only the child inherits this private scratch location.
+    local release_url
+    release_url="$(release_location_for_output "${OUTPUTS[PATCHED_OTA]}")" || return 1
     local -a helper_command=(python "${my_avbroot_setup}/patch.py")
     if [[ "${runtime_care_map_active}" == true ]]; then
       local repository_root build_parent
@@ -1173,8 +976,9 @@ function patch_ota() {
     fi
     local helper_scratch helper_status=0
     helper_scratch="$(mktemp -d "$(realpath -- "${WORKDIR}")/helper-scratch.XXXXXX")" || return 1
-    TMPDIR="${helper_scratch}" run_patch_helper_with_diagnostics \
-      "${ota_zip}.zip" "${helper_command[@]}" "${args[@]}" || helper_status=$?
+    TMPDIR="${helper_scratch}" PYTHONDONTWRITEBYTECODE=1 run_patch_helper_with_diagnostics \
+      "${ota_zip}.zip" "${helper_command[@]}" --release-url "${release_url}" \
+      "${args[@]}" || helper_status=$?
     # Python owns cleanup of its nested temporary directories. Remove only an
     # empty parent; preserve debugging contents for the normal WORKDIR lifecycle.
     rmdir -- "${helper_scratch}" 2>/dev/null || :
@@ -1544,7 +1348,7 @@ function my_avbroot_setup() {
 }
 
 # Fail early when the helper checkout is not the exact revision PixeneOS pins.
-# The compatibility transformer performs the stronger origin/status/source-shape
+# The native compatibility validator performs the stronger origin/status/source
 # validation later; this cheap check intentionally runs before OTA acquisition.
 function helper_repository_preflight() {
   local helper_root="${WORKDIR}/tools/my-avbroot-setup"
@@ -1561,15 +1365,22 @@ function helper_repository_preflight() {
   fi
 }
 
-# Run after env_setup: by this point the fail-closed compatibility transform and
-# pyproject dependencies are in place, so --help exercises the effective helper.
+# Run after env_setup: by this point the fail-closed native source check and
+# pyproject dependencies are in place, so --help exercises the pinned helper.
 function helper_contract_preflight() {
   local helper_root="${WORKDIR}/tools/my-avbroot-setup"
+  local help_output option
 
-  if ! python "${helper_root}/patch.py" --help >/dev/null 2>&1; then
+  if ! help_output="$(PYTHONDONTWRITEBYTECODE=1 python "${helper_root}/patch.py" --help)"; then
     echo "Error: helper patch.py contract smoke check failed" >&2
     return 1
   fi
+  for option in --release-url --adapter-extension; do
+    if [[ "${help_output}" != *"${option}"* ]]; then
+      echo "Error: pinned helper patch.py lacks native option ${option}." >&2
+      return 1
+    fi
+  done
 }
 
 # Function to setup the environment variables and paths for patching the OTA
@@ -1620,7 +1431,7 @@ function env_setup() {
   my_avbroot_setup || return 1
 
   # Enabled python virtual environment
-  enable_venv || return 1
+  enable_venv "${my_avbroot_setup}" || return 1
 
   # Install required Python packages from the maintained helper's pyproject.
   if [[ -f "${pyproject_file}" ]]; then
@@ -1661,39 +1472,41 @@ function env_setup() {
 
 # Function to enable the python virtual environment
 function enable_venv() {
-  local dir_path='' # Default value is empty string
-  local base_path=$(basename "$(pwd)")
-  local venv_path=''
-
-  # Check presence of venv
-  # Create a virtual environment if not found
-  if [[ "${base_path}" == "my-avbroot-setup" ]]; then
-    if [ ! -d "venv" ]; then
-      echo -e "Virtual environment not found. Creating..."
-      python3 -m venv venv
-    fi
-  else
-    echo -e "The script is not run from the \`my-avbroot-setup\` directory.\nSearching for the directory..."
-    dir_path=$(find . -type d -name "my-avbroot-setup" -print -quit)
-    if [ ! -d "${dir_path}/venv" ]; then
-      echo -e "Virtual environment not found in path \`${dir_path}\`. Creating..."
-      python3 -m venv "${dir_path}/venv"
+  local helper_root="${1:-}"
+  local venv_parent venv_root activate_script
+  if [[ -z "${helper_root}" ]]; then
+    if [[ "$(basename -- "$(pwd)")" == my-avbroot-setup ]]; then
+      helper_root="$(pwd -P)"
+    else
+      helper_root="$(find . -type d -name my-avbroot-setup -print -quit)"
     fi
   fi
-
-  # Set the virtual environment path
-  if [ -n "${dir_path}" ]; then
-    venv_path="${dir_path}/venv/bin/activate"
-  else
-    venv_path="venv/bin/activate"
-  fi
-
-  # Ensure venv_path is set correctly and activate the virtual environment
-  if [[ ! -f "${venv_path}" ]]; then
-    echo -e "Virtual environment activation script not found at \`${venv_path}\`."
+  if [[ -z "${helper_root}" || ! -d "${helper_root}" || -L "${helper_root}" ]]; then
+    echo "Error: pinned helper source directory is unavailable for Python setup." >&2
     return 1
   fi
-  source "${venv_path}" || return 1
+
+  venv_parent="${WORKDIR:-$(dirname -- "${helper_root}")}/venvs"
+  venv_root="${venv_parent}/my-avbroot-setup"
+  case "$(realpath -m -- "${venv_root}")/" in
+    "$(realpath -m -- "${helper_root}")/"*)
+      echo "Error: helper virtual environment must be outside its source checkout." >&2
+      return 1
+      ;;
+  esac
+  activate_script="${venv_root}/bin/activate"
+  if [[ ! -f "${activate_script}" ]]; then
+    if [[ -e "${venv_root}" || -L "${venv_root}" ]]; then
+      echo "Error: helper virtual environment path exists but is not usable: ${venv_root}" >&2
+      return 1
+    fi
+    mkdir -p -- "${venv_parent}" || return 1
+    python3 -m venv "${venv_root}" || return 1
+  fi
+  if [[ -n "${VIRTUAL_ENV:-}" && "$(realpath -m -- "${VIRTUAL_ENV}")" != "$(realpath -m -- "${venv_root}")" ]]; then
+    if declare -F deactivate >/dev/null; then deactivate; fi
+  fi
+  source "${activate_script}" || return 1
   [[ -n "${VIRTUAL_ENV:-}" ]]
 }
 

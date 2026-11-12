@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "catalog_directories": [
+    "manifests"
+  ],
+  "catalog_manifests": [
+    {
+      "source_path": "tools/modules/catalog/shizuku.toml",
+      "source": "manifests/shizuku.toml",
+      "sha256": "4181e3df30b5ae57251c8304804568726956a842df02a5039ce936ac49719c1d"
+    },
+    {
+      "source_path": "tools/modules/catalog/exfatprogs-fsck.toml",
+      "source": "manifests/exfatprogs-fsck.toml",
+      "sha256": "75b0c0670f7cf1d80c244514783744672b1958a14e78fe4c990849734233134a"
+    }
+  ],
+  "adapters": [
+    {
+      "id": "boot-animation",
+      "kind": "legacy-cli",
+      "source_path": "src/boot_animation.py",
+      "source": "adapters/boot_animation.py",
+      "sha256": "78990b82b5923618a58511101951d4fca9392c8c20bec48cb2180777d0a8f209",
+      "target": "_module_class",
+      "verification_schemes": [
+        "sha256"
+      ],
+      "trusted_signers": [],
+      "digest_required": true
+    },
+    {
+      "id": "disable-system-updater",
+      "kind": "legacy-cli",
+      "source_path": "src/disable_system_updater.py",
+      "source": "adapters/disable_system_updater.py",
+      "sha256": "14928159fe74d2e58ce5c1e8a255e1115fa28ec05e38ba81ebdafc0b28ce6fdd",
+      "target": "_module_class",
+      "verification_schemes": [
+        "sha256"
+      ],
+      "trusted_signers": [],
+      "digest_required": true
+    },
+    {
+      "id": "shizuku",
+      "kind": "catalog-legacy",
+      "source_path": "src/shizuku.py",
+      "source": "adapters/shizuku.py",
+      "sha256": "834a1c795603f6c7a5152b082abf48e4fe47a8d0f872b93b592aca6e0a07b2f4",
+      "target": "_module_class",
+      "verification_schemes": [
+        "sha256",
+        "apk-signature"
+      ],
+      "trusted_signers": [
+        "268b5590e868fb08bae7e0ac413564cd1ff88f5ccff74af9dbd0dc918e30db30"
+      ],
+      "digest_required": true
+    },
+    {
+      "id": "fsck-sysfs-sepolicy",
+      "kind": "legacy-cli",
+      "source_path": "src/fsck_sysfs_sepolicy.py",
+      "source": "adapters/fsck_sysfs_sepolicy.py",
+      "sha256": "c38e92102142a1a465ce9c5ea4092420be065d71fba24d943edb6880fc2c4c2b",
+      "target": "_module_class",
+      "verification_schemes": [
+        "sha256"
+      ],
+      "trusted_signers": [],
+      "digest_required": true
+    },
+    {
+      "id": "exfatprogs-fsck",
+      "kind": "catalog-legacy",
+      "source_path": "src/exfatprogs_fsck.py",
+      "source": "adapters/exfatprogs_fsck.py",
+      "sha256": "02cd819c01f505b5691c2e99cccbccdc83dc7786e20931fa4346ff310a009908",
+      "target": "_module_class",
+      "verification_schemes": [
+        "sha256"
+      ],
+      "trusted_signers": [],
+      "digest_required": true
+    }
+  ]
+}

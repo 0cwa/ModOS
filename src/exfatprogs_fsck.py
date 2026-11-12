@@ -467,7 +467,7 @@ def _module_class() -> type[Any]:
             ext_fs: dict[str, ExtFs],
             sepolicies: Iterable[Path],
             compatible_sepolicy: bool = False,
-        ) -> None:
+        ) -> Any:
             del boot_fs, sepolicies, compatible_sepolicy
             _require_target_profile(
                 os.environ.get("PIXENEOS_ROM_FAMILY", ""),
@@ -488,6 +488,11 @@ def _module_class() -> type[Any]:
                 raise ExfatFsckError("system image is unavailable for the exFAT checker")
             _inject_system_binary(system_fs, _system_image_binary(
                 Path(package_path) if package_path else None, verified_bytes=payload))
+            if context is None:
+                return None
+            from lib.modules.report import AdapterPatchResult
+
+            return AdapterPatchResult((str(TARGET_PATH),))
 
     return ExfatprogsFsckMod
 

@@ -56,6 +56,7 @@ function selection_variant_manifest() {
     SELECTION_MODULE_FSCK_SYSFS_SEPOLICY
     SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256
     SELECTION_BOOT_ANIMATION
+    SELECTION_ADAPTER_EXTENSION_SHA256
   )
 
   for field in "${required_fields[@]}"; do
@@ -128,6 +129,12 @@ function selection_variant_manifest() {
     fi
   done
 
+  if [[ "${SELECTION_ADAPTER_EXTENSION_SHA256}" != disabled &&
+    ! "${SELECTION_ADAPTER_EXTENSION_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Error: selection identity field SELECTION_ADAPTER_EXTENSION_SHA256 is not a SHA-256 digest." >&2
+    return 1
+  fi
+
   if [[ "${SELECTION_SHIZUKU_ROOT_MODE}" != disabled &&
     "${SELECTION_SHIZUKU_ROOT_MODE}" != rootless &&
     "${SELECTION_SHIZUKU_ROOT_MODE}" != magisk ]]; then
@@ -194,6 +201,7 @@ function selection_variant_manifest() {
     "helper_commit=${SELECTION_HELPER_COMMIT}" \
     "executable_tools_lock_sha256=${SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256}" \
     "build_diagnostics_sha256=${SELECTION_BUILD_DIAGNOSTICS_SHA256}" \
+    "adapter_extension_sha256=${SELECTION_ADAPTER_EXTENSION_SHA256}" \
     "lock_sha256=${SELECTION_LOCK_SHA256}" \
     "profile_sha256=${SELECTION_PROFILE_SHA256}" \
     "module.afsr=${SELECTION_MODULE_AFSR}" \

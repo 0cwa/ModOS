@@ -1,20 +1,15 @@
 {
-  "compatibility_version": 1,
+  "compatibility_version": 2,
   "report_binding": "verified-output-sha256-v1",
   "repository": "https://github.com/0cwa/my-avbroot-setup",
-  "revision": "b553f46a9b94fff3960617830b6072b0f8b054b5",
+  "revision": "21b8318ab43908dbc6d9c797cffabf99a86f9d5b",
   "targets": {
     "patch.py": {
-      "sha256": "3df0c35b8d8cbe7ed83c23abc91a655c000c4f9cf17c47baf899d99175b45c70",
-      "replacement": {
-        "kind": "qualified_call_argument",
-        "qualified_name": "external.generate_update_info",
-        "arguments": [
-          "update_info",
-          "args.output.name"
-        ],
-        "to": "{release_url!r}"
-      }
+      "sha256": "5144d83047e87a80bad5e383ab924e87d368f4c8f1ce6d44d7f15a282ec15f6e"
     }
-  }
+  },
+  "required_options": [
+    "--release-url",
+    "--adapter-extension"
+  ]
 }

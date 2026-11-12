@@ -89,7 +89,32 @@ class SelectionContractTest(unittest.TestCase):
 
     def test_missing_adapter_preparation(self):
         self.replace('src/util_functions.sh', '! prepare_shizuku_module "${my_avbroot_setup}"', '! omitted_preparation "${my_avbroot_setup}"')
-        with self.assertRaisesRegex(ValueError, 'adapter preparation'):
+        with self.assertRaisesRegex(ValueError, 'local adapter preconditions'):
+            self.check()
+
+    def test_missing_catalog_composer(self):
+        self.replace('src/util_functions.sh', 'compose_locked_inputs.py', 'removed_catalog_composer.py')
+        with self.assertRaisesRegex(ValueError, 'combined locked catalog preparation'):
+            self.check()
+
+    def test_missing_extension_staging_boundary(self):
+        self.replace('src/util_functions.sh', 'tools/modules/build_adapter_extension.py', 'removed_adapter_builder.py')
+        with self.assertRaisesRegex(ValueError, 'trusted adapter extension staging'):
+            self.check()
+
+    def test_missing_extension_identity_input(self):
+        self.replace('src/rom_profiles.sh', 'tools/modules/adapter_extension.json', 'tools/modules/removed.json')
+        with self.assertRaisesRegex(ValueError, 'adapter extension selection identity'):
+            self.check()
+
+    def test_missing_composition_identity_input(self):
+        self.replace('src/rom_profiles.sh', 'tools/modules/compose_locked_inputs.py', 'tools/modules/removed_composer.py')
+        with self.assertRaisesRegex(ValueError, 'adapter extension selection identity'):
+            self.check()
+
+    def test_unbounded_catalog_minimum_api(self):
+        self.replace('tools/modules/catalog/shizuku.toml', 'min_api = 24', 'min_api = 1')
+        with self.assertRaisesRegex(ValueError, 'build/install minimum API'):
             self.check()
 
     def test_missing_rom_policy(self):

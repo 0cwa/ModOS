@@ -173,6 +173,7 @@ jobs:
           bash tests/module_selection_test.sh
           python3 tools/modules/check_selection.py
           python3 tests/module_selection_contract_test.py
+          python3 tests/compose_locked_inputs_test.py
           bash tests/source_care_map_policy_test.sh
           bash tests/pdx235_source_publisher_test.sh
           bash tests/pdx235_repaired_helper_test.sh
@@ -185,6 +186,8 @@ jobs:
           python3 tests/boot_animation_test.py
           python3 tests/shizuku_adapter_test.py
           python3 tests/catalog_payload_context_test.py
+          MODOS_HELPER_ROOT="${RUNNER_TEMP}/pinned-module-tool" \
+            "${RUNNER_TEMP}/module-tool-venv/bin/python3" tests/catalog_patch_report_test.py
           python3 tests/shizuku_post_boot_check_test.py
           python3 tests/disable_system_updater_test.py
           bash tests/disable_system_updater_registration_test.sh

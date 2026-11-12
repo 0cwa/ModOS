@@ -10,16 +10,30 @@ from pathlib import Path
 import re
 import shlex
 import sys
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = (
     'src/config_schema.sh', 'src/util_functions.sh', 'src/rom_profiles.sh',
     'src/ci/selection_variant.sh', '.github/workflows/build-rom.yml',
     'src/device/check_pdx235_modules.py',
+    'tools/modules/adapter_extension.json',
+    'tools/modules/build_adapter_extension.py',
+    'tools/modules/catalog/shizuku.toml',
+    'tools/modules/catalog/exfatprogs-fsck.toml',
+    'tools/modules/compose_locked_inputs.py',
+    'src/boot_animation.py',
+    'src/disable_system_updater.py',
+    'src/shizuku.py',
+    'src/fsck_sysfs_sepolicy.py',
+    'src/exfatprogs_fsck.py',
 )
 # These typed ADDITIONALS switches describe build policy, not catalog modules.
 POLICY_KEYS = {'root', 'compatible_sepolicy_patching'}
-ROUTES = {'host-tool', 'signed-zip', 'local-adapter', 'locked-bundle'}
+ROUTES = {
+    'host-tool', 'signed-zip', 'local-adapter', 'locked-bundle',
+    'helper-extension', 'catalog-locked',
+}
 
 
 def schema_entries(text):
@@ -58,9 +72,48 @@ def check_sources(root, data, sources):
     argument_body = function_body(setup, 'append_enabled_module_arguments')
     actual_arguments = re.findall(r'"([a-z0-9-]+):([A-Z0-9_]+)"', argument_body)
     expected_arguments = {(m['helper_id'], m['key'].upper()) for m in modules
-                          if m['route'] in {'signed-zip', 'local-adapter'}}
+                          if m['route'] in {'signed-zip', 'local-adapter', 'helper-extension'}
+                          or (m['route'] == 'catalog-locked' and m.get('helper_cli'))}
     if len(actual_arguments) != len(set(actual_arguments)) or set(actual_arguments) != expected_arguments:
         raise ValueError('helper argument routing differs from selection index')
+
+    extension = json.loads(sources['tools/modules/adapter_extension.json'])
+    extension_adapters = {item['id']: item for item in extension['adapters']}
+    extension_catalogs = {item['source']: item for item in extension['catalog_manifests']}
+    for module in modules:
+        extension_id = module.get('extension_adapter')
+        if extension_id:
+            entry = extension_adapters.get(extension_id)
+            expected_kind = 'catalog-legacy' if module['route'] == 'catalog-locked' else 'legacy-cli'
+            if not entry or entry['kind'] != expected_kind or entry['source_path'] not in sources:
+                raise ValueError(f'{module["key"]}: missing trusted extension registration')
+            if module.get('helper_id') != extension_id:
+                raise ValueError(f'{module["key"]}: helper ID differs from extension adapter')
+        if module['key'] in {'shizuku', 'exfatprogs_fsck'}:
+            catalog_path = f'manifests/{module["helper_id"]}.toml'
+            manifest_entry = extension_catalogs.get(catalog_path)
+            if not manifest_entry:
+                raise ValueError(f'{module["key"]}: missing real helper catalog manifest')
+            manifest = tomllib.loads(sources[
+                'tools/modules/catalog/' + module['helper_id'] + '.toml'
+            ])
+            if manifest.get('id') != module['helper_id'] or manifest.get('adapter') != extension_id:
+                raise ValueError(f'{module["key"]}: catalog manifest ID/adapter differs')
+            minimum_api = manifest.get('capabilities', {}).get('requires', {}).get('min_api')
+            if type(minimum_api) is not int or minimum_api != 24:
+                raise ValueError(f'{module["key"]}: catalog manifest lacks its evidenced build/install minimum API')
+
+    adapter_stage = function_body(setup, 'prepare_adapter_extension')
+    patch_body = function_body(setup, 'patch_ota')
+    if 'tools/modules/build_adapter_extension.py' not in adapter_stage or \
+            'prepare_adapter_extension "${my_avbroot_setup}" || return 1' not in patch_body:
+        raise ValueError('missing trusted adapter extension staging boundary')
+    locked_prepare = function_body(setup, 'prepare_locked_catalog_modules')
+    if any(token not in locked_prepare for token in (
+        'compose_locked_inputs.py', 'module-tool.py', 'artifacts fetch',
+        'artifacts verify', '--module-lock', '--module-profile',
+    )) or 'prepare_locked_catalog_modules locked_module_args' not in patch_body:
+        raise ValueError('missing combined locked catalog preparation path')
 
     profiles = sources['src/rom_profiles.sh']
     fingerprint = function_body(profiles, 'module_selection_fingerprint')
@@ -110,12 +163,22 @@ def check_sources(root, data, sources):
                 raise ValueError(f'{key}: missing/miswired health registration')
         elif not m.get('health_pending'):
             raise ValueError(f'{key}: missing health coverage needs an explicit reason')
-        if m['route'] == 'local-adapter':
+        if m['route'] in {'local-adapter', 'helper-extension', 'catalog-locked'}:
             preparation = m['prepare']
-            function_body(setup, preparation)
-            patch = function_body(setup, 'patch_ota')
-            if not re.search(r'! ' + re.escape(preparation) + r' "\$\{my_avbroot_setup\}"', patch):
-                raise ValueError(f'{key}: missing adapter preparation call')
+            if preparation == 'prepare_locked_catalog_modules':
+                function_body(setup, preparation)
+                if f'"${{ADDITIONALS[{flag}]}}"' not in locked_prepare and \
+                        f'ADDITIONALS[{flag}]' not in locked_prepare:
+                    raise ValueError(f'{key}: locked catalog selection is not consumed')
+            else:
+                function_body(setup, preparation)
+                if not re.search(r'! ' + re.escape(preparation) + r' "\$\{my_avbroot_setup\}"', patch_body):
+                    raise ValueError(f'{key}: missing adapter preparation call')
+            local_prepare = m.get('local_prepare')
+            if local_prepare:
+                function_body(setup, local_prepare)
+                if not re.search(r'! ' + re.escape(local_prepare) + r' "\$\{my_avbroot_setup\}"', patch_body):
+                    raise ValueError(f'{key}: missing local adapter preconditions')
         elif m['route'] == 'locked-bundle':
             body = function_body(setup, m['prepare'])
             if '--module-lock' not in body or '--module-profile' not in body or 'module-tool.py' not in body:
@@ -124,6 +187,13 @@ def check_sources(root, data, sources):
             raise ValueError(f'{key}: unknown exclusive module')
     if not re.search(r'grapheneos\) ADDITIONALS\[BCR\]=false', function_body(profiles, 'apply_rom_module_policy')):
         raise ValueError('bcr: missing GrapheneOS exclusion policy')
+
+    if 'SELECTION_ADAPTER_EXTENSION_SHA256' not in fingerprint or \
+            'tools/modules/adapter_extension.json' not in fingerprint or \
+            'tools/modules/build_adapter_extension.py' not in fingerprint or \
+            'tools/modules/compose_locked_inputs.py' not in fingerprint or \
+            'adapter_extension_sha256=${SELECTION_ADAPTER_EXTENSION_SHA256}' not in variant:
+        raise ValueError('missing adapter extension selection identity')
 
 
 def check(root=ROOT, index_path=None):

@@ -39,9 +39,18 @@ test_helper_contract_preflight() (
   printf '#!/usr/bin/env python3\n' >"${helper}/patch.py"
 
   python() {
-    [[ "${1}" == "${helper}/patch.py" && "${2}" == "--help" ]]
+    [[ "${1}" == "${helper}/patch.py" && "${2}" == "--help" ]] || return 1
+    printf '%s\n' 'usage: patch.py --release-url URL --adapter-extension PATH'
   }
   helper_contract_preflight
+
+  local missing_option
+  for missing_option in --release-url --adapter-extension; do
+    python() { printf 'usage: patch.py %s\n' "${missing_option}"; }
+    if helper_contract_preflight 2>/dev/null; then
+      fail "missing native helper option was accepted: ${missing_option}"
+    fi
+  done
 
   python() { return 1; }
   if helper_contract_preflight 2>/dev/null; then

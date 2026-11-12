@@ -1,83 +1,77 @@
 #!/usr/bin/env python3
-"""Exercise the helper's dynamic import and module-registration contract."""
+"""Verify fsck policy uses the explicit external adapter extension route."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 import tempfile
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-ADAPTER_SOURCE = REPOSITORY_ROOT / "src" / "fsck_sysfs_sepolicy.py"
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="fsck-sysfs-helper-import-") as temporary:
-        helper_root = Path(temporary)
-        modules = helper_root / "lib" / "modules"
-        modules.mkdir(parents=True)
-        (helper_root / "lib" / "__init__.py").write_text("")
-        (helper_root / "lib" / "modules" / "__init__.py").write_text(
-            "from dataclasses import dataclass\n"
-            "class LegacyCliModule: pass\n"
-            "class MissingArgs(Exception): pass\n"
-            "@dataclass\n"
-            "class ModuleRequirements:\n"
-            "    boot_images: set[str]\n"
-            "    ext_images: set[str]\n"
-            "    selinux_patching: bool\n"
-        )
-        (helper_root / "lib" / "filesystem.py").write_text(
-            "class CpioFs: pass\nclass ExtFs: pass\n"
-        )
-        (helper_root / "lib" / "linux.py").write_text(
-            "def linux_run(*args, **kwargs): return None\n"
-        )
-        (modules / "fsck_sysfs_sepolicy.py").write_bytes(ADAPTER_SOURCE.read_bytes())
-        (modules / "registry.py").write_text(
-            "def legacy_cli_module_types():\n"
-            "    from lib.modules.fsck_sysfs_sepolicy import FsckSysfsSePolicyMod\n"
-            "    return (FsckSysfsSePolicyMod,)\n"
-        )
+    config = json.loads((ROOT / 'tools/modules/adapter_extension.json').read_text())
+    entry = next(item for item in config['adapters'] if item['id'] == 'fsck-sysfs-sepolicy')
+    assert entry['kind'] == 'legacy-cli'
+    assert entry['target'] == '_module_class'
+    assert entry['source_path'] == 'src/fsck_sysfs_sepolicy.py'
+    assert entry['source'] == 'adapters/fsck_sysfs_sepolicy.py'
+    assert entry['sha256'] == hashlib.sha256((ROOT / entry['source_path']).read_bytes()).hexdigest()
 
-        helper_contract = """
-import os
-from lib.modules import LegacyCliModule
-from lib.modules.registry import legacy_cli_module_types
-os.environ['PIXENEOS_ROM_FAMILY'] = 'lineageos'
-os.environ['PIXENEOS_DEVICE_NAME'] = 'pdx235'
-modules = legacy_cli_module_types()
-assert len(modules) == 1
-module = modules[0]
-assert module.__name__ == 'FsckSysfsSePolicyMod'
-assert issubclass(module, LegacyCliModule)
-assert module.NAME == 'fsck-sysfs-sepolicy'
-requirements = module().requirements()
-assert requirements.selinux_patching is True
-assert requirements.boot_images == set()
-assert requirements.ext_images == set()
-"""
-        environment = os.environ.copy()
-        environment["PYTHONPATH"] = str(helper_root)
+    util = (ROOT / 'src/util_functions.sh').read_text()
+    start = util.index('function prepare_fsck_sysfs_sepolicy_module()')
+    end = util.index('\n# Register the locked Termux exfatprogs binary adapter', start)
+    preparation = util[start:end]
+    assert 'registry.py' not in preparation
+    assert 'lib/modules' not in preparation
+    assert 'prepare_adapter_extension' in util
+    assert 'args+=(--adapter-extension "${ADAPTER_EXTENSION_PATH}")' in util
+
+    temp_root = Path(tempfile.mkdtemp(
+        prefix='fsck-sysfs-extension-',
+        dir=os.environ['TMPDIR'],
+    ))
+    try:
+        script = '''
+set -euo pipefail
+source src/util_functions.sh
+WORKDIR="$1/work"
+ROM_FAMILY=lineageos
+DEVICE_NAME=pdx235
+EXFATPROGS_POLICY_PATCHER_PATH="$1/patcher"
+ADDITIONALS[FSCK_SYSFS_SEPOLICY]=true
+prepare_fsck_sysfs_sepolicy_module
+[[ -f "$WORKDIR/modules/fsck-sysfs-sepolicy.zip" ]]
+[[ -f "$WORKDIR/signatures/fsck-sysfs-sepolicy.zip.sig" ]]
+[[ "$PIXENEOS_FSCK_SYSFS_POLICY_PATCHER" == "$1/patcher" ]]
+'''
         result = subprocess.run(
-            [sys.executable, "-c", helper_contract],
-            cwd=helper_root,
-            env=environment,
+            ['bash', '-c', script, 'fsck-registration-test', str(temp_root)],
+            cwd=ROOT,
             check=False,
-            capture_output=True,
             text=True,
+            capture_output=True,
         )
-        if result.returncode != 0:
+        if result.returncode:
             raise AssertionError(
-                "helper-style module import/registration failed:\n"
-                f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+                'local fsck preparation failed:\n'
+                f'stdout:\n{result.stdout}\nstderr:\n{result.stderr}'
             )
+    finally:
+        for child in sorted(temp_root.rglob('*'), reverse=True):
+            if child.is_dir():
+                child.rmdir()
+            else:
+                child.unlink()
+        temp_root.rmdir()
 
-    print("fsck sysfs SELinux helper import and registration contract passed")
+    print('fsck sysfs external adapter preparation contract passed')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
