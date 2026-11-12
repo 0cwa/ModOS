@@ -171,6 +171,8 @@ jobs:
           python3 tests/fsck_sysfs_sepolicy_registration_test.py
           bash tests/rom_contract_test.sh
           bash tests/module_selection_test.sh
+          python3 tools/modules/check_selection.py
+          python3 tests/module_selection_contract_test.py
           bash tests/source_care_map_policy_test.sh
           bash tests/pdx235_source_publisher_test.sh
           bash tests/pdx235_repaired_helper_test.sh

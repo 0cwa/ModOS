@@ -1,0 +1,17 @@
+{
+  "modules": [
+    {"key":"afsr","config":"afsr","health":"afsr","route":"helper-catalog","helper_id":"afsr"},
+    {"key":"alterinstaller","config":"alterinstaller","health":"alterinstaller","route":"helper-catalog","helper_id":"alterinstaller"},
+    {"key":"bcr","config":"bcr","health":"bcr","route":"helper-catalog","helper_id":"bcr","profile":"lineageos-only"},
+    {"key":"custota","config":"custota","health":"custota","route":"helper-catalog","helper_id":"custota"},
+    {"key":"msd","config":"msd","health":"msd","route":"helper-catalog","helper_id":"msd"},
+    {"key":"oemunlockonboot","config":"oemunlockonboot","health":"oemunlockonboot","route":"helper-catalog","helper_id":"oemunlockonboot"},
+    {"key":"microg","config":"microg","health":"microg","route":"locked-bundle","helper_id":"microg"},
+    {"key":"fdroid_privileged_extension","config":"fdroid_privileged_extension","health":"fdroid_privileged_extension","route":"locked-bundle","helper_id":"fdroid-privileged-extension","exclusive":"microg"},
+    {"key":"shizuku","config":"shizuku","health":null,"route":"local-adapter"},
+    {"key":"exfatprogs_fsck","config":"exfatprogs_fsck","health":"exfatprogs_fsck","route":"local-adapter"},
+    {"key":"fsck_sysfs_sepolicy","config":"fsck_sysfs_sepolicy","health":"fsck_sysfs_sepolicy","route":"local-adapter"},
+    {"key":"boot_animation","config":"boot_animation","health":"boot_animation","selection_field":"BOOT_ANIMATION","route":"signed-zip"},
+    {"key":"disable_system_updater","config":"disable_system_updater","health":"stock_updater","selection_field":"DISABLE_SYSTEM_UPDATER","route":"local-adapter"}
+  ]
+}
