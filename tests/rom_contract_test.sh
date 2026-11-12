@@ -467,7 +467,10 @@ test_shizuku_selection_follows_supported_rom_profiles() (
     [[ "${1}" == "locks/shizuku-v13.6.0.json" ||
       "${1}" == "src/shizuku.py" ||
       "${1}" == "locks/executable-tools-v1.json" ||
-      "${1}" == "src/build_diagnostics.py" ]] || return 1
+      "${1}" == "src/build_diagnostics.py" ||
+      "${1}" == "tools/modules/build_adapter_extension.py" ||
+      "${1}" == "tools/modules/adapter_extension.json" ||
+      "${1}" == "tools/modules/compose_locked_inputs.py" ]] || return 1
     printf '%064d\n' 0
   }
   ADDITIONALS[SHIZUKU]="true"
