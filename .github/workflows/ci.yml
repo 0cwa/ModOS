@@ -10,6 +10,57 @@ permissions:
   contents: read
 
 jobs:
+  # Keep the Magisk contract observable independently of unrelated optional
+  # module endpoints. The full test job and full-profile gates remain required.
+  magisk_compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Configure Android APK verification tools
+        run: bash src/ci/configure_android_apk_tools.sh
+
+      - name: Test Magisk integration boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/magisk_artifact_test.py
+          python3 tests/magisk_compatibility_test.py
+          bash tests/magisk_output_verification_test.sh
+          bash tests/verifier_test.sh
+          bash tests/typed_config_resolver_test.sh
+          bash tests/rom_contract_test.sh
+          bash tests/provider_acquisition_test.sh
+          bash tests/root_mode_both_test.sh
+          bash tests/module_selection_test.sh
+          python3 tests/pdx235_modular_health_test.py
+
+      - name: Qualify Magisk APK signatures and real boot patching
+        shell: bash
+        run: |
+          set -euo pipefail
+          source src/declarations.sh
+          for version in "${VERSION[MAGISK]}" v30.7; do
+            apk="${RUNNER_TEMP}/Magisk-${version}.apk"
+            python3 src/magisk_artifact.py \
+              --repository "${MAGISK[REPOSITORY]}" --version "${version}" \
+              download --apk "${apk}"
+            python3 src/ci/check_magisk_compatibility.py \
+              --workdir "${RUNNER_TEMP}/magisk-compat-${version}" \
+              --repository "${MAGISK[REPOSITORY]}" --version "${version}" --apk "${apk}"
+          done
+
+      - name: Retain Magisk host compatibility receipts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: magisk-host-compatibility
+          path: ${{ runner.temp }}/magisk-compat-*/report.json
+          if-no-files-found: error
+          retention-days: 14
+
   test:
     runs-on: ubuntu-latest
 
@@ -193,10 +244,62 @@ jobs:
         run: bash src/ci/smoke_test.sh
 
   # No repository signing secrets, release credentials or write permissions.
+  # This additional narrow profile qualifies the Magisk boundary even when
+  # the optional exfatprogs package is unavailable. It neither replaces nor
+  # relaxes the full-profile qualification jobs below and cannot publish.
+  magisk_ota_qualification:
+    needs: magisk_compatibility
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'integration/magisk-')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rom: grapheneos
+            device: shiba
+            channel: stable
+            preinit: sda10
+            sepolicy: false
+          - rom: lineageos
+            device: pdx235
+            channel: nightly
+            preinit: sda47
+            sepolicy: true
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-rom.yml
+    with:
+      rom-family: ${{ matrix.rom }}
+      device-id: ${{ matrix.device }}
+      update-channel: ${{ matrix.channel }}
+      magisk-preinit-device: ${{ matrix.preinit }}
+      compatible-sepolicy-patching: ${{ matrix.sepolicy }}
+      root: false
+      root-mode: both
+      afsr: true
+      custota: true
+      alterinstaller: false
+      bcr: false
+      msd: false
+      oemunlockonboot: false
+      microg: false
+      exfatprogs-fsck: false
+      fsck-sysfs-sepolicy: false
+      allow-unauthorized-adb: false
+      disable-system-updater: true
+      boot-animation: true
+      development-profile: none
+      signing-mode: disposable
+      release-type: build-only
+      publish: false
+
+  # No repository signing secrets, release credentials or write permissions.
   # Same-repository integration branches opt into real, nonpublishing OTA builds.
   # This catches runner/tool upgrades that the deterministic tests cannot cover.
   lineage24_qualification:
-    needs: test
+    needs: [test, magisk_compatibility]
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -229,7 +332,7 @@ jobs:
       publish: false
 
   grapheneos_qualification:
-    needs: test
+    needs: [test, magisk_compatibility]
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&

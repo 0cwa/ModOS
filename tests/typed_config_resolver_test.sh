@@ -74,6 +74,8 @@ test_section_semantics() (
     "'ADDITIONALS[AFSR]' = false" \
     "'ADDITIONALS[BOOT_ANIMATION]' = false" \
     'MAGISK_PREINIT = "sda10"' \
+    'MAGISK_VERSION = "v31.1"' \
+    'MAGISK_APK_SHA256 = "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7"' \
     'FORCE_UPDATE = true' \
     '[github]' \
     'PIXENEOS_RELEASE_OWNER = ""' \
@@ -88,6 +90,9 @@ test_section_semantics() (
     assert_equals beta "${GRAPHENEOS[UPDATE_CHANNEL]}" "device channel"
     assert_equals false "${ADDITIONALS[ROOT]}" "build root"
     assert_equals both "${ROOT_MODE}" "build root mode"
+    assert_equals v31.1 "${VERSION[MAGISK]}" "build Magisk version"
+    assert_equals 89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7 \
+      "${MAGISK_APK_SHA256}" "build Magisk APK digest"
     assert_equals true "${ADDITIONALS[MICROG]}" "build microG"
     assert_equals true "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" "build updater removal"
     assert_equals false "${ADDITIONALS[AFSR]}" "build AFSR"

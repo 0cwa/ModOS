@@ -11,6 +11,14 @@
   labels: ["dependencies"],
   packageRules: [
     {
+      description: "Propose stable Magisk releases for explicit artifact and runtime review",
+      matchPackageNames: ["topjohnwu/Magisk"],
+      automerge: false,
+      prBodyNotes: [
+        "Update locks/magisk-v1.json using the official release APK hash, size and version code. Verify its existing APK signer and avbroot support, then run the real-patcher fixtures and paired ROM qualification. Review manager/bootstrap/authorization changes and collect target-device boot, root and OTA persistence evidence; a version-only update must not bypass these checks.",
+      ],
+    },
+    {
       description: "Propose microG releases; require verified helper lock update before merge",
       matchPackageNames: ["microg/GmsCore"],
       automerge: false,
@@ -33,6 +41,14 @@
   // Their versions, archive hashes, member hashes, modes, and signer binding must
   // be updated atomically in locks/executable-tools-v1.json.
   customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^src/config_schema\\.sh$/"],
+      matchStrings: ["VERSION array MAGISK MAGISK_VERSION (?<currentValue>v[0-9.]+) "],
+      depNameTemplate: "topjohnwu/Magisk",
+      datasourceTemplate: "github-releases",
+      versioningTemplate: "loose",
+    },
     {
       customType: "regex",
       managerFilePatterns: ["/^src/declarations\\.sh$/"],

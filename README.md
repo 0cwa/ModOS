@@ -222,19 +222,31 @@ Root changes the device security model and can introduce compatibility breakage 
 
 ModOS defaults to the official `topjohnwu/Magisk` repository. The source remains configurable through `MAGISK[REPOSITORY]` in `env.toml`, but alternate Magisk forks are opt-in rather than part of the GrapheneOS build contract. If you use Zygisk Next for GrapheneOS compatibility, install and manage it separately from the OTA build. Magisk/Zygisk behavior can change across releases, so rooted builds should be revalidated after ROM, Magisk, or Zygisk changes.
 
-ModOS retains **official Magisk v30.7** as its reviewed runtime baseline. The avbroot executable is pinned separately in `locks/executable-tools-v1.json`. Advancing avbroot and its supported Magisk patch formats does not establish target-device runtime compatibility, so ModOS does not automatically advance to the highest Magisk tag. Override `MAGISK_VERSION` only for an intentional compatibility test.
+ModOS pins **official Magisk v31.1**. The APK and avbroot compatibility checks cover the build inputs and patched images; physical boot, runtime root, Zygisk and OTA persistence still need validation on each target device. The avbroot executable is pinned separately in `locks/executable-tools-v1.json`. Magisk updates require a deliberate compatibility review instead of automatically selecting the highest tag. [Magisk v31.1](https://github.com/topjohnwu/Magisk/releases/tag/v31.1) requires Android 7.0 or newer and changes how the manager is installed and root is authorized.
 
-With avbroot, Magisk is not updated using the app's normal **Direct install** path. Magisk version changes must be made by repatching/re-signing the OTA and installing that OTA. The manager's **Additional setup / Environment fix** is a separate runtime-environment step and does not replace OTA repatching.
+The selected APK must match its size, SHA-256 and version in [`locks/magisk-v1.json`](locks/magisk-v1.json). Downloads are verified before replacing a cached APK, and rooted build fingerprints include the APK digest. The finished boot image must contain the same `magiskinit`, Magisk core, loader and optional stub bytes, with appropriate ramdisk ownership and permissions. Official **v30.7** remains available by setting `MAGISK_VERSION = "v30.7"`. Other versions or repositories require an independently verified `MAGISK_APK_SHA256` in `[build]`; selecting a fork alone is insufficient. See [Magisk compatibility maintenance](docs/magisk-compatibility.md) for updating the lock and qualifying a new release.
 
-A Magisk-patched OTA is only the boot-image half of a working Magisk installation. On a clean install, after a data wipe, or whenever Magisk reports that additional setup is required, install/open the **matching Magisk manager APK**, accept **Additional setup / Environment fix**, and allow the device to reboot. That step provisions the runtime binaries (including `su`) under `/data/adb/magisk`; those files are device state and cannot be embedded in or verified from an OTA image.
+Follow [avbroot's Magisk update procedure](https://github.com/chenxiaolong/avbroot#updating-magisk): repatch/re-sign the OTA with the selected Magisk APK, then install that OTA. **Direct install** and **Install to inactive slot** in the Magisk app do not preserve ModOS's signed OTA installation path. The manager's **Additional setup / Environment fix** is a separate runtime-environment step and does not replace OTA repatching.
 
-After that reboot, verify runtime root on the actual device:
+After installing the Magisk OTA:
+
+1. Install the **matching official manager APK** as an ordinary user app. For the default release, download [Magisk-v31.1.apk](https://github.com/topjohnwu/Magisk/releases/download/v31.1/Magisk-v31.1.apk), then use Android's package installer or:
+
+   ```shell
+   adb install -r /path/to/Magisk-v31.1.apk
+   ```
+
+   Magisk v31.1 no longer automatically installs a missing manager. Its [manager lookup](https://github.com/topjohnwu/Magisk/blob/v31.1/native/src/core/package.rs) expects a user installation under `/data/app`; putting the APK only in a system image is insufficient. When upgrading a previously hidden/repackaged manager, install the official package rather than relying on the old stub.
+2. Open the matching manager, complete the runtime **Additional setup / Environment fix** if requested, and let the device reboot. The environment under `/data/adb/magisk` is device state; an OTA cannot establish that this setup completed. If the app instead requests a full Magisk reinstall or reflash, stop that flow: a version mismatch or unavailable preinit partition can trigger it. Check the manager/OTA versions and preinit selection, then rebuild and install the signed OTA as needed. The upstream [setup decision](https://github.com/topjohnwu/Magisk/blob/v31.1/app/apk/src/main/java/com/topjohnwu/magisk/ui/home/HomeScreen.kt) distinguishes this from repairing runtime files.
+3. In **Superuser**, choose **+ / Grant Superuser**, search for **Shell** or **adb**, and grant **Shell** (`com.android.shell`, UID 2000) access before checking root over ADB. Grant other applications individually as needed. [v31.1's grant screen](https://github.com/topjohnwu/Magisk/blob/v31.1/app/apk/src/main/java/com/topjohnwu/magisk/ui/superuser/SuperuserGrantViewModel.kt) includes Shell explicitly. Reactive permission prompts and the old **Superuser access / Apps and ADB** setting have been removed.
+
+Then verify runtime root on the actual device:
 
 ```shell
 adb shell su -c id
 ```
 
-A working setup should report `uid=0(root)`. ModOS CI verifies that the Magisk OTA has a distinct Magisk-patched boot target with the configured preinit device; it deliberately does **not** call that static check proof of runtime root.
+A working setup should report `uid=0(root)`. Check the manager's installed Magisk version against the version used to build the OTA, then repeat the root check after a reboot and a subsequent ModOS OTA update. A denied `su` request before the Shell grant does not by itself establish a broken boot patch. ModOS CI verifies the Magisk boot patch and its configured preinit device; the [read-only device audit](docs/pdx235-device-evidence.md) keeps runtime root as an explicit manual check.
 
 For one build flavor, the existing boolean `ROOT` remains supported (`false` = rootless, `true` = Magisk). `ROOT_MODE` is an optional string override with `rootless`, `magisk`, or `both`. `both` prepares the OTA and shared modules once, then emits the normal rootless and Magisk variants from the same prepared image set. Each output keeps its own module-selection fingerprint, Custota signature, update metadata, and `/rootless/` or `/magisk/` publication pointer.
 

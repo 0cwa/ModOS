@@ -7,21 +7,16 @@
 source src/declarations.sh
 source src/rom_profiles.sh
 source src/ota_providers.sh
+source src/magisk.sh
 
 # Resolve the ROM version plus the configured Magisk compatibility version
 function get_latest_version() {
   local selected_magisk_version="${VERSION[MAGISK]:-}"
 
   if [[ -z "${selected_magisk_version}" ]]; then
-    selected_magisk_version=$(
-      git ls-remote --tags "${DOMAIN}/${MAGISK[REPOSITORY]}.git" |
-        awk -F'\t' '{print $2}' |
-        grep -E 'refs/tags/' |
-        grep -v '\^{}$' |
-        sed 's/refs\/tags\///' |
-        sort -V |
-        tail -n1
-    )
+    # An empty override must not float to an unreviewed/pre-release Git tag.
+    # Rootless metadata resolution also needs no connection to Magisk upstream.
+    selected_magisk_version="$(config_schema_default magisk_version)"
   fi
 
   resolve_rom_profile || return 1
@@ -59,15 +54,16 @@ function get() {
     return 1
   fi
 
+  if [[ "${filename}" == "magisk" ]]; then
+    echo "Error: Magisk requires digest-verified acquisition through run_magisk_artifact." >&2
+    return 1
+  fi
+
   # `my-avbroot-setup` is a special case as it is a git repository
   if [[ "${filename}" == "my-avbroot-setup" ]]; then
     git clone "${url}" "${WORKDIR}/tools/${filename}" && git -C "${WORKDIR}/tools/${filename}" checkout "${VERSION[AVBROOT_SETUP]}"
   else
-    if [[ "${filename}" == "magisk" ]]; then
-      suffix="apk"
-    else
-      suffix="zip"
-    fi
+    local suffix="zip"
 
     # Download the files directly to modules directory
     curl -sLf "${url}" --output "${WORKDIR}/modules/${filename}.${suffix}"

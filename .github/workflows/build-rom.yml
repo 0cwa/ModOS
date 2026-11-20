@@ -566,8 +566,10 @@ jobs:
             if [[ "${ROOT_MODE_RESOLVED}" == magisk || "${ROOT_MODE_RESOLVED}" == both ]]; then
               echo
               echo "Magisk boot patch: statically verified during the build."
-              echo "Runtime root bootstrap: install/open the matching ${MAGISK_REPOSITORY} ${MAGISK_VERSION} manager, complete Additional setup / Environment fix when prompted, then reboot."
-              echo "Runtime verification: adb shell su -c id"
+              echo "Runtime root bootstrap: install the matching ${MAGISK_REPOSITORY} ${MAGISK_VERSION} manager as a normal user app, open it, complete runtime Additional setup / Environment fix when prompted, then reboot. If setup requires a full reinstall/reflash, stop and check the manager/OTA versions and preinit configuration before rebuilding the signed OTA."
+              echo "Magisk v31.1 no longer installs a missing manager automatically. In Superuser > + / Grant Superuser, grant Shell (com.android.shell, UID 2000) before the ADB root check; reactive permission prompts were removed."
+              echo "Runtime verification: adb shell su -c id must report uid=0(root). Confirm the installed Magisk version matches this OTA and repeat after reboot and the next ModOS OTA update."
+              echo "Magisk version changes require a repatched, signed OTA; do not use Direct install or Install to inactive slot. Static build verification does not establish physical boot, runtime root, Zygisk or OTA persistence."
             fi
           } > "${GITHUB_WORKSPACE}-CHANGELOG.txt"
 

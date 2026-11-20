@@ -142,19 +142,11 @@ function check_and_download_dependencies() {
     done
   done
 
-  # Retry logic for magisk. ROOT_MODE=both downloads it once for the
-  # secondary output while preserving the legacy ROOT boolean path.
+  # Verify a reused APK or atomically acquire the selected bytes. Both root
+  # modes use the same verified input; a failed download cannot accept a stale
+  # or partially written APK left by an earlier version.
   if root_mode_includes_magisk; then
-    RETRY_COUNT=0 # Reset retry count for magisk
-    while true; do
-      # Magisk is an exception as it is an APK and hence we do the get call directly and verify
-      URL="${MAGISK[URL]}/releases/download/${VERSION[MAGISK]}/Magisk-${VERSION[MAGISK]}.apk"
-      echo "URL for \`magisk\`: ${URL}"
-      get "magisk" "${URL}"
-      verify_downloads "magisk"
-
-      [[ "${ADDITIONALS[RETRY]}" == "true" ]] && [[ "${RETRY}" == "true" ]] || break
-    done
+    run_magisk_artifact download --apk "${WORKDIR}/modules/magisk.apk" || return 1
   fi
 }
 
@@ -1381,14 +1373,34 @@ function verify_magisk_ota() {
     rm -rf -- "${temp_dir}"
     return 1
   fi
-  rm -rf -- "${temp_dir}"
-
   if ! grep -Fxq -- "PREINITDEVICE=${expected_preinit}" <<<"${magisk_info}"; then
     echo "Error: Magisk OTA does not contain the expected PREINITDEVICE=${expected_preinit}." >&2
+    rm -rf -- "${temp_dir}"
     return 1
   fi
 
-  echo "Verified Magisk boot-patch evidence in ${ota_path} (${target}, PREINITDEVICE=${expected_preinit})."
+  # Magisk metadata alone cannot distinguish a stale APK/version. Compare the
+  # actual init and compressed runtime payloads to the verified selected APK.
+  if ! run_executable_tool avbroot boot unpack \
+    --input "${image_path}" \
+    --output-header "${temp_dir}/boot.toml" \
+    --output-ramdisk-prefix "${temp_dir}/ramdisk." \
+    --no-output-kernel --no-output-second --no-output-recovery-dtbo \
+    --no-output-dtb --no-output-vts-signature --no-output-bootconfig --quiet ||
+    ! run_executable_tool avbroot cpio unpack \
+      --input "${temp_dir}/ramdisk.0" \
+      --output-info "${temp_dir}/cpio.toml" \
+      --output-tree "${temp_dir}/tree" --quiet ||
+    ! run_magisk_artifact verify-ramdisk \
+      --apk "${WORKDIR}/modules/magisk.apk" --ramdisk-dir "${temp_dir}/tree" \
+      --cpio-info "${temp_dir}/cpio.toml"; then
+    echo "Error: finished Magisk boot payload does not match the selected APK." >&2
+    rm -rf -- "${temp_dir}"
+    return 1
+  fi
+  rm -rf -- "${temp_dir}"
+
+  echo "Verified Magisk boot-patch evidence in ${ota_path} (${target}, ${VERSION[MAGISK]}, PREINITDEVICE=${expected_preinit})."
 }
 
 function verify_paired_root_outputs() {

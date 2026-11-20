@@ -43,11 +43,23 @@ interpret the capture as one boot; rebooted captures require a fresh collection.
 The logs are limited to the most recent 20,000 entries.
 
 Physical acceptance still requires the observed rootless/Magisk behavior,
-Magisk setup and `su -c id` after reboot when applicable, microG self-check and
+Magisk setup, explicit Shell authorization and `su -c id` after reboot when applicable, microG self-check and
 restricted spoofing, account/push/location checks, and OTA persistence. Follow
 [pdx235 acceptance](pdx235-care-map-integration.md) and record these human/device
 results alongside the private receipt. Disposable-key fixture OTAs establish
 artifact verification and are not upgrade candidates for an existing installation.
+
+For Magisk v31.1, follow the [root setup procedure](../README.md#using-root):
+install the matching official manager as a normal user app, finish any requested
+runtime environment repair and reboot, then grant **Shell** (`com.android.shell`, UID 2000)
+through **Superuser → + / Grant Superuser** before running `adb shell su -c id`
+yourself. The [v31.1 release](https://github.com/topjohnwu/Magisk/releases/tag/v31.1)
+removes automatic manager installation and reactive root prompts. Record the
+manager's installed version, the `uid=0(root)` observation, and whether root
+persists after another reboot and the Custota OTA cycle. The collector and audit
+do not perform these authorization or root operations. A request for a full
+reinstall/reflash requires checking the version and preinit configuration and
+rebuilding the signed OTA; do not use the app's direct or inactive-slot install.
 
 The explicit LineageOS workflow now supports `development-profile=care-map-pdx235`,
 `release-type=build-only` and `signing-mode=repository` to retain the configured
@@ -110,7 +122,7 @@ Module ownership:
 | `boot_animation.py` | Product animation file present | On-screen animation |
 | `stock_updater.py` | Stock updater absent when disabled | Custota update itself |
 | `fdroid_privileged_extension.py` | Package present only if enabled | Privileged install behavior |
-| `magisk.py` | None; included only in the `magisk` runtime mode | Root setup and authorization |
+| `magisk.py` | None; included only in the `magisk` runtime mode | Matching manager installation, setup, v31.1 Shell authorization, runtime root and OTA persistence |
 
 The October 17 microG `DUMP` privileged-permission regression is explicitly
 checked using the installed product XML. Absence of the deny, a conflicting

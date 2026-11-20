@@ -1,0 +1,111 @@
+{
+  "apk": {
+    "repository": "topjohnwu/Magisk",
+    "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+    "size": 11613864,
+    "version": "30.7",
+    "version_code": 30700
+  },
+  "apk_signer": {
+    "certificate_sha256": "b4cb83b4dad99f997dbe872f013aa16c14eec41d167021f371f7e1330f273ee6",
+    "output_format": "scheme-prefixed",
+    "schemes": [
+      "V2"
+    ],
+    "signer_count": 1
+  },
+  "avbroot": "avbroot 3.39.0",
+  "execution": "authenticated sealed avbroot runner",
+  "fixtures": [
+    {
+      "fixture": "boot-v3",
+      "header_version": 3,
+      "magisk": {
+        "boot_sha256": "d5af0b354759b71bc60f5f3ab53a555d289a5d61ff30cbe0c7a99ea49a7c33d1",
+        "ota_sha256": "6bb02d274071d77ebf85be3ce192a52454d16e5efd0e14a671666085af732de2"
+      },
+      "magisk_payload": {
+        "abi": "arm64-v8a",
+        "ramdisk_payloads": [
+          "init",
+          "magisk.xz",
+          "init-ld.xz",
+          "stub.xz"
+        ],
+        "repository": "topjohnwu/Magisk",
+        "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+        "size": 11613864,
+        "version": "30.7",
+        "version_code": 30700
+      },
+      "preinit_device": "sda47",
+      "rootless": {
+        "boot_sha256": "7e9f8e39f6d91eed03e176c57a89f5b69eb6f69ef7b2566359e6477343e14467",
+        "ota_sha256": "3f5f1d1a186781d723d13ebf8c76141770e8f4d882f8e47c06dc4a96a2a3d92c"
+      },
+      "target": "boot"
+    },
+    {
+      "fixture": "boot-v4",
+      "header_version": 4,
+      "magisk": {
+        "boot_sha256": "195b49cbc0fdad6834029f4c962a9f5162db2a55e101ed3b8ecb5e6fc94d5f59",
+        "ota_sha256": "8052ebb92b525655b686e9cd7b968bcbf7887359fd1849ab727d861502507960"
+      },
+      "magisk_payload": {
+        "abi": "arm64-v8a",
+        "ramdisk_payloads": [
+          "init",
+          "magisk.xz",
+          "init-ld.xz",
+          "stub.xz"
+        ],
+        "repository": "topjohnwu/Magisk",
+        "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+        "size": 11613864,
+        "version": "30.7",
+        "version_code": 30700
+      },
+      "preinit_device": "sda47",
+      "rootless": {
+        "boot_sha256": "92ee8c1fd3fb10e1a5e713e610ece65975dc7c8dd893f259962472f894cc5adb",
+        "ota_sha256": "5e1c0dfb083cca08a537dd226a5fe8d19aacf25e76ec0d2423a3a5292bb0181c"
+      },
+      "target": "boot"
+    },
+    {
+      "fixture": "init-boot-v4",
+      "header_version": 4,
+      "magisk": {
+        "boot_sha256": "f114b454c18eb44ad915fa8cbeecade412b9f8fface9f43f81329350f4c59dae",
+        "ota_sha256": "eae6e1d6d96d0cee65fd3d4c23f5631b60cd465c9e3e9d46d98328ca8fe01b67"
+      },
+      "magisk_payload": {
+        "abi": "arm64-v8a",
+        "ramdisk_payloads": [
+          "init",
+          "magisk.xz",
+          "init-ld.xz",
+          "stub.xz"
+        ],
+        "repository": "topjohnwu/Magisk",
+        "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+        "size": 11613864,
+        "version": "30.7",
+        "version_code": 30700
+      },
+      "preinit_device": "sda10",
+      "rootless": {
+        "boot_sha256": "1e2bcb908f4e9538dccdc4b6ae424b7fbec572b5427ab4bba1cb330f389dd0d1",
+        "ota_sha256": "97246196b7bf163227342f7a8b7fe30d3653879cc5e9ad9395a2be9136868940"
+      },
+      "stock_directory_repetition": {
+        "count": 2,
+        "path": "dev"
+      },
+      "target": "init_boot"
+    }
+  ],
+  "schema": "modos-magisk-host-compatibility-v1",
+  "scope": "synthetic host patch/verification only; no device boot or runtime root"
+}

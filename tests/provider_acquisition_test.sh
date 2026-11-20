@@ -25,12 +25,7 @@ assert_equals() {
 }
 
 mock_magisk_tags() {
-  if [[ "${1:-}" == "ls-remote" ]]; then
-    printf '1111111111111111111111111111111111111111\trefs/tags/v28.1\n'
-    printf '2222222222222222222222222222222222222222\trefs/tags/v29.0\n'
-    return 0
-  fi
-  fail "unexpected git invocation: $*"
+  fail "ROM/version resolution must not query unreviewed Magisk Git tags: $*"
 }
 
 reset_acquisition_fixture() {
@@ -85,7 +80,7 @@ test_grapheneos_text_metadata() (
   assert_equals \
     "https://releases.grapheneos.org/shiba-ota_update-2026071700.zip" \
     "${GRAPHENEOS[OTA_URL]}" "GrapheneOS OTA URL"
-  assert_equals "v29.0" "${VERSION[MAGISK]}" "Magisk version"
+  assert_equals "v31.1" "${VERSION[MAGISK]}" "empty Magisk selection uses reviewed default"
   assert_equals "" "${ROM_OTA_SHA256}" "GrapheneOS digest availability"
   assert_equals "" "${ROM_OTA_API_LEVEL}" "GrapheneOS clears prior source SDK"
 )
@@ -147,7 +142,7 @@ test_lineageos_v2_metadata() (
   assert_equals \
     "https://mirrorbits.lineageos.org/full/pdx235/20260717/lineage-23.2-20260717-nightly-pdx235-signed.zip" \
     "${GRAPHENEOS[OTA_URL]}" "LineageOS OTA URL"
-  assert_equals "v29.0" "${VERSION[MAGISK]}" "Magisk version"
+  assert_equals "v31.1" "${VERSION[MAGISK]}" "empty Magisk selection uses reviewed default"
   assert_equals \
     "df27d06052a79f0acc24e8862b70a0c32f188e4a6f107964c93bdb54ade7accc" \
     "${ROM_OTA_SHA256}" "LineageOS OTA SHA-256"
