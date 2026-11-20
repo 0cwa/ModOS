@@ -157,6 +157,142 @@
     "guard_patch_touches_magisk_patcher": false,
     "guarded_engine_base": "88362620a21377b160ae7500f64f144a2262a281"
   },
+  "hosted_ci_execution": {
+    "apk_signatures": {
+      "certificate_sha256": "b4cb83b4dad99f997dbe872f013aa16c14eec41d167021f371f7e1330f273ee6",
+      "releases": [
+        "v31.1",
+        "v30.7"
+      ],
+      "schemes": [
+        "V2"
+      ],
+      "signer_count": 1,
+      "subprocess_verification": "passed for both releases",
+      "verifier": "Android SDK Build Tools 37 apksigner verify --verbose --print-certs"
+    },
+    "avbroot_version": "3.39.0",
+    "conclusion": "success",
+    "execution": "Mandatory authenticated, sealed avbroot executable runner; no unsealed fallback.",
+    "fixtures": {
+      "cases_per_release": [
+        "boot-v3",
+        "boot-v4",
+        "init-boot-v4"
+      ],
+      "passed_pairs_per_release": 3,
+      "releases": [
+        "v31.1",
+        "v30.7"
+      ],
+      "result": "All six real-patcher fixture pairs passed signature/payload/partition/AVB verification, exact Magisk payload and metadata checks, preinit retention and rooted/rootless separation.",
+      "root_modes_per_case": [
+        "rootless",
+        "magisk"
+      ]
+    },
+    "head_branch": "integration/magisk-v31.1-compatibility",
+    "head_sha": "283857f33e1f9f0157c7d82cb7662d94d787ed78",
+    "job_id": 136502764927,
+    "job_name": "magisk_compatibility",
+    "job_url": "https://github.com/0cwa/ModOS/actions/runs/44798081929/job/136502764927",
+    "receipt_artifact": {
+      "created_at": "2026-11-20T19:01:11Z",
+      "download_verified": true,
+      "downloaded_archive_sha256": "07fd16a8efe4e3834de4361d543edd5f7f2998fb529a0a1e2ca654e0f2b65451",
+      "expires_at": "2026-12-04T19:01:10Z",
+      "github_reported_archive_sha256": "07fd16a8efe4e3834de4361d543edd5f7f2998fb529a0a1e2ca654e0f2b65451",
+      "id": 14660270661,
+      "name": "magisk-host-compatibility",
+      "reports": [
+        {
+          "path": "docs/evidence/magisk-host-20261120-v31.1.json",
+          "release": "v31.1",
+          "sha256": "ebd08dea80bb66a779f7b67f24baddb7226b0bc3c442602dc005132ea8e3ec45",
+          "size_in_bytes": 3431
+        },
+        {
+          "path": "docs/evidence/magisk-host-20261120-v30.7.json",
+          "release": "v30.7",
+          "sha256": "26ee8e9850b2994cbf4cb2839568209b71ef5d26c5d3d89433b520c08b6c26d2",
+          "size_in_bytes": 3494
+        }
+      ],
+      "size_in_bytes": 2494,
+      "url": "https://github.com/0cwa/ModOS/actions/runs/44798081929/artifacts/14660270661"
+    },
+    "regressions": {
+      "device_health_tests": 25,
+      "magisk_artifact_tests": 39,
+      "magisk_signer_tests": 12,
+      "result": "passed",
+      "targeted_shell_suites": [
+        "magisk_output_verification_test.sh",
+        "verifier_test.sh",
+        "typed_config_resolver_test.sh",
+        "rom_contract_test.sh",
+        "provider_acquisition_test.sh",
+        "root_mode_both_test.sh",
+        "module_selection_test.sh"
+      ]
+    },
+    "run_id": 44798081929,
+    "run_url": "https://github.com/0cwa/ModOS/actions/runs/44798081929",
+    "scope": "Completes hosted sealed-runner acceptance for these synthetic fixtures. It does not establish complete ROM qualification, device boot, runtime root or a successful overall CI run.",
+    "status": "completed"
+  },
+  "hosted_rom_qualification": {
+    "full_profile_gate": {
+      "conclusion": "blocked",
+      "job_url": "https://github.com/0cwa/ModOS/actions/runs/44798081929/job/136502764331",
+      "original_gate_retained": true,
+      "reason": "The unchanged locked exfatprogs_1.4.3_aarch64.deb returns HTTP 404 in the original full test job."
+    },
+    "head_sha": "283857f33e1f9f0157c7d82cb7662d94d787ed78",
+    "jobs": [
+      {
+        "checks_passed": [
+          "Both output OTA signatures, payloads, partition hashes, AVB and care maps.",
+          "Exact official Magisk v31.1 init/core/loader bytes and CPIO metadata.",
+          "Configured preinit partition and distinct rootless/Magisk targets.",
+          "Rootless target has no Magisk metadata.",
+          "Existing boot-animation verification and build-only completion."
+        ],
+        "conclusion": "success",
+        "device": "pdx235",
+        "diagnostics": {
+          "explanation": "Source LineageOS uses public AOSP AVB keys and disabled verification flags; the existing patch policy replaces signing keys and clears output flags.",
+          "output_warnings": 0,
+          "source_warnings": 3,
+          "status": "passed_with_warnings"
+        },
+        "job_id": 136503187201,
+        "job_url": "https://github.com/0cwa/ModOS/actions/runs/44798081929/job/136503187201",
+        "magisk_target": "boot",
+        "patch_engine": "Guarded avbroot 3.37.1 built from the existing reviewed source pin.",
+        "preinit_device": "sda47",
+        "rom_family": "lineageos",
+        "source_url": "https://mirrorbits.lineageos.org/full/pdx235/20261120/lineage-24.0-20261120-nightly-pdx235-signed.zip"
+      },
+      {
+        "checks_passed_before_failure": [
+          "Both output OTA signatures, payloads, partition hashes, AVB and care maps."
+        ],
+        "conclusion": "failure",
+        "device": "shiba",
+        "failure": "New metadata verifier rejected equivalent repeated dev directories inherited from the stock init_boot.",
+        "fix": "Permit only repeated directories with equal semantic mode/UID/GID; retain rejection of duplicate files, symlinks and conflicting directories. Cover the observed Lz4Legacy stock layout in the genuine patcher fixture.",
+        "job_id": 136503187283,
+        "job_url": "https://github.com/0cwa/ModOS/actions/runs/44798081929/job/136503187283",
+        "retry_required": true,
+        "rom_family": "grapheneos",
+        "source_url": "https://releases.grapheneos.org/shiba-ota_update-2026111800.zip"
+      }
+    ],
+    "profile": "Additional narrow paired profile: AFSR, Custota, boot animation and stock updater removal; optional modules disabled; disposable keys; no publication.",
+    "run_id": 44798081929,
+    "run_url": "https://github.com/0cwa/ModOS/actions/runs/44798081929"
+  },
   "limitations": [
     "Synthetic boot images cannot boot and are not device firmware.",
     "No physical-device testing or on-device Magisk runtime acceptance was performed.",
@@ -287,13 +423,53 @@
     "version_code": 31100
   },
   "pending_acceptance": [
-    "Run the committed fixture script in CI through the mandatory authenticated sealed runner.",
-    "Run complete nonpublishing shiba/pdx235 OTA qualification at the final PR revision.",
+    "Rerun both narrow paired ROM jobs after the stock-directory compatibility fix.",
+    "Resolve the existing exfatprogs acquisition blocker and run the original full-profile nonpublishing shiba/pdx235 qualification.",
     "Observe physical-device boot, matching-manager setup, pre-granted root authorization, runtime version and OTA persistence."
   ],
   "purpose": "Qualify official Magisk v31.1 acquisition, patch-format compatibility and finished boot payload identity. Device boot and runtime root remain separate acceptance.",
   "review_date": "2026-11-20",
   "schema": "modos-magisk-qualification-v1",
+  "stock_ramdisk_regression": {
+    "acquisition_checks": {
+      "operation_blob_hashes_match_manifest": true,
+      "partition_hash_matches_manifest": true,
+      "payload_metadata_hash_matches_payload_properties": true
+    },
+    "baseline_verifier": {
+      "commit": "283857f33e1f9f0157c7d82cb7662d94d787ed78",
+      "result": "Rejected the actual patched stock init_boot with Magisk ramdisk metadata has invalid or duplicate paths."
+    },
+    "duplicate_stock_entries": {
+      "file_mode": "755",
+      "file_type": "Directory",
+      "gid": 0,
+      "inodes": [
+        300000,
+        300006
+      ],
+      "nlink": 1,
+      "path": "dev",
+      "uid": 0
+    },
+    "fixed_verifier_result": "Passed exact selected-APK payload and CPIO metadata verification on the same patched stock init_boot rejected by the baseline.",
+    "local_updated_fixture_results": {
+      "case": "init-boot-v4",
+      "preservation_check": "Both rootless and Magisk outputs retain two identical root-owned 0755 dev directory records with distinct inodes and Lz4Legacy compression.",
+      "releases_passed": [
+        "v31.1",
+        "v30.7"
+      ]
+    },
+    "partition_sha256": "7b8c2a76fdc71fa472e54b00ee6439bd96e9ddd3670eeb0a190908739528ced4",
+    "partition_size": 8388608,
+    "payload_metadata_sha256": "0d58d71e6e889821280b59bfea395115d2be45ae1b840ae7fb53ddddfc0e098c",
+    "scope": "Local diagnostic only: ranged source extraction, then the actual stock init_boot in a synthetic OTA patched once with the authenticated avbroot 3.39.0 binary and official Magisk v31.1. This exploratory execution does not establish sealed-runner or complete ROM acceptance; the full source OTA signature was not independently verified by this ranged extraction.",
+    "source_url": "https://releases.grapheneos.org/shiba-ota_update-2026111800.zip",
+    "source_zip_size": 1568047043,
+    "stock_cpio_entries": 37,
+    "stock_cpio_format": "Lz4Legacy"
+  },
   "upstream_reference": {
     "modos_source_decision": "Retain the already-established official topjohnwu/Magisk source. PixeneOS uses its separate GrapheneOS Zygisk fork; copying that source choice is unnecessary for v31.1 format support.",
     "pixeneos_commit": "527d1aba174bc57120d5f9a805398f626863512b",

@@ -13,7 +13,7 @@ or that root persists after a later OTA.
   installation, reactive root prompts, and app repackaging. Android 7.0/API 24
   is its minimum. Install the matching official APK as an ordinary user app,
   complete runtime setup when appropriate, then grant each intended client
-  access through the Superuser tab. The [README](../README.md#root) gives the
+  access through the Superuser tab. The [README](../README.md#using-root) gives the
   device procedure, including the explicit Shell grant for ADB checks.
 - [avbroot 3.37.1](https://github.com/chenxiaolong/avbroot/releases/tag/v3.37.1)
   added Magisk `31100` support. ModOS's official 3.39.0 executable and the
@@ -47,7 +47,10 @@ After output verification, ModOS extracts `init_boot` when present, otherwise
 `boot`. It requires the configured `PREINITDEVICE`, compares `init` and the
 decompressed native/stub payloads to the selected APK, and checks their CPIO
 types, permissions and ownership. It rejects stale or unexpected Magisk
-payloads. In a paired build, the rootless target must remain unpatched and
+payloads. Repeated directories are allowed only when their permissions and
+ownership agree: the stock shiba ramdisk repeats `dev` with different inode
+numbers. Duplicate files, symlinks and conflicting directories are rejected.
+In a paired build, the rootless target must remain unpatched and
 differ from the Magisk target. Failure removes the rooted OTA and its Custota
 signature before publication.
 
@@ -66,10 +69,27 @@ and output passes OTA signature, payload, partition and AVB checks. The test
 also checks exact Magisk payloads, preinit retention, rootless separation and
 rejection of a deliberately changed `init`.
 
+On November 20, the [host qualification job](https://github.com/0cwa/ModOS/actions/runs/44798081929/job/136502764927)
+passed for PR head `283857f33e1f9f0157c7d82cb7662d94d787ed78`. Both official
+v31.1 and v30.7 APKs passed Build Tools 37 signature verification with one V2
+signer matching the certificate above. Each release passed all three fixture
+pairs through authenticated, sealed avbroot 3.39.0. The 39 artifact tests,
+12 signer tests, 25 device-health tests and seven targeted shell suites also
+passed. The exact [v31.1 host receipt](evidence/magisk-host-20261120-v31.1.json)
+and [v30.7 host receipt](evidence/magisk-host-20261120-v30.7.json) are preserved
+in this repository, independent of CI artifact expiry. Their hashes and verified
+source archive identity are recorded in the evidence.
+
+This completes the hosted sealed-runner check. Earlier local observations used
+a separate exploratory adapter because that workspace lacked sealed execution;
+the evidence retains that distinction. Complete ROM qualification and physical
+device acceptance remain separate gates.
+
 On a host that supports the existing executable runner:
 
 ```shell
 python3 tests/magisk_artifact_test.py
+python3 tests/magisk_compatibility_test.py
 python3 src/magisk_artifact.py \
   --repository topjohnwu/Magisk --version v31.1 \
   download --apk /path/to/Magisk-v31.1.apk
@@ -89,6 +109,13 @@ with AFSR, Custota, boot animation and stock updater removal. This uses the same
 build workflow, disposable keys and verification gates, with optional modules
 disabled. It produces no release or update-feed changes. The ordinary full
 test job and full-profile qualification remain separate gates.
+
+The first narrow pdx235 paired build passed at the revision above, including
+the guarded 3.37.1 engine, exact v31.1 payloads and rootless separation. The
+shiba run found the repeated stock `dev` directories after both OTAs passed
+signature, AVB and care-map checks. That verifier false positive is covered by
+the directory rule above and an expanded `init_boot` fixture using the actual
+LZ4 format. Both ROM jobs must be rerun after that fix.
 
 On November 20 the existing full test job is blocked because Termux removed the
 locked `exfatprogs_1.4.3_aarch64.deb` from its rolling package repository (HTTP

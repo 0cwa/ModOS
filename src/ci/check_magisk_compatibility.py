@@ -197,10 +197,23 @@ def create_fixture(
     with zipfile.ZipFile(tree / "system/etc/security/otacerts.zip", "w") as archive:
         archive.write(workdir / "test.pem", "test.x509.pem")
 
+    # The stock shiba 2026111800 init_boot contains two root-owned 0755
+    # "dev" directories, at inodes 300000 and 300006. Keep that observed
+    # repetition and its compression format in the init_boot fixture.
+    repeated_directory = ""
+    ramdisk_format = "Gzip"
+    if "init_boot" in partitions:
+        ramdisk_format = "Lz4Legacy"
+        repeated_directory = "".join(
+            '[[entries]]\npath = "dev"\n'
+            f'inode = {inode}\nfile_type = "Directory"\n'
+            'file_mode = "755"\nnlink = 1\n'
+            for inode in (300000, 300006)
+        )
     cpio_info = directory / "input-cpio.toml"
     cpio_info.write_text(
-        'format = "Gzip"\n'
-        '[[entries]]\npath = "init"\nfile_type = "Regular"\n'
+        f'format = "{ramdisk_format}"\n' + repeated_directory
+        + '[[entries]]\npath = "init"\nfile_type = "Regular"\n'
         'file_mode = "750"\nnlink = 1\n'
         '[[entries]]\npath = "system/etc/security/otacerts.zip"\n'
         'file_type = "Regular"\nfile_mode = "644"\nnlink = 1\n'
@@ -320,6 +333,18 @@ def qualify_fixture(
         extracted = directory / f"{mode}-extracted"
         tree = unpack_target(output, target, extracted, avbroot)
         targets[mode] = extracted / f"{target}.img"
+        if target == "init_boot":
+            metadata = tomllib.loads((extracted / "cpio.toml").read_text())
+            repeated = [entry for entry in metadata["entries"] if entry["path"] == "dev"]
+            if (
+                metadata["format"] != "Lz4Legacy" or len(repeated) != 2
+                or len({entry.get("inode") for entry in repeated}) != 2
+                or any((entry["file_type"], entry.get("file_mode"),
+                        entry.get("uid", 0), entry.get("gid", 0))
+                       != ("Directory", "755", 0, 0) for entry in repeated)
+            ):
+                raise RuntimeError(f"{name}: stock repeated dev directory was not retained")
+            reports["stock_directory_repetition"] = {"path": "dev", "count": 2}
         if mode == "rootless":
             try:
                 verify_ramdisk(tree, apk, artifact, extracted / "cpio.toml")

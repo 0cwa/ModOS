@@ -255,6 +255,20 @@ def _unxz(data: bytes, maximum: int) -> bytes:
     return result
 
 
+def _directory_attributes(entry: dict) -> tuple[int, int, int] | None:
+    if entry.get("file_type") != "Directory":
+        return None
+    mode = entry.get("file_mode", "0")
+    uid, gid = entry.get("uid", 0), entry.get("gid", 0)
+    if (
+        not isinstance(mode, str) or not re.fullmatch(r"[0-7]{1,4}", mode)
+        or type(uid) is not int or not 0 <= uid <= 0xffffffff
+        or type(gid) is not int or not 0 <= gid <= 0xffffffff
+    ):
+        return None
+    return int(mode, 8), uid, gid
+
+
 def _verify_cpio_metadata(path: Path, payloads: dict[str, str]) -> None:
     metadata = tomllib.loads(_read_regular(path, 16 * 1024 * 1024).decode("utf-8"))
     entries = metadata.get("entries")
@@ -270,7 +284,19 @@ def _verify_cpio_metadata(path: Path, payloads: dict[str, str]) -> None:
         # an unexpected payload that would exist when the kernel unpacks CPIO.
         canonical = "/".join(part for part in name.split("/") if part not in {"", "."})
         if canonical in by_path:
-            raise MagiskError("Magisk ramdisk metadata has invalid or duplicate paths")
+            previous = by_path[canonical]
+            attributes = _directory_attributes(previous)
+            # Stock shiba init_boot repeats dev with different inode numbers.
+            # Kernel unpacking reapplies a directory's mode/uid/gid; inode,
+            # nlink and mtime do not change path resolution or access rights.
+            # Files, symlinks and conflicting directories remain ambiguous.
+            if attributes is not None and attributes == _directory_attributes(entry):
+                continue
+            raise MagiskError(
+                f"Magisk ramdisk metadata has an ambiguous path {canonical!r}: "
+                f"{previous['path']!r} ({previous.get('file_type')!r}) and "
+                f"{name!r} ({entry.get('file_type')!r})"
+            )
         by_path[canonical] = entry
     required = {
         "init": "Regular", "overlay.d": "Directory", "overlay.d/sbin": "Directory",

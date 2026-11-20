@@ -471,7 +471,48 @@ class MagiskCpioMetadataTest(ArtifactFixture):
     def test_duplicate_metadata_paths_are_rejected(self):
         entries = self.ramdisk_entries()
         entries.append(dict(entries[0]))
-        with self.assertRaises(magisk.MagiskError):
+        with self.assertRaisesRegex(magisk.MagiskError, "ambiguous path 'init'"):
+            self.verify(entries)
+
+    def test_stock_shiba_repeated_dev_directory_is_accepted(self):
+        # shiba-ota_update-2026111800 has these two dev entries before patching.
+        # Their inode identities differ, but both create the same root-owned
+        # directory with the same permissions when the kernel unpacks them.
+        entries = self.ramdisk_entries()
+        entries[:0] = [
+            {"path": "dev", "file_type": "Directory", "file_mode": "755",
+             "inode": inode, "nlink": 1}
+            for inode in (300000, 300006)
+        ]
+        self.assertEqual(self.verify(entries)["version_code"], 31100)
+
+    def test_equivalent_directory_aliases_compare_semantic_permissions(self):
+        entries = self.ramdisk_entries()
+        entries.append({"path": "/overlay.d/./sbin/", "file_type": "Directory",
+                        "file_mode": "0750", "uid": 0, "gid": 0,
+                        "inode": 1234, "nlink": 2, "mtime": 1})
+        self.assertEqual(self.verify(entries)["abi"], "arm64-v8a")
+
+    def test_repeated_directory_cannot_change_type_owner_or_mode(self):
+        for field, value in (("file_type", "Symlink"), ("file_type", "Regular"),
+                             ("file_mode", "755"), ("file_mode", "777"),
+                             ("file_mode", 750), ("uid", 2000), ("gid", 2000),
+                             ("uid", False), ("gid", -1)):
+            with self.subTest(field=field, value=value):
+                entries = self.ramdisk_entries()
+                duplicate = dict(entries[2], path="./overlay.d//sbin")
+                duplicate[field] = value
+                entries.append(duplicate)
+                with self.assertRaisesRegex(magisk.MagiskError,
+                                            "ambiguous path 'overlay.d/sbin'"):
+                    self.verify(entries)
+
+    def test_repeated_magisk_config_is_rejected_even_with_equal_bytes(self):
+        entries = self.ramdisk_entries()
+        entries.extend({"path": name, "file_type": "Regular", "file_mode": "0"}
+                       for name in (".backup/.magisk", ".backup/./.magisk"))
+        with self.assertRaisesRegex(magisk.MagiskError,
+                                    "ambiguous path '.backup/.magisk'"):
             self.verify(entries)
 
     def test_path_alias_cannot_hide_duplicate_or_unexpected_special_payload(self):
