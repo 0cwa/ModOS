@@ -81,7 +81,7 @@ test_magisk_compatibility_defaults() (
   load_contract
   assert_equals "topjohnwu/Magisk" "${MAGISK[REPOSITORY]}" \
     "default Magisk repository"
-  assert_equals "v30.7" "${VERSION[MAGISK]}" \
+  assert_equals "v31.1" "${VERSION[MAGISK]}" \
     "default Magisk compatibility version"
 )
 
@@ -157,10 +157,12 @@ test_selection_fingerprint() (
     "AFSR-on selection did not preserve the exact identity"
 
   MAGISK[REPOSITORY]="pixincreate/Magisk"
+  MAGISK_APK_SHA256="$(printf 'a%.0s' {1..64})"
   rootless_repo_changed="$(fingerprint)"
   assert_equals "${baseline}" "${rootless_repo_changed}" \
     "rootless selection must not depend on the Magisk repository"
   MAGISK[REPOSITORY]="topjohnwu/Magisk"
+  MAGISK_APK_SHA256=''
 
   fingerprint_input="${TEST_ROOT}/fingerprint-input-${BASHPID}"
   sha256sum() {
@@ -183,16 +185,24 @@ test_selection_fingerprint() (
     fail "root selection did not change the fingerprint"
 
   MAGISK[REPOSITORY]="pixincreate/Magisk"
+  MAGISK_APK_SHA256="$(printf 'a%.0s' {1..64})"
   rooted_repo_changed="$(fingerprint)"
   [[ "${rooted_repo_changed}" != "${root_changed}" ]] ||
     fail "Magisk repository selection did not change the rooted fingerprint"
+  MAGISK_APK_SHA256="$(printf 'b%.0s' {1..64})"
+  [[ "$(fingerprint)" != "${rooted_repo_changed}" ]] ||
+    fail "Magisk APK digest selection did not change the rooted fingerprint"
+  MAGISK_APK_SHA256=''
+  if module_selection_fingerprint >/dev/null 2>&1; then
+    fail "unreviewed Magisk fork without an APK digest was accepted"
+  fi
   MAGISK[REPOSITORY]="topjohnwu/Magisk"
 
-  VERSION[MAGISK]="v30.6"
+  VERSION[MAGISK]="v30.7"
   rooted_version_changed="$(fingerprint)"
   [[ "${rooted_version_changed}" != "${root_changed}" ]] ||
     fail "Magisk version selection did not change the rooted fingerprint"
-  VERSION[MAGISK]="v30.7"
+  VERSION[MAGISK]="v31.1"
 
   MAGISK[PREINIT]="sda47"
   local preinit_changed

@@ -21,6 +21,7 @@ import re
 import secrets
 import stat
 import sys
+import tomllib
 import zipfile
 
 from bootstrap_archive import BootstrapError
@@ -104,6 +105,8 @@ def load_lock(path: Path = LOCK_PATH) -> list[MagiskArtifact]:
 def _validate_selection(repository: str, version: str, sha256: str) -> None:
     if not isinstance(repository, str) or not REPOSITORY.fullmatch(repository):
         raise MagiskError("Magisk repository must be owner/name")
+    if any(part in {".", ".."} for part in repository.split("/")):
+        raise MagiskError("Magisk repository cannot contain dot path components")
     if not isinstance(version, str) or not VERSION.fullmatch(version):
         raise MagiskError("Magisk requires an explicit version tag, such as v31.1")
     if not isinstance(sha256, str) or not DIGEST.fullmatch(sha256):
@@ -183,11 +186,19 @@ def _open_verified_apk(path: Path, artifact: MagiskArtifact) -> tuple[zipfile.Zi
             or re.findall(r"^MAGISK_VER_CODE=([0-9]+)\r?$", script, re.MULTILINE) != [code_text]
         ):
             raise MagiskError("Magisk APK script and ZIP versions disagree")
-        if not any(
-            f"lib/{abi}/libmagiskinit.so" in names and f"lib/{abi}/libmagisk.so" in names
-            for abi in ABIS
-        ):
+        supported_abis = [
+            abi for abi in ABIS if f"lib/{abi}/libmagiskinit.so" in names
+            or f"lib/{abi}/libmagisk.so" in names
+        ]
+        if not supported_abis:
             raise MagiskError("Magisk APK lacks a supported native payload layout")
+        for abi in supported_abis:
+            _read_member(archive, f"lib/{abi}/libmagiskinit.so")
+            _read_member(archive, f"lib/{abi}/libmagisk.so")
+            if f"lib/{abi}/libinit-ld.so" in names:
+                _read_member(archive, f"lib/{abi}/libinit-ld.so")
+        if "assets/stub.apk" in names:
+            _read_member(archive, "assets/stub.apk")
         return archive, {
             "repository": artifact.repository,
             "version": version,
@@ -236,14 +247,58 @@ def _ramdisk_file(root: Path, relative: str) -> Path:
 
 
 def _unxz(data: bytes, maximum: int) -> bytes:
-    decoder = lzma.LZMADecompressor(format=lzma.FORMAT_XZ, memlimit=64 * 1024 * 1024)
+    # avbroot uses preset 9: its 64 MiB dictionary also needs decoder overhead.
+    decoder = lzma.LZMADecompressor(format=lzma.FORMAT_XZ, memlimit=128 * 1024 * 1024)
     result = decoder.decompress(data, max_length=maximum + 1)
     if len(result) > maximum or not decoder.eof or decoder.unused_data:
         raise MagiskError("invalid or oversized Magisk ramdisk XZ payload")
     return result
 
 
-def verify_ramdisk(directory: Path, apk: Path, artifact: MagiskArtifact) -> dict:
+def _verify_cpio_metadata(path: Path, payloads: dict[str, str]) -> None:
+    metadata = tomllib.loads(_read_regular(path, 16 * 1024 * 1024).decode("utf-8"))
+    entries = metadata.get("entries")
+    if not isinstance(entries, list):
+        raise MagiskError("Magisk ramdisk metadata lacks entries")
+    by_path = {}
+    for entry in entries:
+        name = entry.get("path") if isinstance(entry, dict) else None
+        if not isinstance(name, str) or "\0" in name or ".." in name.split("/"):
+            raise MagiskError("Magisk ramdisk metadata has an unsafe path")
+        # Match avbroot's extraction normalization, including entries it skips
+        # (symlinks/special files). An alias must not conceal a second init or
+        # an unexpected payload that would exist when the kernel unpacks CPIO.
+        canonical = "/".join(part for part in name.split("/") if part not in {"", "."})
+        if canonical in by_path:
+            raise MagiskError("Magisk ramdisk metadata has invalid or duplicate paths")
+        by_path[canonical] = entry
+    required = {
+        "init": "Regular", "overlay.d": "Directory", "overlay.d/sbin": "Directory",
+        **{f"overlay.d/sbin/{name}": "Regular" for name in payloads},
+    }
+    for name, kind in required.items():
+        entry = by_path.get(name, {})
+        mode = entry.get("file_mode", "0")
+        if not isinstance(mode, str) or not re.fullmatch(r"[0-7]{1,4}", mode):
+            raise MagiskError(f"invalid Magisk ramdisk file mode: {name}")
+        bits = int(mode, 8)
+        expected_access = 0o500 if name == "init" or kind == "Directory" else 0o400
+        if (
+            entry.get("file_type") != kind
+            or type(entry.get("uid", 0)) is not int or entry.get("uid", 0) != 0
+            or type(entry.get("gid", 0)) is not int or entry.get("gid", 0) != 0
+            or bits & expected_access != expected_access
+            or bits & 0o7022
+        ):
+            raise MagiskError(f"unsafe type, ownership or mode for Magisk ramdisk {name}")
+    for name in ("magisk.xz", "magisk32.xz", "magisk64.xz", "init-ld.xz", "stub.xz"):
+        if name not in payloads and f"overlay.d/sbin/{name}" in by_path:
+            raise MagiskError(f"unexpected Magisk ramdisk metadata payload: {name}")
+
+
+def verify_ramdisk(
+    directory: Path, apk: Path, artifact: MagiskArtifact, cpio_info: Path | None = None
+) -> dict:
     archive, report = _open_verified_apk(apk, artifact)
     with archive:
         init = _read_regular(_ramdisk_file(directory, "init"), MAX_MEMBER_BYTES)
@@ -260,6 +315,10 @@ def verify_ramdisk(directory: Path, apk: Path, artifact: MagiskArtifact) -> dict
             payloads["init-ld.xz"] = f"lib/{abi}/libinit-ld.so"
         if "assets/stub.apk" in archive.namelist():
             payloads["stub.xz"] = "assets/stub.apk"
+        if cpio_info is not None:
+            # cpio unpack extracts regular files, but intentionally leaves
+            # ownership/modes in this metadata rather than restoring them.
+            _verify_cpio_metadata(cpio_info, payloads)
         for filename in ("magisk.xz", "magisk32.xz", "magisk64.xz", "init-ld.xz", "stub.xz"):
             path = _ramdisk_file(directory, f"overlay.d/sbin/{filename}")
             if filename not in payloads:
@@ -285,6 +344,7 @@ def main() -> int:
         subparser.add_argument("--apk", type=Path, required=True)
         if action == "verify-ramdisk":
             subparser.add_argument("--ramdisk-dir", type=Path, required=True)
+            subparser.add_argument("--cpio-info", type=Path, required=True)
     args = parser.parse_args()
     try:
         artifact = resolve_artifact(args.repository, args.version, args.sha256)
@@ -294,7 +354,7 @@ def main() -> int:
         if args.action == "download":
             report = download_apk(args.apk, artifact)
         elif args.action == "verify-ramdisk":
-            report = verify_ramdisk(args.ramdisk_dir, args.apk, artifact)
+            report = verify_ramdisk(args.ramdisk_dir, args.apk, artifact, args.cpio_info)
         else:
             report = verify_apk(args.apk, artifact)
         print(json.dumps(report, sort_keys=True))

@@ -16,7 +16,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src" / "device"))
 from modos_health.common import Context, MAX_PROBE_OUTPUT, STATUSES
-from modos_health.checks import microg, msd
+from modos_health.checks import magisk, microg, msd
 
 spec = importlib.util.spec_from_file_location(
     "check_pdx235_modules", ROOT / "src/device/check_pdx235_modules.py"
@@ -304,6 +304,28 @@ class HealthAuditTests(unittest.TestCase):
                              for c in checks), len(selections))
         self.assertFalse(any("pm path" in " ".join(x) for x in fake.calls))
         self.assertFalse(any(x[-1] in (msd._PROCESSES, msd._SERVICE) for x in fake.calls))
+
+    def test_magisk_manual_guidance_never_probes_or_grants_root(self):
+        ctx, fake = fake_ctx()
+        checks = {c["check"]: c for c in magisk.check(ctx)}
+        self.assertEqual(set(checks), {"manager-setup", "root-runtime", "root-persistence"})
+        self.assertTrue(all(c["status"] == "NOT_TESTED" for c in checks.values()))
+        self.assertEqual(fake.calls, [])
+        self.assertIn("user app", checks["manager-setup"]["detail"])
+        self.assertIn("UID 2000", checks["root-runtime"]["detail"])
+        self.assertIn("before manually running", checks["root-runtime"]["detail"])
+        self.assertIn("OTA update", checks["root-persistence"]["detail"])
+
+    def test_magisk_mode_adds_only_manual_checks_to_read_only_audit(self):
+        selections = {name: False for name, _, _ in audit.MODULES}
+        rootless_ctx, rootless_fake = fake_ctx()
+        audit.inspect(rootless_ctx, selections, "rootless")
+        magisk_ctx, magisk_fake = fake_ctx()
+        checks = audit.inspect(magisk_ctx, selections, "magisk")
+        self.assertEqual(magisk_fake.calls, rootless_fake.calls)
+        magisk_checks = [c for c in checks if c["module"] == "magisk"]
+        self.assertEqual(len(magisk_checks), 3)
+        self.assertTrue(all(c["status"] == "NOT_TESTED" for c in magisk_checks))
 
     def test_reject_commands_other_than_static_read_only_probes(self):
         ctx, _ = fake_ctx()

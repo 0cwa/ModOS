@@ -284,9 +284,14 @@ function selection_variant_manifest() {
       echo "Error: rooted selection identity has an invalid Magisk version." >&2
       return 1
     fi
+    if [[ ! "${SELECTION_MAGISK_APK_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Error: rooted selection identity lacks a verified Magisk APK digest." >&2
+      return 1
+    fi
     printf '%s\n' \
       "magisk_repository=${SELECTION_MAGISK_REPOSITORY}" \
-      "magisk_version=${SELECTION_MAGISK_VERSION}"
+      "magisk_version=${SELECTION_MAGISK_VERSION}" \
+      "magisk_apk_sha256=${SELECTION_MAGISK_APK_SHA256}"
   fi
 
   if [[ "${SELECTION_BOOT_ANIMATION}" == 'true' ]]; then

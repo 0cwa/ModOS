@@ -33,6 +33,36 @@ jobs:
         shell: bash
         run: bash src/ci/configure_android_apk_tools.sh
 
+      - name: Test Magisk artifact and finished payload verification
+        run: python3 tests/magisk_artifact_test.py
+
+      - name: Qualify Magisk APK signatures and real boot patching
+        shell: bash
+        run: |
+          set -euo pipefail
+          source src/declarations.sh
+          for version in "${VERSION[MAGISK]}" v30.7; do
+            apk="${RUNNER_TEMP}/Magisk-${version}.apk"
+            python3 src/magisk_artifact.py \
+              --repository "${MAGISK[REPOSITORY]}" --version "${version}" \
+              download --apk "${apk}"
+            # Official upstream signer, also published in Magisk scripts/release.sh.
+            signer_report="$(apksigner verify --print-certs "${apk}")"
+            signer="$(sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-f]+)$/\1/p' <<<"${signer_report}")"
+            test "${signer}" = b4cb83b4dad99f997dbe872f013aa16c14eec41d167021f371f7e1330f273ee6
+            python3 src/ci/check_magisk_compatibility.py \
+              --workdir "${RUNNER_TEMP}/magisk-compat-${version}" \
+              --repository "${MAGISK[REPOSITORY]}" --version "${version}" --apk "${apk}"
+          done
+
+      - name: Retain Magisk host compatibility receipts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: magisk-host-compatibility
+          path: ${{ runner.temp }}/magisk-compat-*/report.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Check shell syntax
         shell: bash
         run: |

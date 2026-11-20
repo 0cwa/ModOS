@@ -9,14 +9,20 @@ source src/util_functions.sh
 TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf -- "${TEST_ROOT}"' EXIT
 WORKDIR="${TEST_ROOT}/work"
-mkdir -p "${WORKDIR}"
+mkdir -p "${WORKDIR}/modules"
+printf 'selected APK fixture' >"${WORKDIR}/modules/magisk.apk"
 
 PARTITIONS=$'boot\ninit_boot\nvendor_boot'
 MAGISK_INFO='PREINITDEVICE=sda10'
 EXTRACT_LOG="${TEST_ROOT}/extract.log"
+PAYLOAD_LOG="${TEST_ROOT}/payload.log"
 : >"${EXTRACT_LOG}"
+: >"${PAYLOAD_LOG}"
 EXTRACT_IDENTICAL=false
 ROOTLESS_HAS_MAGISK=false
+BOOT_UNPACK_RESULT=success
+CPIO_UNPACK_RESULT=success
+PAYLOAD_RESULT=success
 VERIFY_CALLS=()
 PAIR_VERIFY_CALLS=()
 
@@ -90,10 +96,82 @@ run_executable_tool() {
       [[ -n "${MAGISK_INFO}" ]] || return 1
       printf '%s\n' "${MAGISK_INFO}"
       ;;
+    'boot unpack')
+      local input='' header='' prefix=''
+      shift 2
+      while (($#)); do
+        case "${1}" in
+          --input) input="${2}"; shift 2 ;;
+          --output-header) header="${2}"; shift 2 ;;
+          --output-ramdisk-prefix) prefix="${2}"; shift 2 ;;
+          --no-output-kernel|--no-output-second|--no-output-recovery-dtbo|\
+            --no-output-dtb|--no-output-vts-signature|--no-output-bootconfig|--quiet)
+            shift ;;
+          *) fail "unexpected boot unpack argument: ${1}" ;;
+        esac
+      done
+      [[ -f "${input}" && "${header}" == "${input%/*}/boot.toml" &&
+        "${prefix}" == "${input%/*}/ramdisk." ]] ||
+        fail "boot unpack did not use the extracted target and temporary directory"
+      [[ "${BOOT_UNPACK_RESULT}" == success ]] || return 1
+      printf 'header fixture' >"${header}"
+      printf 'ramdisk fixture' >"${prefix}0"
+      ;;
+    'cpio unpack')
+      local input='' info='' tree=''
+      shift 2
+      while (($#)); do
+        case "${1}" in
+          --input) input="${2}"; shift 2 ;;
+          --output-info) info="${2}"; shift 2 ;;
+          --output-tree) tree="${2}"; shift 2 ;;
+          --quiet) shift ;;
+          *) fail "unexpected cpio unpack argument: ${1}" ;;
+        esac
+      done
+      [[ -f "${input}" && "${input##*/}" == ramdisk.0 &&
+        "${info}" == "${input%/*}/cpio.toml" &&
+        "${tree}" == "${input%/*}/tree" ]] ||
+        fail "cpio unpack did not consume the freshly extracted ramdisk"
+      [[ "${CPIO_UNPACK_RESULT}" == success ]] || return 1
+      mkdir -p "${tree}"
+      printf 'cpio fixture' >"${info}"
+      printf 'fresh extraction marker' >"${tree}/.extracted"
+      ;;
     *)
       fail "unexpected avbroot call: $*"
       ;;
   esac
+}
+
+run_magisk_artifact() {
+  [[ "${1:-}" == verify-ramdisk ]] ||
+    fail "unexpected Magisk artifact action: ${1:-}"
+  shift
+  local apk='' tree='' info=''
+  while (($#)); do
+    case "${1}" in
+      --apk) apk="${2}"; shift 2 ;;
+      --ramdisk-dir) tree="${2}"; shift 2 ;;
+      --cpio-info) info="${2}"; shift 2 ;;
+      *) fail "unexpected Magisk artifact argument: ${1}" ;;
+    esac
+  done
+  [[ "${apk}" == "${WORKDIR}/modules/magisk.apk" && -f "${apk}" ]] ||
+    fail "finished-image verification did not use the selected Magisk APK"
+  [[ "${tree}" == "${WORKDIR}"/magisk-verify.*/tree &&
+    -f "${tree}/.extracted" ]] ||
+    fail "finished-image verification did not receive the freshly unpacked tree"
+  [[ "${info}" == "${tree%/*}/cpio.toml" && -f "${info}" ]] ||
+    fail "finished-image verification did not receive the extracted CPIO metadata"
+  printf '%s|%s\n' "${apk}" "${tree}" >>"${PAYLOAD_LOG}"
+  [[ "${PAYLOAD_RESULT}" == success ]]
+}
+
+assert_verification_scratch_removed() {
+  if compgen -G "${WORKDIR}/magisk-verify.*" >/dev/null; then
+    fail "Magisk verification left its temporary extraction directory behind"
+  fi
 }
 
 ota="${TEST_ROOT}/rooted.zip"
@@ -103,6 +181,9 @@ verify_magisk_ota "${ota}" sda10 >/dev/null ||
   fail "valid Magisk OTA boot-patch verification failed"
 [[ "$(tail -n1 "${EXTRACT_LOG}")" == init_boot ]] ||
   fail "init_boot was not preferred over boot"
+[[ "$(wc -l <"${PAYLOAD_LOG}")" -eq 1 ]] ||
+  fail "valid Magisk OTA was accepted without comparing its payload to the APK"
+assert_verification_scratch_removed
 
 PARTITIONS='boot'
 verify_magisk_ota "${ota}" sda10 >/dev/null ||
@@ -112,9 +193,12 @@ verify_magisk_ota "${ota}" sda10 >/dev/null ||
 
 PARTITIONS=$'boot\ninit_boot'
 MAGISK_INFO='PREINITDEVICE=wrong'
+: >"${PAYLOAD_LOG}"
 if verify_magisk_ota "${ota}" sda10 >/dev/null 2>&1; then
   fail "wrong Magisk preinit device was accepted"
 fi
+[[ ! -s "${PAYLOAD_LOG}" ]] || fail "payload check ran after incorrect preinit metadata"
+assert_verification_scratch_removed
 
 MAGISK_INFO=''
 if verify_magisk_ota "${ota}" sda10 >/dev/null 2>&1; then
@@ -128,6 +212,37 @@ if verify_magisk_ota "${ota}" sda10 >/dev/null 2>&1; then
 fi
 
 PARTITIONS=$'boot\ninit_boot'
+MAGISK[PREINIT]=sda10
+RESOLVED_ROOT_MODE=magisk
+OUTPUTS[PATCHED_OTA]="${TEST_ROOT}/rejected-magisk.zip"
+for failure in payload boot-unpack cpio-unpack; do
+  BOOT_UNPACK_RESULT=success
+  CPIO_UNPACK_RESULT=success
+  PAYLOAD_RESULT=success
+  case "${failure}" in
+    payload) PAYLOAD_RESULT=failure ;;
+    boot-unpack) BOOT_UNPACK_RESULT=failure ;;
+    cpio-unpack) CPIO_UNPACK_RESULT=failure ;;
+  esac
+  printf 'rejected OTA' >"${OUTPUTS[PATCHED_OTA]}"
+  printf 'rejected signature' >"${OUTPUTS[PATCHED_OTA]}.csig"
+  : >"${PAYLOAD_LOG}"
+  if verify_requested_root_outputs >/dev/null 2>&1; then
+    fail "${failure} failure was accepted despite matching PREINITDEVICE"
+  fi
+  [[ ! -e "${OUTPUTS[PATCHED_OTA]}" && ! -e "${OUTPUTS[PATCHED_OTA]}.csig" ]] ||
+    fail "${failure} failure retained an unverified Magisk OTA or signature"
+  if [[ "${failure}" == payload ]]; then
+    [[ -s "${PAYLOAD_LOG}" ]] || fail "payload mismatch did not reach APK comparison"
+  else
+    [[ ! -s "${PAYLOAD_LOG}" ]] || fail "payload comparison ran after ${failure} failure"
+  fi
+  assert_verification_scratch_removed
+done
+BOOT_UNPACK_RESULT=success
+CPIO_UNPACK_RESULT=success
+PAYLOAD_RESULT=success
+
 rootless_ota="${TEST_ROOT}/pair-rootless.zip"
 magisk_ota="${TEST_ROOT}/pair-magisk.zip"
 printf 'rootless ota' >"${rootless_ota}"

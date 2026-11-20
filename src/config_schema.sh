@@ -79,7 +79,9 @@ _config_schema_define update_channel 'GRAPHENEOS[UPDATE_CHANNEL]' device string 
 _config_schema_define magisk_repository 'MAGISK[REPOSITORY]' device string \
   MAGISK array REPOSITORY '' topjohnwu/Magisk false caller-or-default
 _config_schema_define magisk_version MAGISK_VERSION build string \
-  VERSION array MAGISK MAGISK_VERSION v30.7 true caller-or-existing-or-default
+  VERSION array MAGISK MAGISK_VERSION v31.1 true caller-or-existing-or-default
+_config_schema_define magisk_apk_sha256 MAGISK_APK_SHA256 build string \
+  MAGISK_APK_SHA256 scalar '' MAGISK_APK_SHA256 '' true caller-or-default
 _config_schema_define afsr 'ADDITIONALS[AFSR]' build boolean \
   ADDITIONALS array AFSR ADDITIONALS_AFSR true true caller-or-existing-or-default
 _config_schema_define alterinstaller 'ADDITIONALS[ALTERINSTALLER]' build boolean \

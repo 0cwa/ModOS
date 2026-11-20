@@ -72,15 +72,51 @@ test_wrong_module_signature_fails() {
   assert_retry_failure bcr "wrong-module signature"
 }
 
-test_unsigned_exceptions_succeed() {
+test_unsigned_helper_succeeds() {
   reset_fixture unsigned-helper
   mkdir -p "${WORKDIR}/tools/my-avbroot-setup"
   verify_downloads my-avbroot-setup >/dev/null
-
-  reset_fixture unsigned-magisk
-  touch "${WORKDIR}/modules/magisk.apk"
-  verify_downloads magisk >/dev/null
 }
+
+test_empty_magisk_apk_is_rejected() {
+  reset_fixture empty-magisk
+  touch "${WORKDIR}/modules/magisk.apk"
+  RETRY=true
+  if verify_downloads magisk >/dev/null 2>&1; then
+    fail "empty Magisk APK was accepted merely because the file exists"
+  fi
+  [[ "${RETRY_CALLED}" == false && "${RETRY}" == false ]] ||
+    fail "Magisk integrity rejection incorrectly entered the legacy retry flow"
+}
+
+test_magisk_uses_artifact_verifier() (
+  reset_fixture verified-magisk
+  printf 'selected APK fixture' >"${WORKDIR}/modules/magisk.apk"
+  local -a artifact_calls=()
+  local artifact_result=0
+  run_magisk_artifact() {
+    [[ "$#" -eq 3 && "${1}" == verify && "${2}" == --apk &&
+      "${3}" == "${WORKDIR}/modules/magisk.apk" ]] ||
+      fail "Magisk verification did not dispatch the exact selected APK"
+    artifact_calls+=("${3}")
+    return "${artifact_result}"
+  }
+
+  RETRY=true
+  verify_downloads magisk >/dev/null
+  [[ "${#artifact_calls[@]}" -eq 1 && "${RETRY}" == false &&
+    "${RETRY_CALLED}" == false ]] ||
+    fail "verified Magisk APK did not complete through the artifact verifier"
+
+  artifact_result=47
+  RETRY=true
+  if verify_downloads magisk >/dev/null 2>&1; then
+    fail "Magisk artifact-verifier rejection was ignored"
+  fi
+  [[ "${#artifact_calls[@]}" -eq 2 && "${RETRY}" == false &&
+    "${RETRY_CALLED}" == false ]] ||
+    fail "Magisk artifact rejection did not propagate without legacy retry"
+)
 
 test_locked_executables_rejected_without_retry() {
   reset_fixture locked-executables
@@ -195,7 +231,9 @@ test_locked_input_rejects_worktree_index_mode_and_path_aliases() {
 test_matching_signature_succeeds
 test_missing_signature_fails
 test_wrong_module_signature_fails
-test_unsigned_exceptions_succeed
+test_unsigned_helper_succeeds
+test_empty_magisk_apk_is_rejected
+test_magisk_uses_artifact_verifier
 test_locked_executables_rejected_without_retry
 test_locked_inputs_require_explicit_checked_in_files
 test_locked_input_rejects_worktree_index_mode_and_path_aliases

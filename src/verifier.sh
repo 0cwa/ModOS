@@ -4,10 +4,12 @@
 
 # This file consists of functions to verify the downloaded tools and signatures existence
 # Verifier also looks after retries if the tool is not found
-# We do not verify signatures as `my-avbroot-setup` checks on behalf of us and `magisk` do not have signature
+# Module signatures are checked by my-avbroot-setup. Magisk APK identity is
+# checked here against the selected reviewed or explicitly supplied digest.
 
 # Source the declarations file
 source src/declarations.sh
+source src/magisk.sh
 
 # Initialize retry count and maximum retries
 RETRY_COUNT=0
@@ -99,6 +101,15 @@ function verify_downloads() {
   fi
 
   echo "Verifying \`${tool}\`..."
+
+  if [[ "${tool}" == magisk ]]; then
+    if ! run_magisk_artifact verify --apk "${WORKDIR}/modules/magisk.apk"; then
+      RETRY=false
+      return 1
+    fi
+    RETRY=false
+    return 0
+  fi
 
   if [[ -f "${WORKDIR}/modules/${tool}.zip" ]] && [ "${tool}" != "magisk" ]; then
     tool_path="${WORKDIR}/modules/${tool}.zip"

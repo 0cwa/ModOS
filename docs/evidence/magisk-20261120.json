@@ -1,0 +1,304 @@
+{
+  "avbroot": {
+    "magisk_patcher_source": {
+      "commits": {
+        "v3.37.1": "88362620a21377b160ae7500f64f144a2262a281",
+        "v3.39.0": "c7b99cb35463f6a03b86906ca08810574353a48e"
+      },
+      "comparison": "Byte-identical across both exact upstream releases. VERS_SUPPORTED contains 25211..31200, including Magisk 31100.",
+      "path": "avbroot/src/patch/boot.rs",
+      "sha256": {
+        "v3.37.1": "ed9c5e656ba6333d9119e165f07629695405cd5962b1718d45a180d76bf1f911",
+        "v3.39.0": "ed9c5e656ba6333d9119e165f07629695405cd5962b1718d45a180d76bf1f911"
+      }
+    },
+    "minimum_magisk_31100_release": "v3.37.1",
+    "official_executable": {
+      "arch": "x86_64-unknown-linux-gnu",
+      "archive_sha256": "13d6e4b67857c87c686e831de5609e03bb706b1e73c10397274489bfbebc99e7",
+      "archive_size": 4106604,
+      "id": "avbroot",
+      "layout": [
+        {
+          "mode": "0644",
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "size": 35149,
+          "type": "file"
+        },
+        {
+          "mode": "0644",
+          "path": "README.md",
+          "sha256": "398f4be471f467b40e33a042b13ef3a31ac47c969672521ed86cf29da335ffe6",
+          "size": 33214,
+          "type": "file"
+        },
+        {
+          "mode": "0755",
+          "path": "avbroot",
+          "sha256": "79309323de07045cc6343ff7416e33c340e524ee70cad82928b777837770a923",
+          "size": 10474928,
+          "type": "file"
+        }
+      ],
+      "signature": {
+        "identity": "chenxiaolong",
+        "namespace": "file",
+        "sha256": "a1412dcd4204134f93b45d61de589714012bbfda07dd81b409c75e5c625341cb",
+        "signer_fingerprint": "SHA256:Ct0HoRyrFLrnF9W+A/BKEiJmwx7yWkgaW/JvghKrboA",
+        "type": "ssh",
+        "verified": true
+      },
+      "version": "3.39.0"
+    },
+    "support_change": "https://github.com/chenxiaolong/avbroot/pull/662"
+  },
+  "baseline_host_regression": {
+    "apk": {
+      "repository": "topjohnwu/Magisk",
+      "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+      "size": 11613864,
+      "version": "30.7",
+      "version_code": 30700
+    },
+    "execution": "Same separate exploratory adapter, exact authenticated avbroot 3.39.0 and sealed-runner limitation as the v31.1 observation.",
+    "fixtures": [
+      {
+        "fixture": "boot-v3",
+        "header_version": 3,
+        "magisk": {
+          "boot_sha256": "cbfa090da1dd2af13a1a839a0625dec37d37fb02a7257e499700764152ad0106",
+          "ota_sha256": "ff49d2def258056f635f1205289e833f03096dfa1f299f013585703e9bc08b73"
+        },
+        "magisk_payload": {
+          "abi": "arm64-v8a",
+          "ramdisk_payloads": [
+            "init",
+            "magisk.xz",
+            "init-ld.xz",
+            "stub.xz"
+          ],
+          "repository": "topjohnwu/Magisk",
+          "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+          "size": 11613864,
+          "version": "30.7",
+          "version_code": 30700
+        },
+        "preinit_device": "sda47",
+        "rootless": {
+          "boot_sha256": "7f377ec0bd24d0c33ed4abf2d3467d9ea6caeb9c53fcf6edecaca3ed58a020d2",
+          "ota_sha256": "c66d26ff582232bb90d6362bb46700286e2e78371069e1641e633959c02561e4"
+        },
+        "target": "boot"
+      },
+      {
+        "fixture": "boot-v4",
+        "header_version": 4,
+        "magisk": {
+          "boot_sha256": "d297235dc5725a51e6b77478ad1fc08f244f56264a36eb5f7033df110a065adc",
+          "ota_sha256": "f0c740c99a96bc35665293a36dc5eb602614bc9c1699c9eafc4071f158ef6ae2"
+        },
+        "magisk_payload": {
+          "abi": "arm64-v8a",
+          "ramdisk_payloads": [
+            "init",
+            "magisk.xz",
+            "init-ld.xz",
+            "stub.xz"
+          ],
+          "repository": "topjohnwu/Magisk",
+          "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+          "size": 11613864,
+          "version": "30.7",
+          "version_code": 30700
+        },
+        "preinit_device": "sda47",
+        "rootless": {
+          "boot_sha256": "5b01afaeb06acdc6b92c6f10503db7f5bc8adf7a921b0f7d0e08361f6be5bb0d",
+          "ota_sha256": "16d540f9afc9ca00a6e19c022bac4d6a6a4b6f26895cafefbf38a5c85f8596a7"
+        },
+        "target": "boot"
+      },
+      {
+        "fixture": "init-boot-v4",
+        "header_version": 4,
+        "magisk": {
+          "boot_sha256": "919647a05e939aa19ed91b640831ac7eddba18d7a7f7de7b5a6d4ae4b63d47e7",
+          "ota_sha256": "0a8cdb9d6b5db191ade38b21fcec417539d442dab770309ddeb67a0a28dcc6a8"
+        },
+        "magisk_payload": {
+          "abi": "arm64-v8a",
+          "ramdisk_payloads": [
+            "init",
+            "magisk.xz",
+            "init-ld.xz",
+            "stub.xz"
+          ],
+          "repository": "topjohnwu/Magisk",
+          "sha256": "e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5",
+          "size": 11613864,
+          "version": "30.7",
+          "version_code": 30700
+        },
+        "preinit_device": "sda10",
+        "rootless": {
+          "boot_sha256": "0e68286d85ace515263a8ba7f5d32fdb9ac69b70802921ea25066a52eba0752a",
+          "ota_sha256": "dfddf8a6e1818f8997268647a9f97f445058a0e77ba944b10f2c81773299550e"
+        },
+        "target": "init_boot"
+      }
+    ],
+    "result": "All three real-patcher fixture pairs passed, including the v30.7-only stub payload. This retains the explicit rollback path without claiming runtime downgrade acceptance."
+  },
+  "helper": {
+    "commit": "b553f46a9b94fff3960617830b6072b0f8b054b5",
+    "decision": "Keep the reviewed helper and avbroot locks. Existing engines already implement the required Magisk v31.1 patch format.",
+    "guard_patch_sha256": "8596d81bcafcb576ac8b4df549908ac6837d83643e8495304433c8e24fa4b15f",
+    "guard_patch_touches_magisk_patcher": false,
+    "guarded_engine_base": "88362620a21377b160ae7500f64f144a2262a281"
+  },
+  "limitations": [
+    "Synthetic boot images cannot boot and are not device firmware.",
+    "No physical-device testing or on-device Magisk runtime acceptance was performed.",
+    "No release or update feed was published by this qualification."
+  ],
+  "local_host_execution": {
+    "apk_digest_and_size_match_release": true,
+    "avbroot_archive_signature_verified": true,
+    "avbroot_executable_sha256": "79309323de07045cc6343ff7416e33c340e524ee70cad82928b777837770a923",
+    "checks_passed": [
+      "Original synthetic OTA whole-file, payload, partition-hash and AVB verification using its disposable signer.",
+      "Rootless and Magisk output verification with the same trust checks.",
+      "Magisk targets boot for v3/v4 boot-only fixtures and prefers init_boot when both are present.",
+      "Configured PREINITDEVICE is retained in each finished image.",
+      "Unpacked init and decompressed Magisk/init-ld payloads match the locked APK byte for byte.",
+      "Ramdisk entry types, permissions and ownership match the required metadata contract.",
+      "Rootless output and a deliberately changed init are rejected by Magisk payload verification.",
+      "Paired boot targets differ; the non-target boot image is identical across the v4 rootless/Magisk pair."
+    ],
+    "exploratory_runner": "The publisher-authenticated exact avbroot binary was run by a separate local test adapter. This is not a successful sealed-runner qualification.",
+    "fixture_device": "modos_magisk_synthetic_do_not_flash",
+    "fixture_script": "src/ci/check_magisk_compatibility.py",
+    "fixtures": [
+      {
+        "fixture": "boot-v3",
+        "header_version": 3,
+        "magisk": {
+          "boot_sha256": "3ec6029749322154d4bc4b164addd48b2976a0ad45d9e05520a9c3d82c801f07",
+          "ota_sha256": "ce251705f1740a0c4cfa55fa536aa01dc762c7c5275e8a0be083f13c6f821479"
+        },
+        "magisk_payload": {
+          "abi": "arm64-v8a",
+          "ramdisk_payloads": [
+            "init",
+            "magisk.xz",
+            "init-ld.xz"
+          ],
+          "repository": "topjohnwu/Magisk",
+          "sha256": "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7",
+          "size": 10679283,
+          "version": "31.1",
+          "version_code": 31100
+        },
+        "preinit_device": "sda47",
+        "rootless": {
+          "boot_sha256": "d10d10121734d4d3f8237dd1370c7771542045d081e7f85d09ad5b1d27536534",
+          "ota_sha256": "d126f6b14cfcc178df323e3f44c11ca62534382eab85b1326a323ecef70fcab9"
+        },
+        "target": "boot"
+      },
+      {
+        "fixture": "boot-v4",
+        "header_version": 4,
+        "magisk": {
+          "boot_sha256": "3389d6109488fd62b7f60d4f6155b8f9433441e622a9bb660b80a36972cce80e",
+          "ota_sha256": "341891b755553f29e882d66b7100abec30c2a1662e5d4175575aae5df997da3d"
+        },
+        "magisk_payload": {
+          "abi": "arm64-v8a",
+          "ramdisk_payloads": [
+            "init",
+            "magisk.xz",
+            "init-ld.xz"
+          ],
+          "repository": "topjohnwu/Magisk",
+          "sha256": "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7",
+          "size": 10679283,
+          "version": "31.1",
+          "version_code": 31100
+        },
+        "preinit_device": "sda47",
+        "rootless": {
+          "boot_sha256": "1f7cd8f30fd9f6d39d2cc7afd5f9fc4a666b6de0979088fe04c626817accf2e7",
+          "ota_sha256": "1c613972ac468ea2bb6d0b01506625b5d57a6d5ffeb7982784fb631bee936d4f"
+        },
+        "target": "boot"
+      },
+      {
+        "fixture": "init-boot-v4",
+        "header_version": 4,
+        "magisk": {
+          "boot_sha256": "a174f71565782c1ac7ba969bcaf4fc50ddbbe2b64f8c2db604a8febbf6cc1a0b",
+          "ota_sha256": "b0b47532f22c36922acb24601f699b5ce35ad5e0f7495e7fc33112f0f3d350a1"
+        },
+        "magisk_payload": {
+          "abi": "arm64-v8a",
+          "ramdisk_payloads": [
+            "init",
+            "magisk.xz",
+            "init-ld.xz"
+          ],
+          "repository": "topjohnwu/Magisk",
+          "sha256": "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7",
+          "size": 10679283,
+          "version": "31.1",
+          "version_code": 31100
+        },
+        "preinit_device": "sda10",
+        "rootless": {
+          "boot_sha256": "70e0fe24dbd691df471114b84d09c48ca6e859e7d4a6c734b2a2a69cb0186a9b",
+          "ota_sha256": "fecfc696a2641df69c565f0f5121d85a8ec983c1995250bb0e12b4c85fcb3f20"
+        },
+        "target": "init_boot"
+      }
+    ],
+    "sealed_runner": "The workspace rejected sealed execution with: sealed file-descriptor execution is unavailable. No production fallback was added.",
+    "test_input_notes": [
+      "Fixtures have no system filesystem and use the test-only --skip-system-ota-cert option. Recovery-certificate patching and every OTA/AVB check remain enabled.",
+      "Each run creates fresh disposable keys, so output digests record this observation and are not reproducible across independently generated keys.",
+      "No fixture ZIP, signing key, APK or executable is committed."
+    ]
+  },
+  "magisk": {
+    "asset_url": "https://github.com/topjohnwu/Magisk/releases/download/v31.1/Magisk-v31.1.apk",
+    "payload_sha256": {
+      "lib/arm64-v8a/libinit-ld.so": "edc355f90c76bed3ae4b93fd098cd15f5e688840ea5aa104d65ac9dd210ae1d7",
+      "lib/arm64-v8a/libmagisk.so": "fb0ba1b1f3472d34b8ae21edd3a69c2a44f46a3a7c34e85e37c6b2b57d22b9ec",
+      "lib/arm64-v8a/libmagiskinit.so": "c0c7cc1c8e1afb92bff602164f6aa1bb4103f5028d076216d8bef48496e2f4dc"
+    },
+    "release_api": "https://api.github.com/repos/topjohnwu/Magisk/releases/tags/v31.1",
+    "release_url": "https://github.com/topjohnwu/Magisk/releases/tag/v31.1",
+    "repository": "topjohnwu/Magisk",
+    "sha256": "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7",
+    "size": 10679283,
+    "tag": "v31.1",
+    "tag_commit": "0972f67d97f9b6302b67c5171283330c74114b4a",
+    "version": "31.1",
+    "version_code": 31100
+  },
+  "pending_acceptance": [
+    "Run the committed fixture script in CI through the mandatory authenticated sealed runner.",
+    "Run complete nonpublishing shiba/pdx235 OTA qualification at the final PR revision.",
+    "Observe physical-device boot, matching-manager setup, pre-granted root authorization, runtime version and OTA persistence."
+  ],
+  "purpose": "Qualify official Magisk v31.1 acquisition, patch-format compatibility and finished boot payload identity. Device boot and runtime root remain separate acceptance.",
+  "review_date": "2026-11-20",
+  "schema": "modos-magisk-qualification-v1",
+  "upstream_reference": {
+    "modos_source_decision": "Retain the already-established official topjohnwu/Magisk source. PixeneOS uses its separate GrapheneOS Zygisk fork; copying that source choice is unnecessary for v31.1 format support.",
+    "pixeneos_commit": "527d1aba174bc57120d5f9a805398f626863512b",
+    "pixeneos_magisk_source": "pixincreate/Magisk",
+    "rooted_graphene_observation": "At review time DEFAULT_MAGISK_VERSION=v31.1; this is corroborating integration practice, not ModOS device acceptance.",
+    "rooted_graphene_reference": "https://github.com/schnatterer/rooted-graphene/blob/main/rooted-ota.sh"
+  }
+}

@@ -11,6 +11,7 @@ source "${_rom_profiles_source_dir}/ci/selection_variant.sh"
 source "${_rom_profiles_source_dir}/ci/pdx235_release_quarantine.sh"
 source "${_rom_profiles_source_dir}/ci/pdx235_repaired_helper.sh"
 source "${_rom_profiles_source_dir}/development_profile.sh"
+source "${_rom_profiles_source_dir}/magisk.sh"
 unset _rom_profiles_source_dir
 
 function _require_profile_boolean() {
@@ -244,6 +245,7 @@ function module_selection_fingerprint() {
   local magisk_preinit="disabled"
   local magisk_repository="disabled"
   local magisk_version="disabled"
+  local magisk_apk_sha256="disabled"
   local boot_animation_digest="disabled"
   local shizuku_lock_digest="disabled"
   local shizuku_adapter_digest="disabled"
@@ -381,6 +383,7 @@ function module_selection_fingerprint() {
       echo "Error: rooted profiles require a canonical Magisk version tag." >&2
       return 1
     fi
+    magisk_apk_sha256="$(run_magisk_artifact resolve)" || return 1
   fi
 
   if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
@@ -414,6 +417,7 @@ function module_selection_fingerprint() {
   SELECTION_MAGISK_PREINIT="${magisk_preinit}"
   SELECTION_MAGISK_REPOSITORY="${magisk_repository}"
   SELECTION_MAGISK_VERSION="${magisk_version}"
+  SELECTION_MAGISK_APK_SHA256="${magisk_apk_sha256}"
   SELECTION_DEBUG="${ADDITIONALS[DEBUG]}"
   SELECTION_COMPATIBLE_SEPOLICY="${ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]}"
   SELECTION_CLEAR_VBMETA_FLAGS="${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}"
