@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tomllib
@@ -33,6 +34,9 @@ from magisk_artifact import (  # noqa: E402
 
 
 DEVICE = "modos_magisk_synthetic_do_not_flash"
+OFFICIAL_MAGISK_SIGNER_SHA256 = (
+    "b4cb83b4dad99f997dbe872f013aa16c14eec41d167021f371f7e1330f273ee6"
+)
 FIXTURES = (
     ("boot-v3", 3, ("boot",), "boot", "sda47"),
     ("boot-v4", 4, ("boot",), "boot", "sda47"),
@@ -52,6 +56,83 @@ def checked(command: list[str | Path], cwd: Path) -> str:
             f"{completed.stdout}{completed.stderr}"
         )
     return completed.stdout
+
+
+def validate_apk_signer_output(output: str) -> dict:
+    """Check the single upstream signer across Android Build Tools formats.
+
+    Build Tools <=36 reports ``Signer #1``. Build Tools 37 reports one line
+    per signing scheme, such as ``V2 Signer:`` and ``V3.0 Signer:``. Repeated
+    certificates across distinct schemes are expected, but duplicate signer
+    records, mixed output formats and multiple APK signers are not accepted.
+    The subprocess's exit status must be checked before calling this parser.
+    """
+    counts = []
+    legacy = []
+    schemes = []
+    for line in output.splitlines():
+        line = line.rstrip()
+        if line.startswith("Number of signers:"):
+            counts.append(line.removeprefix("Number of signers:").strip())
+        if "certificate SHA-256 digest:" not in line:
+            continue
+        if line.startswith("Source Stamp Signer:"):
+            # Source stamps are not APK signers and cannot establish identity.
+            continue
+        match = re.fullmatch(
+            r"Signer #(\d+) certificate SHA-256 digest: ([0-9A-Fa-f:]+)", line
+        )
+        if match:
+            legacy.append(match.groups())
+            continue
+        match = re.fullmatch(
+            r"(V[1-4](?:\.\d+)?) Signer:(?: \([^\n)]*\))? "
+            r"certificate SHA-256 digest: ([0-9A-Fa-f:]+)", line,
+        )
+        if match:
+            schemes.append(match.groups())
+            continue
+        raise ValueError("Unrecognized APK signer certificate report; review apksigner output")
+
+    if counts != ["1"]:
+        raise ValueError(
+            "Expected exactly one APK signer count of 1 from apksigner --verbose; "
+            f"reported counts: {counts!r}"
+        )
+    if legacy:
+        if schemes or len(legacy) != 1 or legacy[0][0] != "1":
+            raise ValueError("APK signer report has duplicate, mixed or multiple signer records")
+        format_name = "legacy"
+        certificates = [legacy[0][1]]
+        scheme_names = []
+    else:
+        scheme_names = [name for name, _ in schemes]
+        if not schemes or len(set(scheme_names)) != len(scheme_names):
+            raise ValueError("APK signer report has missing or duplicate signing-scheme records")
+        format_name = "scheme-prefixed"
+        certificates = [certificate for _, certificate in schemes]
+    if any(value.replace(":", "").lower() != OFFICIAL_MAGISK_SIGNER_SHA256
+           for value in certificates):
+        raise ValueError("APK certificate does not match the single official Magisk signer")
+    return {
+        "certificate_sha256": OFFICIAL_MAGISK_SIGNER_SHA256,
+        "signer_count": 1,
+        "output_format": format_name,
+        "schemes": scheme_names,
+    }
+
+
+def verify_apk_signer(apk: Path) -> dict:
+    output = checked(
+        ["apksigner", "verify", "--verbose", "--print-certs", apk], apk.parent,
+    )
+    report = validate_apk_signer_output(output)
+    scheme_text = ", ".join(report["schemes"]) or "legacy signer report"
+    print(
+        f"Verified official Magisk APK signer {report['certificate_sha256']} "
+        f"(one signer; {scheme_text})."
+    )
+    return report
 
 
 class Avbroot:
@@ -294,6 +375,7 @@ def main() -> int:
     apk = args.apk.absolute()
     artifact = resolve_artifact(args.repository, args.version, args.sha256)
     apk_report = verify_apk(apk, artifact)
+    signer_report = verify_apk_signer(apk)
     workdir.mkdir(mode=0o700)
     avbroot = Avbroot(workdir)
     avbroot.install()
@@ -304,7 +386,7 @@ def main() -> int:
         "schema": "modos-magisk-host-compatibility-v1",
         "scope": "synthetic host patch/verification only; no device boot or runtime root",
         "execution": "authenticated sealed avbroot runner", "avbroot": version,
-        "apk": apk_report, "fixtures": fixtures,
+        "apk": apk_report, "apk_signer": signer_report, "fixtures": fixtures,
     }
     (workdir / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(f"Magisk {artifact.version}: {len(fixtures)} real-patcher fixture pairs passed ({version}).")

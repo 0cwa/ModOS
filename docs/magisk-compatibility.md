@@ -84,6 +84,18 @@ disposable keys are never release candidates. The script has no unsealed
 execution fallback. Same-repository `integration/` PRs additionally use the
 existing nonpublishing GrapheneOS/shiba and LineageOS/pdx235 paired OTA jobs.
 
+Magisk integration branches also run an independent, narrow paired ROM profile
+with AFSR, Custota, boot animation and stock updater removal. This uses the same
+build workflow, disposable keys and verification gates, with optional modules
+disabled. It produces no release or update-feed changes. The ordinary full
+test job and full-profile qualification remain separate gates.
+
+On November 20 the existing full test job is blocked because Termux removed the
+locked `exfatprogs_1.4.3_aarch64.deb` from its rolling package repository (HTTP
+404). No byte-identical replacement was found on the checked official mirrors
+or retained upstream artifacts. The exfatprogs lock remains unchanged; passing
+Magisk-specific checks does not resolve or waive that full-profile blocker.
+
 ## Updating the supported release
 
 1. Review the official stable GitHub release and its source changes. Renovate
