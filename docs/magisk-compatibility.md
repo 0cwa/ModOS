@@ -69,14 +69,15 @@ and output passes OTA signature, payload, partition and AVB checks. The test
 also checks exact Magisk payloads, preinit retention, rootless separation and
 rejection of a deliberately changed `init`.
 
-On November 20, the [host qualification job](https://github.com/0cwa/ModOS/actions/runs/44798081929/job/136502764927)
-passed for PR head `283857f33e1f9f0157c7d82cb7662d94d787ed78`. Both official
+On November 20, the [host qualification job](https://github.com/0cwa/ModOS/actions/runs/44800680856/job/136511709691)
+passed for PR head `fa1d23eec4de705c5a036ca07e717bb09ba570df`. Both official
 v31.1 and v30.7 APKs passed Build Tools 37 signature verification with one V2
 signer matching the certificate above. Each release passed all three fixture
-pairs through authenticated, sealed avbroot 3.39.0. The 39 artifact tests,
+pairs through authenticated, sealed avbroot 3.39.0, including the repeated stock
+`dev` directory case. The 43 artifact tests,
 12 signer tests, 25 device-health tests and seven targeted shell suites also
-passed. The exact [v31.1 host receipt](evidence/magisk-host-20261120-v31.1.json)
-and [v30.7 host receipt](evidence/magisk-host-20261120-v30.7.json) are preserved
+passed. The exact [v31.1 host receipt](evidence/magisk-host-20261120-fa1d23e-v31.1.json)
+and [v30.7 host receipt](evidence/magisk-host-20261120-fa1d23e-v30.7.json) are preserved
 in this repository, independent of CI artifact expiry. Their hashes and verified
 source archive identity are recorded in the evidence.
 
@@ -110,12 +111,29 @@ build workflow, disposable keys and verification gates, with optional modules
 disabled. It produces no release or update-feed changes. The ordinary full
 test job and full-profile qualification remain separate gates.
 
-The first narrow pdx235 paired build passed at the revision above, including
+The first narrow pdx235 paired build passed at PR head
+`283857f33e1f9f0157c7d82cb7662d94d787ed78`, including
 the guarded 3.37.1 engine, exact v31.1 payloads and rootless separation. The
 shiba run found the repeated stock `dev` directories after both OTAs passed
 signature, AVB and care-map checks. That verifier false positive is covered by
 the directory rule above and an expanded `init_boot` fixture using the actual
-LZ4 format. Both ROM jobs must be rerun after that fix.
+LZ4 format.
+
+Both paired ROM jobs then passed at `fa1d23eec4de705c5a036ca07e717bb09ba570df`
+in [run 44800680856](https://github.com/0cwa/ModOS/actions/runs/44800680856):
+
+| Target | Source | Verified Magisk target | Preinit | Result |
+| --- | --- | --- | --- | --- |
+| GrapheneOS / shiba | `2026111800` | `init_boot` | `sda10` | Both root modes passed |
+| LineageOS / pdx235 | `24.0-20261120` | `boot` | `sda47` | Both root modes passed |
+
+Each job checked both output signatures, payload/partition hashes, AVB and care
+maps, exact v31.1 payloads and metadata, rootless separation, and boot animation.
+The output diagnostic guards reported no output warnings. The pdx235 source
+retained three expected upstream AVB warnings, recorded in the evidence; the
+existing policy replaces the source signing keys and clears disabled output
+verification flags. These results qualify this narrow build profile and do not
+establish full-profile or physical-device acceptance.
 
 On November 20 the existing full test job is blocked because Termux removed the
 locked `exfatprogs_1.4.3_aarch64.deb` from its rolling package repository (HTTP
