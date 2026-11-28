@@ -142,11 +142,37 @@ test_rejections() {
   assert_rejected '[device]'$'\n''DEVICE_NAME = "unterminated' malformed-string
 }
 
-test_checked_in_shizuku_selection() (
+test_local_default_matches_shared_scheduled_settings() (
+  local key
+  local -A shiba=()
+
+  check_toml_env "${REPO_ROOT}/.github/schedules/grapheneos-shiba.toml" >/dev/null
+  for key in "${!TOML_CONFIG_VALUES[@]}"; do
+    if [[ "${CONFIG_SCHEMA_SECTION[${key}]}" == build && "${key}" != magisk_preinit ]]; then
+      shiba[${key}]="${TOML_CONFIG_VALUES[${key}]}"
+    fi
+  done
+
+  check_toml_env "${REPO_ROOT}/.github/schedules/lineageos-pdx235.toml" >/dev/null
+  local -A shared=()
+  for key in "${!shiba[@]}"; do
+    if toml_config_has "${key}" && [[ "${TOML_CONFIG_VALUES[${key}]}" == "${shiba[${key}]}" ]]; then
+      shared[${key}]="${shiba[${key}]}"
+    fi
+  done
+
   check_toml_env "${REPO_ROOT}/env.toml" >/dev/null
+  for key in "${!shared[@]}"; do
+    assert_equals "${shared[${key}]}" "$(config_schema_resolve_value "${key}")" "shared build setting ${key}"
+  done
+
   resolve_root_mode >/dev/null
+  assert_equals bramble "${DEVICE_NAME}" "local default device"
+  assert_equals sda10 "${MAGISK[PREINIT]}" "local bramble preinit device"
+  assert_equals both "${RESOLVED_ROOT_MODE}" "local OTA pair"
   assert_equals true "${ADDITIONALS[SHIZUKU]}" "local Shizuku selection"
-  assert_equals rootless "${RESOLVED_ROOT_MODE}" "local Shizuku startup mode"
+  assert_equals true "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" "local stock updater removal"
+  assert_equals local-unpublished "${OUTPUT_SCOPE}" "local output scope"
 )
 
 test_shizuku_default_and_override() (
@@ -164,7 +190,7 @@ test_current_legacy_env
 test_section_semantics
 test_precedence_and_omission
 test_rejections
-test_checked_in_shizuku_selection
+test_local_default_matches_shared_scheduled_settings
 test_shizuku_default_and_override
 
 echo "typed config resolver tests passed"

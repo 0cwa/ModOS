@@ -582,6 +582,10 @@ checks remain necessary even when the script passes.
 
 ### Disable the stock ROM updater
 
+The checked-in local configuration follows the shared scheduled release settings.
+It builds a rootless OTA and a Magisk OTA, enables Custota and Shizuku, and
+removes the stock updater. Local builds use local signing keys.
+
 Set `'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true` under `[build]` to remove the stock OTA updater from the patched ROM. For the supported profiles, PixeneOS removes GrapheneOS's `app.seamlessupdate.client` updater from the system partition or LineageOS's `org.lineageos.updater` from `system_ext`, along with updater-specific permission/default-permission configuration files when present.
 
 The updater APK itself is required to match the reviewed ROM-specific path; if it has moved or the unpacked filesystem metadata disagrees with the tree, the build fails instead of silently producing an OTA that still contains the updater. Only enable this when another update path such as Custota is configured and maintained.
