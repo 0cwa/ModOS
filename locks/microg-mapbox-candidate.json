@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/microg/GmsCore.git",
+  "release": "v0.3.17.252432",
+  "source_commit": "32bc8954ff872d0e1a05ddfae81561b6dbecef69",
+  "upstream_fix_commit": "dd9fe374bbd16c42877046dbab18baf48830ee4a",
+  "patch": "patches/microg-mapbox/0001-native-loaders-read-only.patch",
+  "patch_sha256": "d737d577d0496f1258665234d4476e6b525ee1b297852b6ba383fff209e63115",
+  "recipe_timestamp": "2026-11-03T16:30:44Z",
+  "gradle": {
+    "version": "8.13",
+    "distribution_url": "https://services.gradle.org/distributions/gradle-8.13-bin.zip",
+    "distribution_sha256": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+    "wrapper_files": {
+      "gradlew": "a3648413b47ef77af21d5ebc36c687c7d103aaef3e17f33de7d4f080a6f300a3",
+      "gradle/wrapper/gradle-wrapper.jar": "2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046",
+      "gradle/wrapper/gradle-wrapper.properties": "a6b59c7242e86d352a742bf1217495f81e93312b09af32782d1906b3fdd72a9b"
+    }
+  },
+  "java_major": 17,
+  "android_platform": 35,
+  "android_build_tools": "35.0.0",
+  "task": ":play-services-core:assembleMapboxDefaultRelease",
+  "apk_directory": "play-services-core/build/outputs/apk/mapboxDefault/release",
+  "apk_package": "com.google.android.gms",
+  "apk_version_code": 252432035,
+  "production_eligible": false
+}

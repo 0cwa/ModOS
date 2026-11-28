@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-11-10",
+  "prepared_by": "ChatGPT",
+  "hosted_build": {
+    "workflow_run": 42765104829,
+    "job": 129660237278,
+    "recipe_commit": "ef169c54b8d0f0e56d047944ab1eeff57810682f",
+    "url": "https://github.com/0cwa/ModOS/actions/runs/42765104829",
+    "conclusion": "success",
+    "artifact": {
+      "id": 13739394108,
+      "name": "microg-mapbox-unsigned-candidate",
+      "size": 103404705,
+      "sha256": "7efee4e0cb2e62a56e1daf10ae717ddcc075e3c4f24972ac90a113a38726e22a",
+      "url": "https://github.com/0cwa/ModOS/actions/runs/42765104829/artifacts/13739394108",
+      "expires_at": "2026-11-24T06:05:03Z"
+    }
+  },
+  "candidate_receipt": {
+    "source_repository": "https://github.com/microg/GmsCore.git",
+    "source_release": "v0.3.17.252432",
+    "source_commit": "32bc8954ff872d0e1a05ddfae81561b6dbecef69",
+    "upstream_fix_commit": "dd9fe374bbd16c42877046dbab18baf48830ee4a",
+    "patch_sha256": "d737d577d0496f1258665234d4476e6b525ee1b297852b6ba383fff209e63115",
+    "backport_commit": "6234f43e3dc4ae41da30300dfe95a54b38cc323f",
+    "backport_tree": "a6ea2e1e75c61f7a19513b33e0a2a206617910ac",
+    "prepared_commit": "b647d49357115d22f56ad326a74c0d411c4e8ef0",
+    "prepared_tree": "b4f6cadb4802bba7547b5a2cdf61322d3cccf1e9",
+    "gradle_distribution_sha256": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+    "production_eligible": false,
+    "state": "unsigned-candidate-built",
+    "apk": {
+      "package": "com.google.android.gms",
+      "version_code": 252432035,
+      "version_name": "0.3.17.252432-2 (b647d49)",
+      "sha256": "d6fc67452a1dbf43ce052ca88485be1bb828fab5662b944ee49b870491b602b4",
+      "size": 107824512,
+      "signing": "unsigned"
+    },
+    "java": "openjdk version \"17.0.21\" 2026-10-20",
+    "android_platform": 35,
+    "android_build_tools": "35.0.0",
+    "gradle_task": ":play-services-core:assembleMapboxDefaultRelease"
+  },
+  "independent_review": {
+    "downloaded_archive_sha256_matches_github": true,
+    "receipt_matches_pinned_source_and_deterministic_preparation": true,
+    "archive_members": [
+      {
+        "name": "com.google.android.gms-unsigned.apk",
+        "size": 107824512
+      },
+      {
+        "name": "candidate.json",
+        "size": 1200
+      },
+      {
+        "name": "gradle.log",
+        "size": 438487
+      }
+    ],
+    "apk_identity_signature_and_native_library": "Validated by the hosted builder; a second local APK re-verification could not start because the execution environment became unavailable.",
+    "hidden_index_regressions": "Both reproduced before the fix and rejected afterward; eleven offline tests passed at local commit bcdba768cdbf63c52553a7b9b0ae78f39b8b1389.",
+    "hidden_index_followup": {
+      "recipe_commit": "e3c1086a866ee6703b150b64c3d860ffee05562b",
+      "workflow_run": 42765926043,
+      "changes_prepared_microg_source": false
+    }
+  },
+  "local_attempt": {
+    "result": "No accepted APK",
+    "detail": "Java/Kotlin compilation completed, then Gradle reported that its daemon disappeared during release lint. The cause was not established. The local execution environment later became unavailable; no local build success is claimed."
+  },
+  "limits": [
+    "Unsigned review candidate only; no production artifact lock or framework signer change.",
+    "No physical-device, Skånetrafiken, account, push, location, or map-service acceptance.",
+    "No byte-for-byte APK reproducibility claim.",
+    "Artifact retention is separate from this enduring source/build receipt."
+  ]
+}
