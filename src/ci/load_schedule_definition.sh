@@ -29,6 +29,7 @@ required=(
   oemunlockonboot
   disable_system_updater
   fsck_sysfs_sepolicy
+  shizuku
   boot_animation
   compatible_sepolicy_patching
   force_update
@@ -63,6 +64,7 @@ disable_system_updater="$(toml_resolve_value disable_system_updater '')"
 fsck_sysfs_sepolicy="$(toml_resolve_value fsck_sysfs_sepolicy '')"
 microg="$(toml_resolve_value microg false)"
 microg_spoof_patch="$(toml_resolve_value microg_spoof_patch false)"
+shizuku="$(toml_resolve_value shizuku '')"
 boot_animation="$(toml_resolve_value boot_animation '')"
 compatible_sepolicy_patching="$(toml_resolve_value compatible_sepolicy_patching '')"
 exfatprogs_fsck="$(toml_resolve_value exfatprogs_fsck false)"
@@ -112,6 +114,7 @@ esac
   echo "fsck_sysfs_sepolicy=${fsck_sysfs_sepolicy}"
   echo "microg=${microg}"
   echo "microg_spoof_patch=${microg_spoof_patch}"
+  echo "shizuku=${shizuku}"
   echo "boot_animation=${boot_animation}"
   echo "compatible_sepolicy_patching=${compatible_sepolicy_patching}"
   echo "exfatprogs_fsck=${exfatprogs_fsck}"
@@ -135,6 +138,7 @@ esac
   echo "ADDITIONALS_FSCK_SYSFS_SEPOLICY=${fsck_sysfs_sepolicy}"
   echo "ADDITIONALS_MICROG=${microg}"
   echo "ADDITIONALS_MICROG_SPOOF_PATCH=${microg_spoof_patch}"
+  echo "ADDITIONALS_SHIZUKU=${shizuku}"
   echo "ADDITIONALS_BOOT_ANIMATION=${boot_animation}"
   echo "ADDITIONALS_MAS_COMPATIBLE_SEPOLICY=${compatible_sepolicy_patching}"
   echo "ADDITIONALS_EXFATPROGS_FSCK=${exfatprogs_fsck}"

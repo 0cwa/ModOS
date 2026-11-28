@@ -371,25 +371,19 @@ function prepare_microg_spoof_patch_module() {
 # The adapter checks APK bytes and ExtFs checks product file-context labels;
 # no privileged permission allowlist or custom SELinux policy is added.
 function prepare_shizuku_module() {
-  local root_mode
   if [[ "${ADDITIONALS[SHIZUKU]}" != 'true' ]]; then
     return 0
-  fi
-  resolve_root_mode || return 1
-  if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
-    echo "Error: Shizuku cannot distinguish rootless and Magisk server startup in ROOT_MODE=both." >&2
-    return 1
   fi
   if [[ ! -f locks/shizuku-v13.6.0.json || -L locks/shizuku-v13.6.0.json ||
     ! -f src/shizuku.py || -L src/shizuku.py ]]; then
     echo "Error: the Shizuku lock or adapter path is missing or unsafe." >&2
     return 1
   fi
-  root_mode="${RESOLVED_ROOT_MODE}"
   mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" || return 1
   : >"${WORKDIR}/modules/shizuku.zip"
   : >"${WORKDIR}/signatures/shizuku.zip.sig"
-  export PIXENEOS_SHIZUKU_ROOT_MODE="${root_mode}"
+  # The shared product image uses the init-managed shell service on every flavor.
+  export PIXENEOS_SHIZUKU_ROOT_MODE=rootless
   export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
 }
 
@@ -574,11 +568,6 @@ function prepare_locked_catalog_modules() {
     lock="${repository_root}/locks/shizuku-v13.6.0.json"
     if [[ "${ROM_FAMILY}" != lineageos && "${ROM_FAMILY}" != grapheneos ]]; then
       echo "Error: Shizuku is unsupported for ROM family ${ROM_FAMILY}." >&2
-      return 1
-    fi
-    resolve_root_mode || return 1
-    if [[ "${RESOLVED_ROOT_MODE}" == both ]]; then
-      echo "Error: Shizuku cannot distinguish rootless and Magisk server startup in ROOT_MODE=both." >&2
       return 1
     fi
     lock_paths+=("${lock}")

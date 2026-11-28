@@ -110,7 +110,7 @@ _config_schema_define fdroid_privileged_extension \
   ADDITIONALS array FDROID_PRIVILEGED_EXTENSION \
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION false false caller-or-existing-or-default
 _config_schema_define shizuku 'ADDITIONALS[SHIZUKU]' build boolean \
-  ADDITIONALS array SHIZUKU ADDITIONALS_SHIZUKU false true caller-or-existing-or-default
+  ADDITIONALS array SHIZUKU ADDITIONALS_SHIZUKU true true caller-or-existing-or-default
 _config_schema_define exfatprogs_fsck 'ADDITIONALS[EXFATPROGS_FSCK]' build boolean \
   ADDITIONALS array EXFATPROGS_FSCK ADDITIONALS_EXFATPROGS_FSCK false true caller-or-existing-or-default
 _config_schema_define fsck_sysfs_sepolicy 'ADDITIONALS[FSCK_SYSFS_SEPOLICY]' build boolean \

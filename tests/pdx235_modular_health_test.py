@@ -62,7 +62,7 @@ class FakeADB:
             code, out = 0, "1\n"
         elif cmd == "getprop ro.boot.verifiedbootstate":
             code, out = 0, "yellow\n"
-        elif cmd == "getprop init.svc.vendor.usbgadget-hal":
+        elif cmd in ("getprop init.svc.vendor.usbgadget-hal", "getprop init.svc.shizuku"):
             code, out = 0, "running\n"
         elif cmd == "ps -A -o LABEL,ARGS":
             code, out = 0, QTI_PROCESS
@@ -96,6 +96,18 @@ class HealthAuditTests(unittest.TestCase):
         self.assertEqual(set(selections), {entry[0] for entry in audit.MODULES})
         self.assertTrue(selections["microg"])
         self.assertTrue(selections["custota"])
+        self.assertTrue(selections["shizuku"])
+
+    def test_shizuku_audit_distinguishes_a_stopped_service(self):
+        selected = {name: name == "shizuku" for name, _, _ in audit.MODULES}
+        for service, expected in (("running", "PASS"), ("stopped", "FAIL"), ("", "WARNING")):
+            with self.subTest(service=service):
+                ctx, fake = fake_ctx()
+                fake.overrides["getprop init.svc.shizuku"] = (0, service + "\n")
+                checks = audit.inspect(ctx, selected, "rootless")
+                self.assertEqual(next(c["status"] for c in checks
+                                      if c["module"] == "shizuku" and c["check"] == "init-service"),
+                                 expected)
 
     def test_every_enabled_module_owns_results_and_disabled_is_not_failure(self):
         ctx, fake = fake_ctx()

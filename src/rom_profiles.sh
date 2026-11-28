@@ -312,12 +312,8 @@ function module_selection_fingerprint() {
   done
 
   if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]]; then
-    resolve_root_mode || return 1
-    shizuku_root_mode="${RESOLVED_ROOT_MODE}"
-    if [[ "${RESOLVED_ROOT_MODE}" == 'both' ]]; then
-      echo "Error: Shizuku requires separate rootless or Magisk builds; ROOT_MODE=both shares the product image." >&2
-      return 1
-    fi
+    # Shizuku uses the same init-managed shell service in every OTA flavor.
+    shizuku_root_mode="rootless"
     shizuku_lock_digest="$(_locked_input_digest locks/shizuku-v13.6.0.json)" || {
       echo "Error: the Shizuku lock is not clean and checked in." >&2
       return 1

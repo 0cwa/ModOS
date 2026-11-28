@@ -149,10 +149,22 @@ test_checked_in_shizuku_selection() (
   assert_equals rootless "${RESOLVED_ROOT_MODE}" "local Shizuku startup mode"
 )
 
+test_shizuku_default_and_override() (
+  TOML_CONFIG_PRESENT=()
+  TOML_CONFIG_VALUES=()
+  DECLARATION_CALLER_PRESENT=()
+  unset ADDITIONALS_SHIZUKU
+  assert_equals true "$(config_schema_resolve_value shizuku)" "unattended Shizuku default"
+  ADDITIONALS_SHIZUKU=false
+  DECLARATION_CALLER_PRESENT[shizuku]=true
+  assert_equals false "$(config_schema_resolve_value shizuku)" "explicit Shizuku opt-out"
+)
+
 test_current_legacy_env
 test_section_semantics
 test_precedence_and_omission
 test_rejections
 test_checked_in_shizuku_selection
+test_shizuku_default_and_override
 
 echo "typed config resolver tests passed"

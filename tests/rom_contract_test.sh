@@ -488,10 +488,12 @@ test_shizuku_selection_follows_supported_rom_profiles() (
       "Shizuku selection mode for ${family}/${device}"
   done
 
-  ROOT_MODE="both"
-  if module_selection_fingerprint >/dev/null 2>&1; then
-    fail "Shizuku selection unexpectedly accepted shared rootless/Magisk mode"
-  fi
+  for ROOT_MODE in magisk both; do
+    module_selection_fingerprint >/dev/null ||
+      fail "Shizuku selection rejected ${ROOT_MODE}"
+    assert_equals "rootless" "${SELECTION_SHIZUKU_ROOT_MODE}" \
+      "Shizuku identity must reflect shell startup for ${ROOT_MODE}"
+  done
 )
 
 test_shizuku_adapter_is_required_and_fingerprinted_only_when_enabled() (

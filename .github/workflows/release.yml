@@ -46,10 +46,10 @@ on:
         type: boolean
         default: false
       shizuku:
-        description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
+        description: Include Shizuku with automatic shell startup without debugging
         required: false
         type: boolean
-        default: false
+        default: true
       magisk-preinit-device:
         required: false
         type: string
@@ -142,10 +142,10 @@ on:
         type: boolean
         default: false
       shizuku:
-        description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
+        description: Include Shizuku with automatic shell startup without debugging
         required: false
         type: boolean
-        default: false
+        default: true
       magisk-preinit-device:
         description: Magisk preinit device
         required: false
@@ -203,6 +203,7 @@ jobs:
       msd: ${{ steps.scheduled_config.outputs.msd }}
       oemunlockonboot: ${{ steps.scheduled_config.outputs.oemunlockonboot }}
       disable_system_updater: ${{ steps.scheduled_config.outputs.disable_system_updater }}
+      shizuku: ${{ steps.scheduled_config.outputs.shizuku }}
       boot_animation: ${{ steps.scheduled_config.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.scheduled_config.outputs.compatible_sepolicy_patching }}
       expected_variant: ${{ steps.selection_identity.outputs.expected_variant }}
@@ -264,7 +265,7 @@ jobs:
           ADDITIONALS_MSD: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.msd == 'true' || inputs.msd }}
           ADDITIONALS_OEMUNLOCKONBOOT: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}
           ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.disable_system_updater == 'true' || inputs.disable-system-updater }}
-          ADDITIONALS_SHIZUKU: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
+          ADDITIONALS_SHIZUKU: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.shizuku == 'true' || (github.event_name != 'schedule' && inputs.shizuku) }}
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
           ADDITIONALS_DEBUG: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
           ADDITIONALS_BOOT_ANIMATION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.boot_animation == 'true' || github.event_name != 'schedule' && inputs.boot-animation }}
@@ -360,7 +361,7 @@ jobs:
       msd: ${{ github.event_name == 'schedule' && needs.preflight.outputs.msd == 'true' || (github.event_name != 'schedule' && inputs.msd) }}
       oemunlockonboot: ${{ github.event_name == 'schedule' && needs.preflight.outputs.oemunlockonboot == 'true' || (github.event_name != 'schedule' && inputs.oemunlockonboot) }}
       disable-system-updater: ${{ github.event_name == 'schedule' && needs.preflight.outputs.disable_system_updater == 'true' || (github.event_name != 'schedule' && inputs.disable-system-updater) }}
-      shizuku: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
+      shizuku: ${{ github.event_name == 'schedule' && needs.preflight.outputs.shizuku == 'true' || (github.event_name != 'schedule' && inputs.shizuku) }}
       # LineageOS pdx235-only modules; never forward them from a GrapheneOS trigger.
       exfatprogs-fsck: false
       fsck-sysfs-sepolicy: false

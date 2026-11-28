@@ -67,13 +67,12 @@
     {
       "key": "shizuku",
       "config": "shizuku",
-      "health": null,
+      "health": "shizuku",
       "route": "catalog-locked",
       "helper_id": "shizuku",
       "prepare": "prepare_locked_catalog_modules",
       "selection_field": "SELECTION_MODULE_SHIZUKU",
       "identity_key": "module.shizuku",
-      "health_pending": "No dedicated device health probe yet; runtime acceptance remains separate.",
       "helper_cli": true,
       "extension_adapter": "shizuku",
       "local_prepare": "prepare_shizuku_module"

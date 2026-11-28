@@ -52,10 +52,10 @@ on:
         type: boolean
         default: false
       shizuku:
-        description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
+        description: Include Shizuku with automatic shell startup without debugging
         required: false
         type: boolean
-        default: false
+        default: true
       boot-animation:
         description: Include the local custom boot animation
         required: false

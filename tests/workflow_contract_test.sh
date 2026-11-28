@@ -153,7 +153,7 @@ test_reusable_workflow() {
     'oemunlockonboot:boolean:true' \
     'microg:boolean:false' \
     'microg-spoof-patch:boolean:false' \
-    'shizuku:boolean:false' \
+    'shizuku:boolean:true' \
     'disable-system-updater:boolean:false'; do
     IFS=: read -r input expected_type expected_default <<<"${contract}"
     assert_workflow_input_contract \
@@ -541,8 +541,8 @@ test_release_triggers() {
   assert_dispatch_default "${RELEASE}" msd true
   assert_dispatch_default "${RELEASE}" oemunlockonboot true
   assert_dispatch_default "${RELEASE}" disable-system-updater false
-  assert_dispatch_default "${RELEASE}" shizuku false
-  assert_dispatch_default "${RELEASE}" shizuku false workflow_call
+  assert_dispatch_default "${RELEASE}" shizuku true
+  assert_dispatch_default "${RELEASE}" shizuku true workflow_call
   assert_dispatch_default "${RELEASE}" boot-animation true
   assert_dispatch_default "${RELEASE}" boot-animation true workflow_call
   assert_dispatch_default "${RELEASE}" compatible-sepolicy-patching false
@@ -552,12 +552,12 @@ test_release_triggers() {
   assert_dispatch_default "${lineage}" microg false
   assert_dispatch_default "${lineage}" microg-spoof-patch false
   assert_dispatch_default "${lineage}" bcr true
-  assert_dispatch_default "${lineage}" shizuku false
+  assert_dispatch_default "${lineage}" shizuku true
   assert_dispatch_default "${lineage}" disable-system-updater false
   assert_dispatch_default "${lineage}" boot-animation true
   assert_contains "${lineage}" 'boot-animation:[[:space:]]*\$\{\{ inputs\.boot-animation \}\}' "LineageOS manual boot animation input must be forwarded"
   assert_contains "${lineage}" 'shizuku:[[:space:]]*\$\{\{ inputs\.shizuku \}\}' "LineageOS manual Shizuku selection must be forwarded"
-  assert_contains "${lineage}" 'shizuku:[[:space:]]*false' "LineageOS scheduled Shizuku selection must remain disabled"
+  assert_contains "${lineage}" 'shizuku:[[:space:]]*\$\{\{ needs\.schedule_config\.outputs\.shizuku == .true. \}\}' "LineageOS must forward scheduled Shizuku"
 }
 
 test_bcr_reusable_workflow_family_policy() {
@@ -641,7 +641,7 @@ test_microg_lineage_forwarding() {
 test_shizuku_manual_selection_and_ci() {
   local multi="${WORKFLOW_DIR}/multi-release.yml"
 
-  assert_workflow_input_contract "${multi}" shizuku boolean false
+  assert_workflow_input_contract "${multi}" shizuku boolean true
   assert_contains "${multi}" \
     'shizuku:[[:space:]]*\$\{\{ inputs\.shizuku \}\}' \
     "multi-device builds must forward their explicit Shizuku selection"
@@ -649,8 +649,11 @@ test_shizuku_manual_selection_and_ci() {
     'ADDITIONALS_SHIZUKU:[[:space:]]*\$\{\{ inputs\.shizuku \}\}' \
     "shared builder must map the Shizuku input to typed configuration"
   assert_contains "${RELEASE}" \
-    'shizuku:[[:space:]]*\$\{\{ github\.event_name != .schedule. && inputs\.shizuku \|\| false \}\}' \
-    "GrapheneOS must forward manual Shizuku selection and keep schedules disabled"
+    'shizuku:[[:space:]]*\$\{\{ github\.event_name == .schedule. && needs\.preflight\.outputs\.shizuku == .true. \|\| \(github\.event_name != .schedule. && inputs\.shizuku\) \}\}' \
+    "GrapheneOS must forward both scheduled and manual Shizuku selections"
+  assert_contains "${RELEASE}" \
+    'ADDITIONALS_SHIZUKU:[[:space:]]*\$\{\{ github\.event_name == .schedule. && steps\.scheduled_config\.outputs\.shizuku == .true. \|\| \(github\.event_name != .schedule. && inputs\.shizuku\) \}\}' \
+    "GrapheneOS preflight must fingerprint the Shizuku selection passed to the builder"
   assert_contains "${WORKFLOW_DIR}/ci.yml" \
     'python3 tests/shizuku_adapter_test\.py' \
     "CI must run the Shizuku adapter regression tests"
