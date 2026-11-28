@@ -727,17 +727,32 @@ test_shizuku_magisk_composes_rooted_catalog_profile() {
   run_patch
   grep -Fxq 'root_mode = "rooted"' "${WORKDIR}/locked-profiles/selected-modules.toml" ||
     fail 'Magisk selection did not compose a rooted catalog profile'
-  [[ "${PIXENEOS_SHIZUKU_ROOT_MODE}" == magisk ]] ||
-    fail 'Catalog root mode translation changed the Shizuku startup mode'
+  [[ "${PIXENEOS_SHIZUKU_ROOT_MODE}" == rootless ]] ||
+    fail 'Magisk OTA must use the automatic Shizuku shell service'
   assert_contains --patch-arg=--magisk 'Magisk selection retained the root patch route'
 }
 
-test_shizuku_rejects_shared_rootless_magisk_product_image() {
-  reset_fixture shizuku-both-modes
-  ADDITIONALS[SHIZUKU]="true"
-  ROOT_MODE="both"
-  assert_patch_fails_before_execution \
-    "Shizuku cannot share one injected product image across root modes"
+test_shizuku_paired_otas_share_shell_service() {
+  local family device
+  for family in grapheneos lineageos; do
+    reset_fixture "shizuku-pair-${family}"
+    enable_shizuku_fixture
+    ROOT_MODE="both"
+    ROM_FAMILY="${family}"
+    device=shiba
+    [[ "${family}" != lineageos ]] || device=pdx235
+    DEVICE_NAME="${device}"
+    OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+    run_patch
+    [[ "${PIXENEOS_SHIZUKU_ROOT_MODE}" == rootless ]] ||
+      fail "${family} paired OTA must use the automatic Shizuku shell service"
+    grep -Fxq 'root_mode = "rootless"' "${WORKDIR}/locked-profiles/selected-modules.toml" ||
+      fail "${family} paired OTA did not resolve a rootless catalog profile"
+    assert_pair "--module-shizuku" "${WORKDIR}/modules/shizuku.zip" "shared Shizuku payload"
+    assert_pair "--secondary-output" "${OUTPUTS[PATCHED_OTA_MAGISK]}" "paired Magisk OTA"
+    assert_not_contains '--patch-arg=--magisk' 'primary OTA stays rootless'
+    assert_contains '--secondary-patch-arg=--magisk' 'secondary OTA still patches Magisk'
+  done
 }
 
 test_lineage_both_modes_clear_vbmeta_flags() {
@@ -1015,7 +1030,7 @@ test_microg_rejects_missing_or_invalid_source_sdk
 test_disabled_microg_does_not_require_source_sdk
 test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices
 test_shizuku_magisk_composes_rooted_catalog_profile
-test_shizuku_rejects_shared_rootless_magisk_product_image
+test_shizuku_paired_otas_share_shell_service
 test_lineage_both_modes_clear_vbmeta_flags
 test_care_map_compatibility_scope
 test_pdx235_publisher_preflight

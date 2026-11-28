@@ -59,10 +59,10 @@ on:
         type: boolean
         default: false
       shizuku:
-        description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
+        description: Include Shizuku with automatic shell startup without debugging
         required: false
         type: boolean
-        default: false
+        default: true
       exfatprogs-fsck:
         description: Replace fsck.exfat with the locked Termux exfatprogs 1.4.3 binary (LineageOS pdx235 only)
         required: false

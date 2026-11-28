@@ -19,7 +19,7 @@ from modos_health.common import Context, item
 from modos_health.checks import (afsr, alterinstaller, android, bcr,
                                  boot_animation, custota,
                                  exfatprogs_fsck, fsck_sysfs_sepolicy, magisk, microg,
-                                 microg_spoof_patch, msd, oemunlockonboot,
+                                 microg_spoof_patch, msd, oemunlockonboot, shizuku,
                                  stock_updater)
 
 # Static registry: every enabled module has exactly one owning check file.
@@ -34,6 +34,7 @@ MODULES = (
     ("oemunlockonboot", "ADDITIONALS[OEMUNLOCKONBOOT]", oemunlockonboot),
     ("microg", "ADDITIONALS[MICROG]", microg),
     ("microg_spoof_patch", "ADDITIONALS[MICROG_SPOOF_PATCH]", microg_spoof_patch),
+    ("shizuku", "ADDITIONALS[SHIZUKU]", shizuku),
     ("boot_animation", "ADDITIONALS[BOOT_ANIMATION]", boot_animation),
     ("stock_updater", "ADDITIONALS[DISABLE_SYSTEM_UPDATER]", stock_updater),
     ("exfatprogs_fsck", "ADDITIONALS[EXFATPROGS_FSCK]", exfatprogs_fsck),
@@ -64,7 +65,8 @@ def load_config(path):
         raise ValueError("unregistered build module(s): " + ", ".join(unknown))
     selections = {}
     for name, key, _ in MODULES:
-        value = build.get(key)
+        # Older schedule snapshots omitted Shizuku and built without it.
+        value = build.get(key, False if name == "shizuku" else None)
         if type(value) is not bool:
             raise ValueError("required module selection must be a TOML boolean: " + key)
         selections[name] = value

@@ -20,6 +20,7 @@ MAGISK_PREINIT = "sda47"
 # Preserve the Companion signer already published in the November 10 OTA pair.
 # A signer change requires an explicit migration review before publication.
 'ADDITIONALS[MICROG_SPOOF_PATCH]' = true
+'ADDITIONALS[SHIZUKU]' = true
 'ADDITIONALS[BOOT_ANIMATION]' = true
 'ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]' = true
 'ADDITIONALS[EXFATPROGS_FSCK]' = true

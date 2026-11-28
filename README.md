@@ -22,7 +22,7 @@ compatibility boundaries and the upstream changes that would let us remove them.
 - [AlterInstaller](https://github.com/chenxiaolong/AlterInstaller)
 - Optional Magisk using the repository selected by the build
 - Custom boot animation enabled by default (opt-out available)
-- Optional Shizuku with an init-managed rootless boot service (no wireless debugging)
+- Shizuku with an init-managed shell service (no wireless debugging)
 
 > [!NOTE]
 >
@@ -486,26 +486,17 @@ is implied by the extracted-file test.
 
 ### Shizuku module
 
-To patch Shizuku into the system image with automatic startup and no USB or
-wireless debugging requirement, use the checked-in `env.toml` selection with rootless mode:
-
-```toml
-[build]
-ROOT_MODE = "rootless"
-'ADDITIONALS[SHIZUKU]' = true
-```
-
-The GrapheneOS single-device/multi-device and LineageOS manual workflows also
-expose the `shizuku` input. Select `root-mode: rootless` for the system-managed
-service. The checked-in local configuration enables Shizuku. Scheduled paired
-builds and manual workflow inputs still default to disabled.
+ModOS includes Shizuku by default in local builds, GitHub Actions manual
+builds, and the scheduled GrapheneOS shiba and LineageOS pdx235 releases.
+Set `'ADDITIONALS[SHIZUKU]' = false` in local `env.toml` or turn off the
+`shizuku` input in a manual workflow to omit it.
 
 For local Shizuku builds, put Android SDK `apksigner` and `apkanalyzer` on
 `PATH` so the pinned helper can verify the APK.
 
 #### Startup and permissions
 
-The rootless module installs the official Shizuku manager and server from the
+The module installs the official Shizuku manager and server from the
 [locked v13.6.0 APK](locks/shizuku-v13.6.0.json). Android init starts the server
 after `sys.boot_completed=1` on every boot and supervises it with a ten-second
 restart interval. The launcher executes `app_process` in the foreground using
@@ -524,7 +515,7 @@ regular product app, and clients still need the user's normal per-app Shizuku
 approval. The manager may call this mode “ADB” because of the server's UID;
 the service does not depend on an ADB connection or enabled debugging.
 
-For this rootless mode, `/product/etc/sysconfig/modos-shizuku.xml` disables the
+The file `/product/etc/sysconfig/modos-shizuku.xml` disables the
 official manager's boot receiver by default, using its fully qualified
 component name.
 That receiver can otherwise [turn USB and wireless debugging on](https://github.com/RikkaApps/Shizuku/blob/v13.6.0/manager/src/main/java/moe/shizuku/manager/receiver/BootCompleteReceiver.kt)
@@ -535,7 +526,7 @@ permissions; its Stop action is temporary because init restarts the server.
 To remove automatic startup, rebuild the OTA with the module disabled.
 
 **When upgrading an existing Shizuku installation, turn off Shizuku's own
-Start on boot setting and leave it off in rootless mode.** Android preserves
+Start on boot setting and leave it off.** Android preserves
 explicit per-user component settings ahead of the image's default override.
 The official manager's switch may also appear on when Android is using the
 disabled default; explicitly switching it off records the intended state.
@@ -550,11 +541,9 @@ image version, so update them together through the APK lock and a rebuilt OTA.
 The adapter's SHA-256 also participates in Shizuku-enabled build fingerprints,
 so boot-service fixes cannot reuse an older selection's published OTA.
 
-`ROOT_MODE = "magisk"` installs the same complete manager payload and retains
-Shizuku's normal ROOT startup after the user's one-time setup and root approval.
-It does not install the shell init service or disable the manager's boot
-receiver. `ROOT_MODE = "both"` remains unsupported with Shizuku because the
-helper injects one shared product image before splitting output modes.
+Rootless and Magisk OTAs use the same Shizuku shell service. A paired build
+installs that service in the shared product image and patches Magisk into
+only the Magisk OTA. Shizuku clients receive shell permissions in either OTA.
 
 #### Compatibility and device acceptance
 
@@ -566,7 +555,7 @@ ABIs. Host tests exercise payload installation, foreground process identity,
 startup arguments, receiver overrides, build selection, and the acceptance
 script. They do not establish target-device runtime compatibility.
 
-For rootless acceptance on each ROM/device combination, keep Shizuku's own
+For acceptance on each ROM/device and OTA flavor, keep Shizuku's own
 **Start on boot** setting off, boot the patched image with **both USB and
 wireless debugging disabled**, open Shizuku, and confirm that an approved
 client works. Check that an unapproved client still requires approval, then reboot
@@ -576,8 +565,6 @@ wireless debugging off, connect by USB, and run the read-only check:
 
 ```shell
 bash tests/shizuku_post_boot_check.sh rootless
-# or
-bash tests/shizuku_post_boot_check.sh magisk
 ```
 
 The script uses `adb -d` throughout. It checks the installed manager, exactly
@@ -594,6 +581,10 @@ or inconclusive without another failure. The manual client and cold-boot
 checks remain necessary even when the script passes.
 
 ### Disable the stock ROM updater
+
+The checked-in local configuration follows the shared scheduled release settings.
+It builds a rootless OTA and a Magisk OTA, enables Custota and Shizuku, and
+removes the stock updater. Local builds use local signing keys.
 
 Set `'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true` under `[build]` to remove the stock OTA updater from the patched ROM. For the supported profiles, PixeneOS removes GrapheneOS's `app.seamlessupdate.client` updater from the system partition or LineageOS's `org.lineageos.updater` from `system_ext`, along with updater-specific permission/default-permission configuration files when present.
 

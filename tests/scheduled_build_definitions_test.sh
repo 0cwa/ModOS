@@ -45,8 +45,8 @@ check_definition() {
       fail "${file}: wrong exfatprogs fsck selection"
     [[ "$(toml_resolve_value force_update '')" == false ]] ||
       fail "${file}: scheduled force update must default to false"
-    [[ "$(toml_resolve_value shizuku false)" == false ]] ||
-      fail "${file}: scheduled Shizuku selection must remain default-off"
+    [[ "$(toml_resolve_value shizuku '')" == true ]] ||
+      fail "${file}: scheduled Shizuku selection must be enabled"
 
     local expected_microg=false
     [[ "${expected_family}" != lineageos ]] || expected_microg=true
@@ -104,6 +104,10 @@ check_loader() {
     fail "${file}: loader did not export paired root mode"
   grep -Fxq 'boot_animation=true' "${output_file}" ||
     fail "${file}: loader did not enable scheduled boot animation"
+  grep -Fxq 'shizuku=true' "${output_file}" ||
+    fail "${file}: loader did not enable scheduled Shizuku"
+  grep -Fxq 'ADDITIONALS_SHIZUKU=true' "${env_file}" ||
+    fail "${file}: loader did not export Shizuku for preflight"
   local expected_exfat=false
   [[ "${expected_family}" != lineageos ]] || expected_exfat=true
   grep -Fxq "exfatprogs_fsck=${expected_exfat}" "${output_file}" ||
@@ -272,6 +276,7 @@ scheduled_boolean_outputs = {
     "msd": "msd",
     "oemunlockonboot": "oemunlockonboot",
     "disable-system-updater": "disable_system_updater",
+    "shizuku": "shizuku",
 }
 for name, output in scheduled_boolean_outputs.items():
     expected = (
