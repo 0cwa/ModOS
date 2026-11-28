@@ -15,8 +15,6 @@ declare -a CAPTURED_ARGS=()
 declare -a EXPECTED_ARGS=()
 declare -a PREPARE_STAGES=()
 PREPARE_FAILURE=""
-PREPARE_CACHE_SENTINEL=""
-LOCKED_INPUTS_VALID="true"
 DIAGNOSTICS_FAILURE=false
 declare -a DIAGNOSTIC_ARGS=()
 
@@ -41,20 +39,11 @@ python() {
       stage="${2}"
     fi
     PREPARE_STAGES+=("${stage}")
-    if [[ "${stage}" == "artifacts-fetch" &&
-      -n "${PREPARE_CACHE_SENTINEL}" ]]; then
-      mkdir -p "$(dirname -- "${PREPARE_CACHE_SENTINEL}")"
-      touch -- "${PREPARE_CACHE_SENTINEL}"
-    fi
     [[ "${stage}" != "${PREPARE_FAILURE}" ]]
     return
   fi
 
   CAPTURED_ARGS=("$@")
-}
-
-verify_checked_in_locked_input() {
-  [[ "${LOCKED_INPUTS_VALID}" == "true" ]]
 }
 
 # This suite verifies orchestration/argv ordering without a full signed OTA.
@@ -216,13 +205,7 @@ reset_fixture() {
   ROOT_MODE=""
   RESOLVED_ROOT_MODE=""
 
-  FDROID_PRIVILEGED_EXTENSION_LOCK=""
-  FDROID_PRIVILEGED_EXTENSION_PROFILE=""
-  FDROID_PRIVILEGED_EXTENSION_CACHE=""
-  FDROID_PRIVILEGED_EXTENSION_PATCH_REPORT=""
-  LOCKED_INPUTS_VALID="true"
   PREPARE_FAILURE=""
-  PREPARE_CACHE_SENTINEL=""
 
   CAPTURED_ARGS=()
   PREPARE_STAGES=()
@@ -866,45 +849,6 @@ assert not scratch.exists(), 'Empty helper scratch parent was retained'
 PYTHON
 )
 
-test_microg_and_fdroid_locked_modes_conflict() {
-  reset_fixture microg-fdroid-conflict
-  enable_microg_fixture
-  enable_fdroid_fixture
-
-  assert_patch_fails_before_execution "microG/F-Droid locked bundle conflict"
-}
-
-enable_fdroid_fixture() {
-  ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="true"
-  FDROID_PRIVILEGED_EXTENSION_LOCK="${WORKDIR}/fdroid.lock.json"
-  FDROID_PRIVILEGED_EXTENSION_PROFILE="${WORKDIR}/fdroid.profile.toml"
-  touch \
-    "${FDROID_PRIVILEGED_EXTENSION_LOCK}" \
-    "${FDROID_PRIVILEGED_EXTENSION_PROFILE}"
-}
-
-test_fdroid_locked_preparation_and_arguments() {
-  reset_fixture fdroid-enabled
-  enable_fdroid_fixture
-  run_patch
-
-  assert_prepare_stages \
-    "F-Droid preparation" \
-    resolve artifacts-fetch artifacts-verify
-  assert_pair \
-    "--module-lock" "${FDROID_PRIVILEGED_EXTENSION_LOCK}" "F-Droid"
-  assert_pair \
-    "--module-profile" "${FDROID_PRIVILEGED_EXTENSION_PROFILE}" "F-Droid"
-  assert_pair \
-    "--module-cache" "${WORKDIR}/locked-artifacts" "F-Droid"
-  assert_pair \
-    "--patch-report" "${OUTPUTS[PATCHED_OTA]}.patch-report.json" "F-Droid"
-  assert_not_contains \
-    "--module-fdroid-privileged-extension" "F-Droid legacy archive"
-  assert_not_contains \
-    "--module-fdroid-privileged-extension-sig" "F-Droid legacy signature"
-}
-
 assert_patch_fails_before_execution() {
   local context="${1}"
 
@@ -915,169 +859,12 @@ assert_patch_fails_before_execution() {
     fail "${context}: patch command was executed"
 }
 
-test_fdroid_missing_or_untracked_inputs_fail_closed() {
-  reset_fixture fdroid-missing-inputs
-  ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="true"
-  assert_patch_fails_before_execution "missing locked inputs"
-  assert_prepare_stages "missing locked inputs"
-
-  reset_fixture fdroid-untracked-inputs
-  enable_fdroid_fixture
-  LOCKED_INPUTS_VALID="false"
-  assert_patch_fails_before_execution "untracked locked inputs"
-  assert_prepare_stages "untracked locked inputs"
-
-  reset_fixture fdroid-missing-module-tool
-  enable_fdroid_fixture
-  rm -f -- "${WORKDIR}/tools/my-avbroot-setup/module-tool.py"
-  assert_patch_fails_before_execution "missing locked module tool"
-  assert_prepare_stages "missing locked module tool"
-}
-
-test_fdroid_preparation_precedes_ota_extraction() (
-  local event_log
-  local -a expected_events=(prepare-start prepare-complete extract)
-  local -a actual_events=()
-
-  reset_fixture fdroid-before-extraction
-  enable_fdroid_fixture
-  rm -f -- \
-    "${WORKDIR}/extracted/avb_pkmd.bin" \
-    "${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
-  event_log="${WORKDIR}/events"
-
-  prepare_fdroid_privileged_extension() {
-    printf '%s\n' prepare-start >>"${event_log}"
-    printf '%s\n' prepare-complete >>"${event_log}"
-  }
-
-  extract_official_keys() {
-    [[ "$(tail -n 1 -- "${event_log}")" == 'prepare-complete' ]] ||
-      fail "OTA extraction started before locked preparation completed"
-    printf '%s\n' extract >>"${event_log}"
-    mkdir -p -- "${WORKDIR}/extracted/ota/META-INF/com/android"
-    touch -- \
-      "${WORKDIR}/extracted/avb_pkmd.bin" \
-      "${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
-  }
-
-  run_patch
-  mapfile -t actual_events <"${event_log}"
-  assert_array_equals \
-    expected_events actual_events "F-Droid before OTA extraction"
+test_fdroid_extension_request_is_rejected() (
+  reset_fixture retired-fdroid
+  ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]=true
+  assert_patch_fails_before_execution "retired F-Droid extension"
+  assert_prepare_stages "retired F-Droid extension"
 )
-
-test_fdroid_preparation_failure_prevents_ota_extraction() (
-  local event_log
-
-  reset_fixture fdroid-failure-before-extraction
-  enable_fdroid_fixture
-  rm -f -- \
-    "${WORKDIR}/extracted/avb_pkmd.bin" \
-    "${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
-  event_log="${WORKDIR}/events"
-
-  prepare_fdroid_privileged_extension() {
-    printf '%s\n' prepare-failed >>"${event_log}"
-    return 1
-  }
-
-  extract_official_keys() {
-    printf '%s\n' extract >>"${event_log}"
-  }
-
-  assert_patch_fails_before_execution "locked preparation before extraction"
-  [[ "$(<"${event_log}")" == 'prepare-failed' ]] ||
-    fail "OTA extraction ran after locked preparation failed"
-)
-
-test_fdroid_disabled_preserves_legacy_extraction_order() (
-  local event_log
-  local -a expected_events=(extract prepare)
-  local -a actual_events=()
-
-  reset_fixture fdroid-disabled-extraction
-  set_default_expected_args
-  rm -f -- \
-    "${WORKDIR}/extracted/avb_pkmd.bin" \
-    "${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
-  event_log="${WORKDIR}/events"
-
-  extract_official_keys() {
-    printf '%s\n' extract >>"${event_log}"
-    mkdir -p -- "${WORKDIR}/extracted/ota/META-INF/com/android"
-    touch -- \
-      "${WORKDIR}/extracted/avb_pkmd.bin" \
-      "${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
-  }
-
-  prepare_fdroid_privileged_extension() {
-    printf '%s\n' prepare >>"${event_log}"
-  }
-
-  run_patch
-  mapfile -t actual_events <"${event_log}"
-  assert_array_equals \
-    expected_events actual_events "disabled F-Droid extraction order"
-  assert_array_equals \
-    EXPECTED_ARGS CAPTURED_ARGS "disabled F-Droid missing-key arguments"
-)
-
-test_fdroid_preparation_stages_fail_closed() {
-  local failure
-
-  for failure in resolve artifacts-fetch artifacts-verify; do
-    reset_fixture "fdroid-fail-${failure}"
-    enable_fdroid_fixture
-    PREPARE_FAILURE="${failure}"
-    assert_patch_fails_before_execution "failed ${failure}"
-    case "${failure}" in
-    resolve)
-      assert_prepare_stages "failed resolve" resolve
-      ;;
-    artifacts-fetch)
-      assert_prepare_stages \
-        "failed fetch" resolve artifacts-fetch
-      ;;
-    artifacts-verify)
-      assert_prepare_stages \
-        "failed verify" resolve artifacts-fetch artifacts-verify
-      ;;
-    esac
-  done
-}
-
-test_fdroid_locked_paths_survive_cleanup_and_quoting() {
-  reset_fixture "fdroid paths with spaces [literal]*"
-  enable_fdroid_fixture
-  FDROID_PRIVILEGED_EXTENSION_CACHE="${WORKDIR}/extracted/extracts/cache [literal]*"
-  FDROID_PRIVILEGED_EXTENSION_PATCH_REPORT="${WORKDIR}/reports/patch report [literal]*.json"
-  PREPARE_CACHE_SENTINEL="${FDROID_PRIVILEGED_EXTENSION_CACHE}/verified-object"
-
-  run_patch
-
-  [[ -f "${PREPARE_CACHE_SENTINEL}" ]] ||
-    fail "F-Droid cache was removed after locked verification"
-  assert_pair \
-    "--module-cache" "${FDROID_PRIVILEGED_EXTENSION_CACHE}" \
-    "F-Droid quoted cache"
-  assert_pair \
-    "--patch-report" "${FDROID_PRIVILEGED_EXTENSION_PATCH_REPORT}" \
-    "F-Droid quoted report"
-}
-
-test_fdroid_enabled_does_not_reuse_legacy_output_marker() {
-  reset_fixture fdroid-legacy-marker
-  enable_fdroid_fixture
-  touch -- "${WORKDIR}/${GRAPHENEOS[OTA_TARGET]}.patched*.zip"
-
-  run_patch
-  assert_prepare_stages \
-    "enabled F-Droid legacy marker" \
-    resolve artifacts-fetch artifacts-verify
-  assert_pair "--output" "${OUTPUTS[PATCHED_OTA]}" \
-    "enabled F-Droid legacy marker"
-}
 
 test_default_arguments
 test_each_module_can_be_disabled
@@ -1106,14 +893,6 @@ test_pdx235_secondary_verification_failure_blocks_sidecars
 test_diagnostic_failure_blocks_postflight_and_sidecars
 test_existing_grapheneos_output_cannot_bypass_diagnostics
 test_helper_uses_build_filesystem_scratch
-test_microg_and_fdroid_locked_modes_conflict
-test_fdroid_locked_preparation_and_arguments
-test_fdroid_missing_or_untracked_inputs_fail_closed
-test_fdroid_preparation_precedes_ota_extraction
-test_fdroid_preparation_failure_prevents_ota_extraction
-test_fdroid_disabled_preserves_legacy_extraction_order
-test_fdroid_preparation_stages_fail_closed
-test_fdroid_locked_paths_survive_cleanup_and_quoting
-test_fdroid_enabled_does_not_reuse_legacy_output_marker
+test_fdroid_extension_request_is_rejected
 
 echo "module selection tests passed"

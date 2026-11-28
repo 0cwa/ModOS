@@ -156,7 +156,6 @@ jobs:
       disable_system_updater: ${{ steps.definition.outputs.disable_system_updater }}
       microg: ${{ steps.definition.outputs.microg }}
       microg_spoof_patch: ${{ steps.definition.outputs.microg_spoof_patch }}
-      fdroid_privileged_extension: ${{ steps.definition.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.definition.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.definition.outputs.compatible_sepolicy_patching }}
       exfatprogs_fsck: ${{ steps.definition.outputs.exfatprogs_fsck }}
@@ -225,7 +224,6 @@ jobs:
       microg: ${{ needs.schedule_config.outputs.microg == 'true' }}
       microg-spoof-patch: ${{ needs.schedule_config.outputs.microg_spoof_patch == 'true' }}
       shizuku: false
-      fdroid-privileged-extension: ${{ needs.schedule_config.outputs.fdroid_privileged_extension == 'true' }}
       compatible-sepolicy-patching: ${{ needs.schedule_config.outputs.compatible_sepolicy_patching == 'true' }}
       exfatprogs-fsck: ${{ needs.schedule_config.outputs.exfatprogs_fsck == 'true' }}
       fsck-sysfs-sepolicy: ${{ needs.schedule_config.outputs.fsck_sysfs_sepolicy == 'true' }}

@@ -13,6 +13,8 @@ source "${_selection_variant_source_dir}/libclang_identity.sh"
 unset _selection_variant_source_dir
 
 function selection_variant_manifest() {
+  # Keep the retired F-Droid fields at their former disabled values.
+  # Their placement is part of existing OTA selection fingerprints.
   local field value
   local -a required_fields=(
     SELECTION_ROM_FAMILY
@@ -29,8 +31,6 @@ function selection_variant_manifest() {
     SELECTION_HELPER_COMMIT
     SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256
     SELECTION_BUILD_DIAGNOSTICS_SHA256
-    SELECTION_LOCK_SHA256
-    SELECTION_PROFILE_SHA256
     SELECTION_MODULE_AFSR
     SELECTION_MODULE_ALTERINSTALLER
     SELECTION_MODULE_ALTERINSTALLER_VERSION
@@ -38,7 +38,6 @@ function selection_variant_manifest() {
     SELECTION_MODULE_BCR_VERSION
     SELECTION_MODULE_CUSTOTA
     SELECTION_MODULE_CUSTOTA_VERSION
-    SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION
     SELECTION_MODULE_MICROG
     SELECTION_MODULE_MSD
     SELECTION_MODULE_MSD_VERSION
@@ -75,7 +74,6 @@ function selection_variant_manifest() {
     SELECTION_MODULE_ALTERINSTALLER \
     SELECTION_MODULE_BCR \
     SELECTION_MODULE_CUSTOTA \
-    SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION \
     SELECTION_MODULE_MICROG \
     SELECTION_MODULE_MSD \
     SELECTION_MODULE_OEMUNLOCKONBOOT \
@@ -115,8 +113,7 @@ function selection_variant_manifest() {
     fi
   done
 
-  for field in SELECTION_LOCK_SHA256 SELECTION_PROFILE_SHA256 \
-    SELECTION_SHIZUKU_LOCK_SHA256 SELECTION_EXFATPROGS_FSCK_LOCK_SHA256 \
+  for field in SELECTION_SHIZUKU_LOCK_SHA256 SELECTION_EXFATPROGS_FSCK_LOCK_SHA256 \
     SELECTION_EXFATPROGS_FSCK_ADAPTER_SHA256 \
     SELECTION_EXFATPROGS_FSCK_PAYLOAD_SHA256 \
     SELECTION_EXFATPROGS_FSCK_PROVENANCE_SHA256 \
@@ -194,8 +191,8 @@ function selection_variant_manifest() {
     "helper_commit=${SELECTION_HELPER_COMMIT}" \
     "executable_tools_lock_sha256=${SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256}" \
     "build_diagnostics_sha256=${SELECTION_BUILD_DIAGNOSTICS_SHA256}" \
-    "lock_sha256=${SELECTION_LOCK_SHA256}" \
-    "profile_sha256=${SELECTION_PROFILE_SHA256}" \
+    "lock_sha256=disabled" \
+    "profile_sha256=disabled" \
     "module.afsr=${SELECTION_MODULE_AFSR}" \
     "module.alterinstaller=${SELECTION_MODULE_ALTERINSTALLER}" \
     "module.alterinstaller.version=${SELECTION_MODULE_ALTERINSTALLER_VERSION}" \
@@ -203,7 +200,7 @@ function selection_variant_manifest() {
     "module.bcr.version=${SELECTION_MODULE_BCR_VERSION}" \
     "module.custota=${SELECTION_MODULE_CUSTOTA}" \
     "module.custota.version=${SELECTION_MODULE_CUSTOTA_VERSION}" \
-    "module.fdroid-privileged-extension=${SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION}" \
+    "module.fdroid-privileged-extension=false" \
     "module.microg=${SELECTION_MODULE_MICROG}" \
     "module.msd=${SELECTION_MODULE_MSD}" \
     "module.msd.version=${SELECTION_MODULE_MSD_VERSION}" \

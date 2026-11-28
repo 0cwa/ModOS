@@ -99,22 +99,6 @@ test_locked_executables_rejected_without_retry() {
   done
 }
 
-test_locked_inputs_require_explicit_checked_in_files() {
-  reset_fixture locked-inputs
-  local lock_path="${WORKDIR}/fdroid.lock.json"
-  local profile_path="${WORKDIR}/fdroid.profile.toml"
-
-  if verify_fdroid_privileged_extension_inputs "" "" >/dev/null 2>&1; then
-    fail "locked inputs: empty paths unexpectedly succeeded"
-  fi
-
-  touch "${lock_path}" "${profile_path}"
-  if verify_fdroid_privileged_extension_inputs \
-    "${lock_path}" "${profile_path}" >/dev/null 2>&1; then
-    fail "locked inputs: untracked temporary files unexpectedly succeeded"
-  fi
-}
-
 test_locked_input_rejects_worktree_index_mode_and_path_aliases() {
   reset_fixture locked-input-git-state
   local repository="${WORKDIR}/repository with spaces"
@@ -186,9 +170,8 @@ test_locked_input_rejects_worktree_index_mode_and_path_aliases() {
 
   local untracked_path="${repository}/locks/untracked.lock"
   printf '%s\n' '{"fixture":"untracked"}' >"${untracked_path}"
-  if verify_fdroid_privileged_extension_inputs \
-    "${untracked_path}" "${profile_path}"; then
-    fail "untracked F-Droid lock unexpectedly succeeded"
+  if (cd "${repository}" && verify_checked_in_locked_input "${untracked_path}"); then
+    fail "untracked lock unexpectedly succeeded"
   fi
 }
 
@@ -197,7 +180,6 @@ test_missing_signature_fails
 test_wrong_module_signature_fails
 test_unsigned_exceptions_succeed
 test_locked_executables_rejected_without_retry
-test_locked_inputs_require_explicit_checked_in_files
 test_locked_input_rejects_worktree_index_mode_and_path_aliases
 
 echo "verifier tests passed"

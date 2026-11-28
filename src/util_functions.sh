@@ -807,61 +807,6 @@ function prepare_exfatprogs_fsck_module() {
   export PIXENEOS_EXFATPROGS_PACKAGE_PATH="${expected_package}"
 }
 
-# Resolve and acquire the locked F-Droid inputs before exposing them to the
-# patch command. Artifact URLs and versions belong exclusively to the lock.
-function prepare_fdroid_privileged_extension() {
-  local args_name="${1}"
-  local helper_root="${2}"
-  local -n args_ref="${args_name}"
-  local lock_path="${FDROID_PRIVILEGED_EXTENSION_LOCK}"
-  local profile_path="${FDROID_PRIVILEGED_EXTENSION_PROFILE}"
-  local cache_path="${FDROID_PRIVILEGED_EXTENSION_CACHE:-${WORKDIR}/locked-artifacts}"
-  local report_path="${FDROID_PRIVILEGED_EXTENSION_PATCH_REPORT:-${OUTPUTS[PATCHED_OTA]}.patch-report.json}"
-  local module_tool="${helper_root}/module-tool.py"
-
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" != 'true' ]]; then
-    return 0
-  fi
-
-  if ! verify_fdroid_privileged_extension_inputs \
-    "${lock_path}" "${profile_path}"; then
-    return 1
-  fi
-  if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
-    echo "Error: the pinned patch helper lacks the locked module tool." >&2
-    return 1
-  fi
-
-  if ! python "${module_tool}" resolve \
-    --profile "${profile_path}" \
-    --lock "${lock_path}" \
-    --format json >/dev/null; then
-    echo "Error: F-Droid locked profile resolution failed." >&2
-    return 1
-  fi
-  if ! python "${module_tool}" artifacts fetch \
-    --lock "${lock_path}" \
-    --cache "${cache_path}" \
-    --module fdroid-privileged-extension >/dev/null; then
-    echo "Error: F-Droid locked artifact fetch failed." >&2
-    return 1
-  fi
-  if ! python "${module_tool}" artifacts verify \
-    --lock "${lock_path}" \
-    --cache "${cache_path}" \
-    --module fdroid-privileged-extension >/dev/null; then
-    echo "Error: F-Droid locked artifact verification failed." >&2
-    return 1
-  fi
-
-  args_ref+=(
-    "--module-lock" "${lock_path}"
-    "--module-profile" "${profile_path}"
-    "--module-cache" "${cache_path}"
-    "--patch-report" "${report_path}"
-  )
-}
-
 function write_microg_resolution_profile() {
   local profile_path="${1}"
   local root_mode='rootless'
@@ -1052,27 +997,10 @@ function patch_ota() {
   local grapheneos_otacert="${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
   local magisk_path="${WORKDIR}/modules/magisk.apk"
   local my_avbroot_setup="${WORKDIR}/tools/my-avbroot-setup"
-  local -a locked_module_args=()
 
   # Activate the virtual environment
   if [ -z "${VIRTUAL_ENV:-}" ]; then
     enable_venv || return 1
-  fi
-
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
-    "${ADDITIONALS[MICROG]}" == 'true' ]]; then
-    echo "Error: multiple locked module bundles are not supported in one build." >&2
-    return 1
-  fi
-
-  # Locked module artifacts must be resolved, fetched, and verified before any
-  # OTA contents are unpacked. Keep the disabled path on its legacy ordering.
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
-    rm -rf -- "${WORKDIR}/extracted/extracts/"
-    if ! prepare_fdroid_privileged_extension \
-      locked_module_args "${my_avbroot_setup}"; then
-      return 1
-    fi
   fi
 
   # Extract the official public keys and certificates if not found.
@@ -1167,12 +1095,7 @@ function patch_ota() {
     args+=("--pass-avb-env-var" "PASSPHRASE_AVB")
     args+=("--pass-ota-env-var" "PASSPHRASE_OTA")
 
-    # Preserve the legacy cleanup ordering when locked modules are disabled.
-    # Enabled builds already cleared this tree before locked acquisition so a
-    # caller-selected cache below it remains available to patch.py.
-    if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" != 'true' ]]; then
-      rm -rf -- "${WORKDIR}/extracted/extracts/"
-    fi
+    rm -rf -- "${WORKDIR}/extracted/extracts/"
 
     # Modules and their signatures
     if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]] &&
@@ -1200,12 +1123,8 @@ function patch_ota() {
       return 1
     fi
     append_enabled_module_arguments args || return 1
-    if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
-      args+=("${locked_module_args[@]}")
-    elif [[ "${ADDITIONALS[MICROG]}" == 'true' ]]; then
+    if [[ "${ADDITIONALS[MICROG]}" == 'true' ]]; then
       prepare_microg args "${my_avbroot_setup}" || return 1
-    elif ! prepare_fdroid_privileged_extension args "${my_avbroot_setup}"; then
-      return 1
     fi
 
     if [[ "${ROM_PROFILE[CLEAR_VBMETA_FLAGS]}" == 'true' ]]; then

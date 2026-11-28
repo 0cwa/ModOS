@@ -67,8 +67,6 @@ check_definition() {
       [[ "$(toml_resolve_value "${key}" '')" == true ]] ||
         fail "${file}: ${key} must be enabled"
     done
-    [[ "$(toml_resolve_value fdroid_privileged_extension '')" == false ]] ||
-      fail "${file}: F-Droid privileged extension must remain default-off"
   )
 }
 
@@ -274,7 +272,6 @@ scheduled_boolean_outputs = {
     "msd": "msd",
     "oemunlockonboot": "oemunlockonboot",
     "disable-system-updater": "disable_system_updater",
-    "fdroid-privileged-extension": "fdroid_privileged_extension",
 }
 for name, output in scheduled_boolean_outputs.items():
     expected = (
