@@ -764,13 +764,15 @@ PY
   ROM_FAMILY="lineageos"
   resolve_rom_profile
   ROOT_MODE="rootless"
-  mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src"
+  mkdir -p "${fixture_repo}/locks" "${fixture_repo}/src" "${fixture_repo}/tools/modules"
   cp locks/executable-tools-v1.json "${fixture_repo}/locks/"
   cp src/build_diagnostics.py src/microg_spoof_patch.py "${fixture_repo}/src/"
+  cp tools/modules/build_adapter_extension.py tools/modules/adapter_extension.json \
+    tools/modules/compose_locked_inputs.py "${fixture_repo}/tools/modules/"
   git -C "${fixture_repo}" init -q
   git -C "${fixture_repo}" config user.email fixture@example.invalid
   git -C "${fixture_repo}" config user.name fixture
-  git -C "${fixture_repo}" add locks src
+  git -C "${fixture_repo}" add locks src tools/modules
   git -C "${fixture_repo}" commit -q -m 'Original signer patch adapter'
   cd "${fixture_repo}"
 
