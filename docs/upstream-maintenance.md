@@ -51,6 +51,10 @@ not permission to apply the old patch to an unknown source tree.
 
 ## Updating dependencies
 
+Use [the dependency-update policy](dependency-updates.md) for compatible major
+ranges, grouped minor/patch PRs, guarded auto-merge and Termux artifact recovery.
+Exact authenticated build inputs remain locked even when updates are automated.
+
 1. Compare the upstream change with the local requirement it might replace.
    Review the actual source or release artifacts; a higher version is not proof
    that a local compatibility or authentication check is obsolete.
