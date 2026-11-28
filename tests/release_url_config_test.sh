@@ -37,7 +37,6 @@ test_toml_env_allowlisted_assignments() {
     MSD
     OEMUNLOCKONBOOT
     BOOT_ANIMATION
-    FDROID_PRIVILEGED_EXTENSION
   )
   tmpdir="$(mktemp -d)"
   marker="${tmpdir}/command-executed"

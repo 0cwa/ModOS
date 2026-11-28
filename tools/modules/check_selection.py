@@ -28,8 +28,8 @@ SOURCES = (
     'src/fsck_sysfs_sepolicy.py',
     'src/exfatprogs_fsck.py',
 )
-# These typed ADDITIONALS switches describe build policy, not catalog modules.
-POLICY_KEYS = {'root', 'compatible_sepolicy_patching'}
+# Policy switches and legacy configuration keys have no module routing.
+POLICY_KEYS = {'root', 'compatible_sepolicy_patching', 'fdroid_privileged_extension'}
 ROUTES = {
     'host-tool', 'signed-zip', 'local-adapter', 'locked-bundle',
     'helper-extension', 'catalog-locked',

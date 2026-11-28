@@ -17,7 +17,7 @@ import tomllib
 
 from modos_health.common import Context, item
 from modos_health.checks import (afsr, alterinstaller, android, bcr,
-                                 boot_animation, custota, fdroid_privileged_extension,
+                                 boot_animation, custota,
                                  exfatprogs_fsck, fsck_sysfs_sepolicy, magisk, microg,
                                  msd, oemunlockonboot, stock_updater)
 
@@ -36,8 +36,6 @@ MODULES = (
     ("stock_updater", "ADDITIONALS[DISABLE_SYSTEM_UPDATER]", stock_updater),
     ("exfatprogs_fsck", "ADDITIONALS[EXFATPROGS_FSCK]", exfatprogs_fsck),
     ("fsck_sysfs_sepolicy", "ADDITIONALS[FSCK_SYSFS_SEPOLICY]", fsck_sysfs_sepolicy),
-    ("fdroid_privileged_extension", "ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]",
-     fdroid_privileged_extension),
 )
 
 def load_config(path):
@@ -53,6 +51,10 @@ def load_config(path):
     # schedule without adding its own check file to the registry.
     known = {key for _, key, _ in MODULES}
     ignored = {"ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]"}
+    retired_key = "ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]"
+    if retired_key in build and build[retired_key] is not False:
+        raise ValueError("F-Droid Privileged Extension support has been removed")
+    ignored.add(retired_key)
     unknown = sorted(k for k in build if
                      k.startswith("ADDITIONALS[") and k.endswith("]") and
                      k not in known and k not in ignored)

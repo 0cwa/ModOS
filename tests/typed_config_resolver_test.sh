@@ -142,9 +142,17 @@ test_rejections() {
   assert_rejected '[device]'$'\n''DEVICE_NAME = "unterminated' malformed-string
 }
 
+test_checked_in_shizuku_selection() (
+  check_toml_env "${REPO_ROOT}/env.toml" >/dev/null
+  resolve_root_mode >/dev/null
+  assert_equals true "${ADDITIONALS[SHIZUKU]}" "local Shizuku selection"
+  assert_equals rootless "${RESOLVED_ROOT_MODE}" "local Shizuku startup mode"
+)
+
 test_current_legacy_env
 test_section_semantics
 test_precedence_and_omission
 test_rejections
+test_checked_in_shizuku_selection
 
 echo "typed config resolver tests passed"

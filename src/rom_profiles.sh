@@ -34,6 +34,10 @@ function validate_device_name() {
 # it even when a legacy caller requests the old shared default. Validate before
 # applying the family policy so malformed values cannot be silently accepted.
 function apply_rom_module_policy() {
+  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]:-false}" != 'false' ]]; then
+    echo "Error: F-Droid Privileged Extension support has been removed." >&2
+    return 1
+  fi
   _require_profile_boolean ADDITIONALS_BCR "${ADDITIONALS[BCR]}" || return 1
   case "${ROM_FAMILY}" in
     grapheneos) ADDITIONALS[BCR]=false ;;
@@ -142,11 +146,6 @@ function enforce_output_policy() {
     return 1
   fi
 
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
-    "${output_scope}" != 'local-unpublished' ]]; then
-    echo "Error: F-Droid output is restricted to local-unpublished." >&2
-    return 1
-  fi
   if [[ "${ADDITIONALS[EXFATPROGS_FSCK]:-false}" == true &&
     "${output_scope}" == published ]]; then
     require_verified_exfat_source_bundle || return 1
@@ -176,14 +175,8 @@ function enforce_publication_evidence() {
     echo "Error: publication requires the published output scope." >&2
     return 1
   fi
-  enforce_output_policy "${output_scope}" || return 1
-
-  # F-Droid remains local-only until its source-delivery publication path is
-  # reviewed. The locked microG artifacts are Apache-2.0 and permit publication.
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
-    echo "Error: locked-module publication evidence is unavailable." >&2
-    return 1
-  fi
+  apply_rom_module_policy || return 1
+  enforce_output_policy "${output_scope}"
 }
 
 function _locked_input_digest() {
@@ -239,8 +232,6 @@ function _boot_animation_payload_digest() {
 function module_selection_fingerprint() {
   local executable_tools_lock_digest
   local build_diagnostics_digest
-  local lock_digest="disabled"
-  local profile_digest="disabled"
   local magisk_preinit="disabled"
   local magisk_repository="disabled"
   local magisk_version="disabled"
@@ -267,7 +258,6 @@ function module_selection_fingerprint() {
     "alterinstaller:ALTERINSTALLER"
     "bcr:BCR"
     "custota:CUSTOTA"
-    "fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION"
     "microg:MICROG"
     "msd:MSD"
     "oemunlockonboot:OEMUNLOCKONBOOT"
@@ -371,7 +361,6 @@ function module_selection_fingerprint() {
     "${ADDITIONALS[SHIZUKU]}" == 'true' ||
     "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" == 'true' ||
     "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ||
-    "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ||
     "${ADDITIONALS[MICROG]}" == 'true' ]]; then
     local builder_digest extension_index_digest composer_digest
     builder_digest="$(_locked_input_digest tools/modules/build_adapter_extension.py)" || {
@@ -408,23 +397,6 @@ function module_selection_fingerprint() {
     fi
   fi
 
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
-    "${ADDITIONALS[MICROG]}" == 'true' ]]; then
-    echo "Error: F-Droid locked mode and microG cannot share one helper lock/profile yet." >&2
-    return 1
-  fi
-
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
-    lock_digest="$(_locked_input_digest "${FDROID_PRIVILEGED_EXTENSION_LOCK}")" || {
-      echo "Error: the F-Droid lock is not clean and checked in." >&2
-      return 1
-    }
-    profile_digest="$(_locked_input_digest "${FDROID_PRIVILEGED_EXTENSION_PROFILE}")" || {
-      echo "Error: the F-Droid profile is not clean and checked in." >&2
-      return 1
-    }
-  fi
-
   if [[ "${ADDITIONALS[MICROG]}" == 'true' &&
     "${ROM_FAMILY}" != 'lineageos' ]]; then
     echo "Error: microG is supported only by the LineageOS profile." >&2
@@ -445,8 +417,6 @@ function module_selection_fingerprint() {
   SELECTION_HELPER_COMMIT="${VERSION[AVBROOT_SETUP]}"
   SELECTION_EXECUTABLE_TOOLS_LOCK_SHA256="${executable_tools_lock_digest}"
   SELECTION_BUILD_DIAGNOSTICS_SHA256="${build_diagnostics_digest}"
-  SELECTION_LOCK_SHA256="${lock_digest}"
-  SELECTION_PROFILE_SHA256="${profile_digest}"
   SELECTION_MODULE_AFSR="${ADDITIONALS[AFSR]}"
   SELECTION_MODULE_ALTERINSTALLER="${ADDITIONALS[ALTERINSTALLER]}"
   SELECTION_MODULE_ALTERINSTALLER_VERSION="${legacy_module_versions[ALTERINSTALLER]}"
@@ -454,7 +424,6 @@ function module_selection_fingerprint() {
   SELECTION_MODULE_BCR_VERSION="${legacy_module_versions[BCR]}"
   SELECTION_MODULE_CUSTOTA="${ADDITIONALS[CUSTOTA]}"
   SELECTION_MODULE_CUSTOTA_VERSION="${legacy_module_versions[CUSTOTA]}"
-  SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION="${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}"
   SELECTION_MODULE_MICROG="${ADDITIONALS[MICROG]}"
   SELECTION_MODULE_MSD="${ADDITIONALS[MSD]}"
   SELECTION_MODULE_MSD_VERSION="${legacy_module_versions[MSD]}"

@@ -22,7 +22,7 @@ owner of module semantics and artifact trust.
 The current delivery routes are distinct:
 
 - Signed module ZIPs retain their upstream verification and helper CLI path.
-- F-Droid and microG use helper catalog resolution and locked artifact bundles.
+- microG uses helper catalog resolution and locked artifact bundles.
 - Shizuku and exfatprogs use ModOS schema-v2 catalog manifests, reviewed lock
   records, and `catalog-legacy` adapters. The helper validates the selection
   through its normal catalog, compatibility, lock, and artifact paths; both

@@ -665,16 +665,13 @@ test_output_policy() (
     fail "legacy profile rejected publication evidence gate"
 
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="true"
-  enforce_output_policy local-unpublished >/dev/null ||
-    fail "F-Droid profile rejected local-unpublished output"
-  for scope in private shared published; do
-    if enforce_output_policy "${scope}" >/dev/null 2>&1; then
-      fail "F-Droid profile unexpectedly allowed ${scope} output"
-    fi
-  done
-  if enforce_publication_evidence published >/dev/null 2>&1; then
-    fail "F-Droid profile unexpectedly passed publication evidence gate"
+  if apply_rom_module_policy >/dev/null 2>&1; then
+    fail "retired F-Droid selection was accepted"
   fi
+  if enforce_publication_evidence published >/dev/null 2>&1; then
+    fail "retired F-Droid selection passed the publication gate"
+  fi
+  ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
 
   if enforce_output_policy unknown-scope >/dev/null 2>&1; then
     fail "unknown output scope unexpectedly passed policy enforcement"

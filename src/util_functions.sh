@@ -474,24 +474,8 @@ function prepare_exfatprogs_fsck_module() {
   export PIXENEOS_EXFATPROGS_PACKAGE_PATH="${expected_package}"
 }
 
-# Resolve and acquire the locked F-Droid inputs before exposing them to the
+# Resolve and acquire locked catalog inputs before exposing them to the
 # patch command. Artifact URLs and versions belong exclusively to the lock.
-function prepare_fdroid_privileged_extension() {
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" != 'true' ]]; then
-    return 0
-  fi
-  if ! verify_fdroid_privileged_extension_inputs     "${FDROID_PRIVILEGED_EXTENSION_LOCK}" "${FDROID_PRIVILEGED_EXTENSION_PROFILE}"; then
-    return 1
-  fi
-  if [[ ! -f "${FDROID_PRIVILEGED_EXTENSION_LOCK}" ||
-    -L "${FDROID_PRIVILEGED_EXTENSION_LOCK}" ||
-    ! -f "${FDROID_PRIVILEGED_EXTENSION_PROFILE}" ||
-    -L "${FDROID_PRIVILEGED_EXTENSION_PROFILE}" ]]; then
-    echo "Error: the F-Droid lock or profile is missing or unsafe." >&2
-    return 1
-  fi
-}
-
 function prepare_locked_catalog_modules() {
   local args_name="${1}"
   local helper_root="${2}"
@@ -501,17 +485,11 @@ function prepare_locked_catalog_modules() {
   local -a lock_paths=() selected_modules=()
   local -a enabled_modules=()
 
-  [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]] && selected_modules+=(fdroid-privileged-extension)
   [[ "${ADDITIONALS[MICROG]}" == true ]] && selected_modules+=(microg)
   [[ "${ADDITIONALS[SHIZUKU]}" == true ]] && selected_modules+=(shizuku)
   [[ "${ADDITIONALS[EXFATPROGS_FSCK]}" == true ]] && selected_modules+=(exfatprogs-fsck)
   ((${#selected_modules[@]})) || return 0
 
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true &&
-    "${ADDITIONALS[MICROG]}" == true ]]; then
-    echo "Error: F-Droid Privileged Extension and microG cannot be selected together." >&2
-    return 1
-  fi
   if [[ ! "${ROM_OTA_API_LEVEL:-}" =~ ^[1-9][0-9]*$ ]]; then
     echo "Error: locked catalog resolution requires the selected source OTA SDK level." >&2
     return 1
@@ -529,10 +507,6 @@ function prepare_locked_catalog_modules() {
   if [[ ! -f "${module_tool}" || -L "${module_tool}" ]]; then
     echo "Error: the pinned helper lacks the locked module tool." >&2
     return 1
-  fi
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]]; then
-    prepare_fdroid_privileged_extension || return 1
-    lock_paths+=("${FDROID_PRIVILEGED_EXTENSION_LOCK}")
   fi
   if [[ "${ADDITIONALS[MICROG]}" == true ]]; then
     lock="${helper_root}/locks/microg-${VERSION[MICROG]}.json"
@@ -570,10 +544,6 @@ function prepare_locked_catalog_modules() {
   fi
 
   cache_path="${WORKDIR}/locked-artifacts"
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true &&
-    -n "${FDROID_PRIVILEGED_EXTENSION_CACHE:-}" ]]; then
-    cache_path="${FDROID_PRIVILEGED_EXTENSION_CACHE}"
-  fi
   plan_dir="${WORKDIR}/locked-profiles"
   combined_lock="${plan_dir}/selected-modules.json"
   profile_path="${plan_dir}/selected-modules.toml"
@@ -599,9 +569,6 @@ function prepare_locked_catalog_modules() {
   )
   for lock in "${lock_paths[@]}"; do compose_args+=(--lock "${lock}"); done
   for module in "${selected_modules[@]}"; do compose_args+=(--selected "${module}"); done
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]]; then
-    compose_args+=(--profile-base "${FDROID_PRIVILEGED_EXTENSION_PROFILE}")
-  fi
   if ! python3 tools/modules/compose_locked_inputs.py "${compose_args[@]}"; then
     echo "Error: selected locked module inputs could not be composed." >&2
     return 1
@@ -633,9 +600,7 @@ function prepare_locked_catalog_modules() {
   fi
 
   report_path="${OUTPUTS[PATCHED_OTA]}.locked-modules-patch-report.json"
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == true ]]; then
-    report_path="${FDROID_PRIVILEGED_EXTENSION_PATCH_REPORT:-${OUTPUTS[PATCHED_OTA]}.patch-report.json}"
-  elif [[ "${ADDITIONALS[MICROG]}" == true ]]; then
+  if [[ "${ADDITIONALS[MICROG]}" == true ]]; then
     report_path="${OUTPUTS[PATCHED_OTA]}.microg-patch-report.json"
   fi
   args_ref+=(
@@ -764,24 +729,13 @@ function patch_ota() {
     enable_venv "${my_avbroot_setup}" || return 1
   fi
 
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' &&
-    "${ADDITIONALS[MICROG]}" == 'true' ]]; then
-    echo "Error: F-Droid Privileged Extension and microG cannot be selected together." >&2
-    return 1
-  fi
-
   # Catalog and legacy extension modules are prepared against one reviewed
   # helper extension. Locked artifacts are resolved and verified before OTA
   # contents are unpacked.
   prepare_adapter_extension "${my_avbroot_setup}" || return 1
-  if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ||
-    "${ADDITIONALS[MICROG]}" == 'true' ||
+  if [[ "${ADDITIONALS[MICROG]}" == 'true' ||
     "${ADDITIONALS[SHIZUKU]}" == 'true' ||
     "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ]]; then
-    if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" == 'true' ]]; then
-      # Preserve the historic F-Droid cleanup before artifact resolution.
-      rm -rf -- "${WORKDIR}/extracted/extracts/"
-    fi
     prepare_locked_catalog_modules locked_module_args "${my_avbroot_setup}" || return 1
   fi
 
@@ -877,12 +831,7 @@ function patch_ota() {
     args+=("--pass-avb-env-var" "PASSPHRASE_AVB")
     args+=("--pass-ota-env-var" "PASSPHRASE_OTA")
 
-    # Preserve the legacy cleanup ordering when locked modules are disabled.
-    # Enabled builds already cleared this tree before locked acquisition so a
-    # caller-selected cache below it remains available to patch.py.
-    if [[ "${ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]}" != 'true' ]]; then
-      rm -rf -- "${WORKDIR}/extracted/extracts/"
-    fi
+    rm -rf -- "${WORKDIR}/extracted/extracts/"
 
     # Modules and their signatures
     if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ]] &&

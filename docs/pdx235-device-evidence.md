@@ -109,7 +109,6 @@ Module ownership:
 | `afsr.py` | None (build-time repacker) | Signatures/filesystem checked in build CI |
 | `boot_animation.py` | Product animation file present | On-screen animation |
 | `stock_updater.py` | Stock updater absent when disabled | Custota update itself |
-| `fdroid_privileged_extension.py` | Package present only if enabled | Privileged install behavior |
 | `magisk.py` | None; included only in the `magisk` runtime mode | Root setup and authorization |
 
 The October 17 microG `DUMP` privileged-permission regression is explicitly

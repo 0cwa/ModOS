@@ -65,17 +65,6 @@
       "identity_key": "module.microg"
     },
     {
-      "key": "fdroid_privileged_extension",
-      "config": "fdroid_privileged_extension",
-      "health": "fdroid_privileged_extension",
-      "route": "catalog-locked",
-      "helper_id": "fdroid-privileged-extension",
-      "exclusive": "microg",
-      "prepare": "prepare_locked_catalog_modules",
-      "selection_field": "SELECTION_MODULE_FDROID_PRIVILEGED_EXTENSION",
-      "identity_key": "module.fdroid-privileged-extension"
-    },
-    {
       "key": "shizuku",
       "config": "shizuku",
       "health": null,
