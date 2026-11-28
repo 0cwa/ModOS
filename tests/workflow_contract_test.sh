@@ -152,6 +152,7 @@ test_reusable_workflow() {
     'msd:boolean:true' \
     'oemunlockonboot:boolean:true' \
     'microg:boolean:false' \
+    'microg-spoof-patch:boolean:false' \
     'shizuku:boolean:false' \
     'disable-system-updater:boolean:false' \
     'fdroid-privileged-extension:boolean:false'; do
@@ -547,6 +548,7 @@ test_release_triggers() {
   assert_dispatch_default "${lineage}" root true
   assert_dispatch_default "${lineage}" compatible-sepolicy-patching true
   assert_dispatch_default "${lineage}" microg false
+  assert_dispatch_default "${lineage}" microg-spoof-patch false
   assert_dispatch_default "${lineage}" bcr true
   assert_dispatch_default "${lineage}" shizuku false
   assert_dispatch_default "${lineage}" disable-system-updater false
@@ -628,6 +630,10 @@ test_microg_lineage_forwarding() {
   assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG:[[:space:]].*inputs\.microg'     "reusable workflow must map MICROG from its input"
   assert_contains "${lineage}"     'microg:[[:space:]]*\$\{\{ inputs\.microg \}\}'     "LineageOS manual build must forward microG"
   assert_not_contains "${RELEASE}"     'inputs\.microg'     "GrapheneOS workflow must not expose a microG switch"
+  assert_contains "${REUSABLE}"     'ADDITIONALS_MICROG_SPOOF_PATCH:[[:space:]].*inputs\.microg-spoof-patch'     "reusable workflow must map MICROG_SPOOF_PATCH from its input"
+  assert_contains "${lineage}"     'microg-spoof-patch:[[:space:]]*\$\{\{ inputs\.microg-spoof-patch \}\}'     "LineageOS manual build must forward the microG signer patch"
+  assert_contains "${lineage}"     'microg-spoof-patch:[[:space:]]*\$\{\{ needs\.schedule_config\.outputs\.microg_spoof_patch'     "LineageOS schedule must forward the microG signer patch"
+  assert_not_contains "${RELEASE}"     'microg-spoof-patch'     "GrapheneOS workflow must not expose the microG signer patch"
 }
 
 test_shizuku_manual_selection_and_ci() {

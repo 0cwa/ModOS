@@ -235,6 +235,7 @@ function append_enabled_module_arguments() {
     "oemunlockonboot:OEMUNLOCKONBOOT"
     "alterinstaller:ALTERINSTALLER"
     "disable-system-updater:DISABLE_SYSTEM_UPDATER"
+    "microg-spoof-patch:MICROG_SPOOF_PATCH"
     "boot-animation:BOOT_ANIMATION"
     "shizuku:SHIZUKU"
     "fsck-sysfs-sepolicy:FSCK_SYSFS_SEPOLICY"
@@ -402,6 +403,93 @@ function prepare_disable_system_updater_module() {
   : >"${WORKDIR}/modules/disable-system-updater.zip"
   : >"${WORKDIR}/signatures/disable-system-updater.zip.sig"
   export PIXENEOS_ROM_FAMILY="${ROM_FAMILY}"
+}
+
+# Register the local microG Companion signer patch. It adds one owner-supplied
+# certificate for com.android.vending to LineageOS's restricted signature
+# spoofing by patching /system/framework/services.jar (see
+# src/microg_spoof_patch.py). baksmali/smali are Java tools downloaded with a
+# pinned SHA-256; the certificate is a public build input, never a private key.
+function prepare_microg_spoof_patch_module() {
+  local helper_root="${1}"
+  local init_file registry_file module_source cert_path tools_dir
+
+  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]}" != 'true' ]]; then
+    return 0
+  fi
+
+  if [[ "${ROM_FAMILY}" != 'lineageos' ]]; then
+    echo "Error: the microG Companion signer patch is supported only for LineageOS." >&2
+    return 1
+  fi
+  if [[ "${ADDITIONALS[MICROG]}" != 'true' ]]; then
+    echo "Error: the microG Companion signer patch requires ADDITIONALS[MICROG]=true." >&2
+    return 1
+  fi
+  if ! command -v java >/dev/null 2>&1; then
+    echo "Error: the microG Companion signer patch requires java to run baksmali/smali." >&2
+    return 1
+  fi
+  if [[ ! "${ROM_OTA_API_LEVEL:-}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: the microG Companion signer patch requires the source OTA's SDK level." >&2
+    return 1
+  fi
+  cert_path="$(_microg_companion_cert_path)" || return 1
+  python3 src/microg_spoof_patch.py check-cert "${cert_path}" >/dev/null || return 1
+
+  init_file="${helper_root}/lib/modules/__init__.py"
+  registry_file="${helper_root}/lib/modules/registry.py"
+  module_source="${helper_root}/lib/modules/microg_spoof_patch.py"
+
+  if [[ ! -f "${init_file}" || -L "${init_file}" ||
+    ! -f "${registry_file}" || -L "${registry_file}" ||
+    ! -d "${helper_root}/lib/modules" || -L "${helper_root}/lib/modules" ]]; then
+    echo "Error: pinned patch helper lacks a safe module registry." >&2
+    return 1
+  fi
+  if [[ -L "${module_source}" ]]; then
+    echo "Error: pinned patch helper has an unsafe microG signer patch module path." >&2
+    return 1
+  fi
+
+  cp -- src/microg_spoof_patch.py "${module_source}" || return 1
+  if ! grep -Fq 'def all_modules' "${init_file}" ||
+    ! grep -Fq 'legacy_cli_module_types' "${init_file}" ||
+    ! grep -Fq 'def legacy_cli_module_types' "${registry_file}" ||
+    ! grep -Fq 'result: list[type[LegacyCliModule]] = []' "${registry_file}" ||
+    ! grep -Fq '    return tuple(result)' "${registry_file}"; then
+    echo "Error: unsupported pinned helper module registry API." >&2
+    return 1
+  fi
+
+  if ! grep -Fq 'from lib.modules.microg_spoof_patch import MicrogSpoofPatchMod' "${registry_file}"; then
+    awk '/^    result: list\[type\[LegacyCliModule\]\] = \[\]$/ {
+      print
+      print "    from lib.modules.microg_spoof_patch import MicrogSpoofPatchMod"
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+  if ! grep -Fq '    result.append(MicrogSpoofPatchMod)' "${registry_file}"; then
+    awk '/^    return tuple\(result\)$/ {
+      print "    result.append(MicrogSpoofPatchMod)"
+      print
+      next
+    }
+    {print}' "${registry_file}" >"${registry_file}.tmp" || return 1
+    mv -- "${registry_file}.tmp" "${registry_file}" || return 1
+  fi
+
+  tools_dir="${WORKDIR}/microg-spoof-tools"
+  mkdir -p -- "${WORKDIR}/modules" "${WORKDIR}/signatures" "${tools_dir}" || return 1
+  python3 src/microg_spoof_patch.py fetch-tools "${tools_dir}" >/dev/null || return 1
+  : >"${WORKDIR}/modules/microg-spoof-patch.zip"
+  : >"${WORKDIR}/signatures/microg-spoof-patch.zip.sig"
+  export MODOS_MICROG_COMPANION_CERT="${cert_path}"
+  export MODOS_BAKSMALI_JAR="${tools_dir}/baksmali-3.0.10-fat.jar"
+  export MODOS_SMALI_JAR="${tools_dir}/smali-3.0.10-fat.jar"
+  export MODOS_MICROG_SPOOF_API_LEVEL="${ROM_OTA_API_LEVEL}"
 }
 
 # Register the local Shizuku adapter and fetch its digest-locked official APK.
@@ -826,10 +914,20 @@ function prepare_microg() {
     echo "Error: microG is supported only for LineageOS." >&2
     return 1
   fi
+  # With the signer patch, ship ModOS's own Companion build (same release plus
+  # the billing fix, ModOS signer). Services stays the official APK.
+  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]:-false}" == 'true' ]]; then
+    lock_path="${helper_root}/locks/microg-${VERSION[MICROG]}-modos.json"
+  fi
   if [[ ! -f "${lock_path}" || -L "${lock_path}" ||
     ! -f "${module_tool}" || -L "${module_tool}" ]]; then
     echo "Error: pinned helper lacks the reviewed microG lock/module tool." >&2
     return 1
+  fi
+  if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]:-false}" == 'true' ]]; then
+    local cert_path
+    cert_path="$(_microg_companion_cert_path)" || return 1
+    python3 src/microg_spoof_patch.py check-lock "${lock_path}" "${cert_path}" || return 1
   fi
   write_microg_resolution_profile "${profile_path}" || return 1
   python "${module_tool}" artifacts fetch \
@@ -1083,6 +1181,10 @@ function patch_ota() {
     fi
     if [[ "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" == 'true' ]] &&
       ! prepare_disable_system_updater_module "${my_avbroot_setup}"; then
+      return 1
+    fi
+    if [[ "${ADDITIONALS[MICROG_SPOOF_PATCH]}" == 'true' ]] &&
+      ! prepare_microg_spoof_patch_module "${my_avbroot_setup}"; then
       return 1
     fi
     if [[ "${ADDITIONALS[SHIZUKU]}" == 'true' ]] &&

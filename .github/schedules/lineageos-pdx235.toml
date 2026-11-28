@@ -18,6 +18,9 @@ MAGISK_PREINIT = "sda47"
 'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true
 'ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]' = false
 'ADDITIONALS[MICROG]' = true
+# Preserve the Companion signer already published in the November 10 OTA pair.
+# A signer change requires an explicit migration review before publication.
+'ADDITIONALS[MICROG_SPOOF_PATCH]' = true
 'ADDITIONALS[BOOT_ANIMATION]' = true
 'ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]' = true
 'ADDITIONALS[EXFATPROGS_FSCK]' = true

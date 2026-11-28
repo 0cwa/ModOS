@@ -50,6 +50,10 @@ on:
         required: false
         type: boolean
         default: false
+      microg-spoof-patch:
+        required: false
+        type: boolean
+        default: false
       disable-system-updater:
         required: false
         type: boolean
@@ -148,6 +152,7 @@ env:
   ADDITIONALS_MSD: ${{ inputs.msd }}
   ADDITIONALS_OEMUNLOCKONBOOT: ${{ inputs.oemunlockonboot }}
   ADDITIONALS_MICROG: ${{ inputs.microg }}
+  ADDITIONALS_MICROG_SPOOF_PATCH: ${{ inputs.microg-spoof-patch }}
   ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ inputs.disable-system-updater }}
   ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
   ADDITIONALS_SHIZUKU: ${{ inputs.shizuku }}
@@ -265,6 +270,14 @@ jobs:
         if: inputs.microg || inputs.fdroid-privileged-extension
         shell: bash
         run: bash src/ci/configure_android_apk_tools.sh
+
+      - name: Check Java for the microG signer patch
+        if: inputs.microg-spoof-patch
+        shell: bash
+        run: |
+          # baksmali/smali run on the runner's preinstalled JDK.
+          java -version
+          command -v java
 
       - name: Install Python
         uses: actions/setup-python@v7

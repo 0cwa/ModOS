@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-10",
+  "scope": "offline-services-jar-patch",
+  "source": {
+    "ota_url": "https://mirrorbits.lineageos.org/full/pdx235/20261106/lineage-24.0-20261106-nightly-pdx235-signed.zip",
+    "ota_sha256": "3104003df66aa467fd2e50912dd21f966ce078ae6ef0b2c760129555900adaa8",
+    "ota_size": 1270008261,
+    "android_sdk": 37,
+    "signature_verification": "Whole-file and payload verification completed before the independent source care-map check failed.",
+    "overall_ota_verification": "failed: source care-map mismatch; this extraction does not qualify an OTA or relax the production gate",
+    "jar_path": "/system/framework/services.jar",
+    "jar_sha256": "31303a6fba32b47c09f1527c8e3ef905e5b5c29cefbef73eba69060e10124785",
+    "jar_size": 25049071
+  },
+  "inputs": {
+    "adapter_commit": "63f7a0c8010140a798b4567f710cd3cb07d47949",
+    "adapter_sha256": "07ffe5726f4c47b884889272682a0cdd017ab3620ae2729c3fe93b5148e31c66",
+    "companion_signer_der_sha256": "d30b31d91ed58e786f03f266d9b8fc7a6b22f388b0d632aab563c0f3cdc90bef",
+    "tools": {
+      "baksmali-3.0.10-fat.jar": {
+        "url": "https://github.com/baksmali/smali/releases/download/3.0.10/baksmali-3.0.10-fat.jar",
+        "sha256": "37ae4a41a8886e15c20b8362fa4250f96bbdb55e1a608199ad8b5dff068b588f",
+        "size": 4447943
+      },
+      "smali-3.0.10-fat.jar": {
+        "url": "https://github.com/baksmali/smali/releases/download/3.0.10/smali-3.0.10-fat.jar",
+        "sha256": "32fa0e88a6c397b3922201adf5f3e534fbaed5a663c71d0c558c3ddce0af844a",
+        "size": 5384623
+      }
+    }
+  },
+  "result": {
+    "jar_sha256": "d8e25d23a0dbc1eb975e5e60a9441d0b11e7eae84c576111a220486b516f217a",
+    "jar_size": 25092153,
+    "changed_zip_payloads": [
+      "classes2.dex"
+    ],
+    "all_other_zip_payloads_identical": true,
+    "zip_crc_valid": true,
+    "stored_entries_four_byte_aligned": true,
+    "original_and_patched_dex_format": "039",
+    "redirected_calls": [
+      {
+        "class": "com/android/server/pm/ComputerEngine",
+        "method": "MicrogUtils.getFakeSignature",
+        "replacement": "ModosMicrogSigner.getFakeSignature"
+      },
+      {
+        "class": "com/android/server/pm/AppsFilterImpl",
+        "method": "MicrogUtils.isMicrogSigned",
+        "replacement": "ModosMicrogSigner.isMicrogSigned"
+      }
+    ],
+    "added_class": "com/android/server/pm/ModosMicrogSigner",
+    "equivalent_reassembly_changes": [
+      "LocalDisplayAdapter$LocalDisplayDevice: one const-string encoded as const-string/jumbo, with corresponding branch-label offsets updated.",
+      "ShutdownThread: explicit null/false static initializers omitted; default values are unchanged."
+    ],
+    "other_smali_changes": false
+  },
+  "not_established": [
+    "ART dex2oat verification in this review",
+    "OTA construction or flashing",
+    "Device boot or upgrade from official Companion signer",
+    "Runtime restricted signature spoofing",
+    "Signal billing behavior",
+    "Source-built Companion APK reproduction"
+  ]
+}

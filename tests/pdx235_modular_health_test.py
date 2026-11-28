@@ -16,7 +16,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src" / "device"))
 from modos_health.common import Context, MAX_PROBE_OUTPUT, STATUSES
-from modos_health.checks import microg, msd
+from modos_health.checks import microg, microg_spoof_patch, msd
 
 spec = importlib.util.spec_from_file_location(
     "check_pdx235_modules", ROOT / "src/device/check_pdx235_modules.py"
@@ -76,6 +76,8 @@ class FakeADB:
             code, out = 0, ""
         elif cmd.startswith("pm path "):
             code, out = 0, "package:/system/priv-app/Fixture.apk\n"
+        elif cmd.startswith("test -f /system/framework/oat/arm64/services."):
+            code, out = 1, ""
         elif cmd.startswith("test -f /"):
             code, out = 0, ""
         elif cmd.startswith("cat /product/etc/permissions/"):
@@ -248,6 +250,25 @@ class HealthAuditTests(unittest.TestCase):
                 result = msd._gadget_service(ctx)
                 self.assertEqual(result["status"], "WARNING")
                 self.assertNotIn("private", result["detail"])
+
+    def test_signer_patch_requires_stale_services_aot_to_be_gone(self):
+        ctx, fake = fake_ctx()
+        checks = {c["check"]: c for c in microg_spoof_patch.check(ctx)}
+        self.assertEqual(checks["companion"]["status"], "PASS")
+        for ext in ("odex", "vdex", "art"):
+            self.assertEqual(checks["stale-" + ext]["status"], "PASS")
+        self.assertEqual(checks["spoofing"]["status"], "NOT_TESTED")
+
+        fake = FakeADB()
+        fake.overrides["test -f /system/framework/oat/arm64/services.odex"] = (0, "")
+        checks = {c["check"]: c for c in microg_spoof_patch.check(fake_ctx(fake)[0])}
+        self.assertEqual(checks["stale-odex"]["status"], "FAIL")
+        self.assertEqual(checks["stale-vdex"]["status"], "PASS")
+
+        fake = FakeADB()
+        fake.overrides["test -f /system/framework/oat/arm64/services.vdex"] = (2, "")
+        checks = {c["check"]: c for c in microg_spoof_patch.check(fake_ctx(fake)[0])}
+        self.assertEqual(checks["stale-vdex"]["status"], "WARNING")
 
     def test_microg_missing_deny_is_a_failure(self):
         fake = FakeADB()
