@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Exercise helper registration and the callable module API of the microG
+# Exercise native adapter preparation and the callable module API of the microG
 # Companion signer patch. Java and the baksmali/smali download are stubbed.
 set -eo pipefail
 source src/util_functions.sh
@@ -109,8 +109,11 @@ fi
 ROM_OTA_API_LEVEL=37
 [[ ! -e "${helper_root}/lib/modules/microg_spoof_patch.py" ]]
 
+registry_before="$(sha256sum "${helper_root}/lib/modules/registry.py")"
 prepare_microg_spoof_patch_module "${helper_root}"
 prepare_microg_spoof_patch_module "${helper_root}"
+[[ "$(sha256sum "${helper_root}/lib/modules/registry.py")" == "${registry_before}" ]]
+[[ ! -e "${helper_root}/lib/modules/microg_spoof_patch.py" ]]
 
 [[ "${MODOS_MICROG_COMPANION_CERT}" == "${cert}" ]]
 [[ "${MODOS_BAKSMALI_JAR}" == "${WORKDIR}/microg-spoof-tools/baksmali-3.0.10-fat.jar" ]]
@@ -119,9 +122,10 @@ prepare_microg_spoof_patch_module "${helper_root}"
 
 PYTHONPATH="${helper_root}" "${real_python}" - <<'PY'
 import argparse
-from lib.modules import MissingArgs, all_modules
+from lib.modules import MissingArgs
+from src.microg_spoof_patch import _module_class
 
-(module_type,) = all_modules()  # Repeated registration must remain idempotent.
+module_type = _module_class()
 assert module_type.NAME == "microg-spoof-patch"
 parser = argparse.ArgumentParser()
 module_type.add_args(parser)

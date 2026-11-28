@@ -15,6 +15,7 @@ declare -a CAPTURED_ARGS=()
 declare -a EXPECTED_ARGS=()
 declare -a PREPARE_STAGES=()
 PREPARE_FAILURE=""
+LOCKED_INPUTS_VALID="true"
 DIAGNOSTICS_FAILURE=false
 declare -a DIAGNOSTIC_ARGS=()
 
@@ -44,6 +45,31 @@ python() {
   fi
 
   CAPTURED_ARGS=("$@")
+}
+
+python3() {
+  if [[ "${1:-}" == src/exfatprogs_fsck.py && "${2:-}" == verify-package ]]; then
+    return 0
+  fi
+  command python3 "$@"
+}
+
+verify_checked_in_locked_input() {
+  [[ "${LOCKED_INPUTS_VALID}" == "true" ]]
+}
+
+# Capture extension routing here; the dedicated builder tests exercise the
+# real clean-commit staging boundary separately.
+prepare_adapter_extension() {
+  if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == true ||
+    "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" == true ||
+    "${ADDITIONALS[SHIZUKU]}" == true ||
+    "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" == true ||
+    "${ADDITIONALS[EXFATPROGS_FSCK]}" == true ]]; then
+    ADAPTER_EXTENSION_PATH="${WORKDIR}/adapter-extension/adapter-extension.toml"
+  else
+    ADAPTER_EXTENSION_PATH=''
+  fi
 }
 
 # This suite verifies orchestration/argv ordering without a full signed OTA.
@@ -155,7 +181,7 @@ assert_prepare_stages() {
   local index
 
   [[ "${#expected[@]}" -eq "${#PREPARE_STAGES[@]}" ]] ||
-    fail "${context}: wrong preparation stage count"
+    fail "${context}: expected stages [${expected[*]}], got [${PREPARE_STAGES[*]}]"
   for index in "${!expected[@]}"; do
     [[ "${expected[${index}]}" == "${PREPARE_STAGES[${index}]}" ]] ||
       fail "${context}: preparation order differs"
@@ -177,6 +203,7 @@ reset_fixture() {
 
   ROM_FAMILY="grapheneos"
   DEVICE_NAME="shiba"
+  OUTPUT_SCOPE="local-unpublished"
   GRAPHENEOS[OTA_TARGET]="fixture-ota"
   ROM_OTA_API_LEVEL=""
   OUTPUTS[PATCHED_OTA]="${WORKDIR}/patched.zip"
@@ -187,6 +214,7 @@ reset_fixture() {
   MAGISK[PREINIT]="sda10"
   INTERACTIVE_MODE="true"
   VIRTUAL_ENV="fixture"
+  ADAPTER_EXTENSION_PATH=''
 
   ADDITIONALS[CUSTOTA]="true"
   ADDITIONALS[MSD]="true"
@@ -196,6 +224,8 @@ reset_fixture() {
   ADDITIONALS[DISABLE_SYSTEM_UPDATER]="false"
   ADDITIONALS[MICROG_SPOOF_PATCH]="false"
   ADDITIONALS[BOOT_ANIMATION]="false"
+  ADDITIONALS[FSCK_SYSFS_SEPOLICY]="false"
+  ADDITIONALS[EXFATPROGS_FSCK]="false"
   ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]="false"
   ADDITIONALS[MICROG]="false"
   ADDITIONALS[SHIZUKU]="false"
@@ -205,6 +235,7 @@ reset_fixture() {
   ROOT_MODE=""
   RESOLVED_ROOT_MODE=""
 
+  LOCKED_INPUTS_VALID="true"
   PREPARE_FAILURE=""
 
   CAPTURED_ARGS=()
@@ -218,6 +249,7 @@ reset_fixture() {
 set_default_expected_args() {
   EXPECTED_ARGS=(
     "${WORKDIR}/tools/my-avbroot-setup/patch.py"
+    "--release-url" "$(release_location_for_output "${OUTPUTS[PATCHED_OTA]}")"
     "--tool-runner-prefix-json" "$(executable_tool_runner_prefix_json)"
     "--input" "${WORKDIR}/fixture-ota.zip"
     "--output" "${WORKDIR}/patched.zip"
@@ -457,29 +489,28 @@ test_microg_spoof_patch_module_is_optional() {
 }
 
 test_boot_animation_module_is_optional_and_ordered() {
-  local value
-  local -a ordered=()
+  local index archive_index=-1 signature_index=-1 extension_index=-1 rootless_index=-1
   reset_fixture boot-animation-enabled
   ADDITIONALS[BOOT_ANIMATION]="true"
   prepare_boot_animation_module() { :; }
-  set_default_expected_args
-  EXPECTED_ARGS=(
-    "${EXPECTED_ARGS[@]:0:29}"
-    "--module-boot-animation" "${WORKDIR}/modules/boot-animation.zip"
-    "${EXPECTED_ARGS[@]:29}"
-  )
-  for value in "${EXPECTED_ARGS[@]}"; do
-    if [[ "${value}" == "--patch-arg=--rootless" ]]; then
-      ordered+=(
-        "--module-boot-animation-sig"
-        "${WORKDIR}/signatures/boot-animation.zip.sig"
-      )
-    fi
-    ordered+=("${value}")
-  done
-  EXPECTED_ARGS=("${ordered[@]}")
   run_patch
-  assert_array_equals EXPECTED_ARGS CAPTURED_ARGS "boot-animation module ordering"
+  assert_pair "--module-boot-animation" "${WORKDIR}/modules/boot-animation.zip" \
+    "boot-animation archive"
+  assert_pair "--module-boot-animation-sig" "${WORKDIR}/signatures/boot-animation.zip.sig" \
+    "boot-animation signature"
+  assert_pair "--adapter-extension" "${WORKDIR}/adapter-extension/adapter-extension.toml" \
+    "boot-animation trusted adapter extension"
+  for index in "${!CAPTURED_ARGS[@]}"; do
+    case "${CAPTURED_ARGS[${index}]}" in
+      --module-boot-animation) archive_index=${index} ;;
+      --module-boot-animation-sig) signature_index=${index} ;;
+      --adapter-extension) extension_index=${index} ;;
+      --patch-arg=--rootless) rootless_index=${index} ;;
+    esac
+  done
+  ((archive_index >= 0 && archive_index < signature_index &&
+    signature_index < extension_index && extension_index < rootless_index)) ||
+    fail "boot-animation extension and legacy argument ordering changed"
 }
 
 enable_microg_fixture() {
@@ -491,14 +522,16 @@ enable_microg_fixture() {
   ROOT_MODE=""
   RESOLVED_ROOT_MODE=""
   mkdir -p "${WORKDIR}/tools/my-avbroot-setup/locks"
-  touch "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json"
+  cat >"${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json" <<'JSON'
+{"schema_version":1,"modules":[{"id":"microg","version":"fixture","artifacts":[]}]}
+JSON
   python3 - "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}-modos.json" <<'PY'
 import json, sys
 sys.path.insert(0, 'src')
 from microg_spoof_patch import certificate_sha256, load_certificate_der
 signer = certificate_sha256(load_certificate_der('custom/microg-companion-signer/cert.pem'))
 with open(sys.argv[1], 'w') as stream:
-    json.dump({'modules': [{'id': 'microg', 'artifacts': [{
+    json.dump({'schema_version': 1, 'modules': [{'id': 'microg', 'version': 'fixture', 'artifacts': [{
         'id': 'companion-apk', 'apk': {'package_name': 'com.android.vending',
                                     'signer_sha256': signer}}]}]}, stream)
 PY
@@ -510,21 +543,21 @@ test_microg_locked_preparation_and_arguments() {
 
   run_patch
 
-  assert_pair "--module-lock" "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}.json" "microG"
-  assert_pair     "--module-profile"     "${WORKDIR}/locked-profiles/microg.toml"     "microG"
+  assert_pair "--module-lock" "${WORKDIR}/locked-profiles/selected-modules.json" "microG"
+  assert_pair     "--module-profile"     "${WORKDIR}/locked-profiles/selected-modules.toml"     "microG"
   assert_pair "--module-cache" "${WORKDIR}/locked-artifacts" "microG"
   assert_pair     "--patch-report"     "${WORKDIR}/patched.zip.microg-patch-report.json"     "microG"
   assert_not_contains "--allow-source-care-map-mismatch" "pdx235 microG cannot authorize unreviewed source"
   assert_not_contains "--module-microg" "microG legacy module"
-  assert_prepare_stages "microG preparation" artifacts-fetch
+  assert_prepare_stages "microG preparation" lock resolve artifacts-fetch artifacts-verify
 
-  grep -Fxq "rom_family = 'lineageos'"     "${WORKDIR}/locked-profiles/microg.toml" ||
+  grep -Fxq 'rom_family = "lineageos"' "${WORKDIR}/locked-profiles/selected-modules.toml" ||
     fail "microG profile did not bind LineageOS"
-  grep -Fxq "selective_signature_spoofing = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
+  grep -Fxq "selective_signature_spoofing = true"     "${WORKDIR}/locked-profiles/selected-modules.toml" ||
     fail "microG profile lacks restricted spoofing capability"
-  grep -Fxq "product_priv_app = true"     "${WORKDIR}/locked-profiles/microg.toml" ||
+  grep -Fxq "product_priv_app = true"     "${WORKDIR}/locked-profiles/selected-modules.toml" ||
     fail "microG profile lacks product priv-app capability"
-  grep -Fxq "api_level = 36" "${WORKDIR}/locked-profiles/microg.toml" ||
+  grep -Fxq "api_level = 36" "${WORKDIR}/locked-profiles/selected-modules.toml" ||
     fail "microG profile lost the fixture's source SDK"
 }
 
@@ -536,8 +569,8 @@ test_microg_signer_patch_selects_the_modos_companion_lock() {
 
   run_patch
 
-  assert_pair "--module-lock" "${WORKDIR}/tools/my-avbroot-setup/locks/microg-${VERSION[MICROG]}-modos.json" "ModOS Companion lock"
-  assert_pair "--module-profile" "${WORKDIR}/locked-profiles/microg.toml" "ModOS Companion lock"
+  assert_pair "--module-lock" "${WORKDIR}/locked-profiles/selected-modules.json" "ModOS Companion lock"
+  assert_pair "--module-profile" "${WORKDIR}/locked-profiles/selected-modules.toml" "ModOS Companion lock"
   assert_pair "--module-microg-spoof-patch" "${WORKDIR}/modules/microg-spoof-patch.zip" "signer patch"
 }
 
@@ -553,13 +586,50 @@ Path(sys.argv[1]).write_bytes(b'\x30' + b'other-certificate' * 8)
 PY
   MICROG_COMPANION_CERT="${cert}"
   local -a args=()
-  if prepare_microg args "${WORKDIR}/tools/my-avbroot-setup" >/dev/null 2>&1; then
+  if prepare_locked_catalog_modules args "${WORKDIR}/tools/my-avbroot-setup" >/dev/null 2>&1; then
     fail 'a Companion certificate different from the installed APK was accepted'
   fi
   assert_prepare_stages 'signer mismatch must not acquire artifacts'
   [[ "${#args[@]}" == 0 && ! -e "${WORKDIR}/locked-profiles" ]] ||
     fail 'signer mismatch prepared an invalid image configuration'
 )
+
+
+test_scheduled_microg_and_exfat_share_one_checked_profile() {
+  reset_fixture scheduled-microg-exfat
+  enable_microg_fixture
+  ADDITIONALS[EXFATPROGS_FSCK]=true
+  ROOT_MODE=both
+  DEVICE_NAME=pdx235
+  OUTPUTS[PATCHED_OTA_MAGISK]="${WORKDIR}/patched-magisk.zip"
+  run_patch
+
+  assert_pair --module-lock "${WORKDIR}/locked-profiles/selected-modules.json" \
+    'scheduled microG and exfat lock'
+  assert_pair --module-profile "${WORKDIR}/locked-profiles/selected-modules.toml" \
+    'scheduled microG and exfat profile'
+  assert_pair --adapter-extension "${WORKDIR}/adapter-extension/adapter-extension.toml" \
+    'scheduled exfat catalog extension'
+  assert_prepare_stages 'scheduled microG and exfat resolution' \
+    lock lock resolve artifacts-fetch artifacts-verify artifacts-fetch artifacts-verify
+  python3 - "${WORKDIR}/locked-profiles/selected-modules.json" \
+    "${WORKDIR}/locked-profiles/selected-modules.toml" <<'PY'
+import json
+from pathlib import Path
+import sys
+import tomllib
+
+lock = json.loads(Path(sys.argv[1]).read_text())
+profile = tomllib.loads(Path(sys.argv[2]).read_text())
+assert [module['id'] for module in lock['modules']] == ['exfatprogs-fsck', 'microg']
+assert profile['enabled_modules'] == ['exfatprogs-fsck', 'microg']
+assert profile['api_level'] == 36
+assert profile['root_mode'] == 'rootless'
+assert profile['output_scope'] == 'local-unpublished'
+assert profile['capabilities']['selective_signature_spoofing'] is True
+assert profile['capabilities']['product_priv_app'] is True
+PY
+}
 
 test_microg_profile_uses_selected_source_sdk() (
   reset_fixture microg-source-sdk
@@ -575,9 +645,9 @@ test_microg_profile_uses_selected_source_sdk() (
   resolve_rom_profile
   fetch_rom_ota_metadata
   run_patch
-  assert_prepare_stages 'microG selected SDK preparation' artifacts-fetch
-  assert_pair --module-profile "${WORKDIR}/locked-profiles/microg.toml" 'microG selected SDK'
-  python3 - "${WORKDIR}/locked-profiles/microg.toml" <<'PY'
+  assert_prepare_stages 'microG selected SDK preparation' lock resolve artifacts-fetch artifacts-verify
+  assert_pair --module-profile "${WORKDIR}/locked-profiles/selected-modules.toml" 'microG selected SDK'
+  python3 - "${WORKDIR}/locked-profiles/selected-modules.toml" <<'PY'
 from pathlib import Path
 import sys
 import tomllib
@@ -597,7 +667,7 @@ test_microg_rejects_missing_or_invalid_source_sdk() {
     ROM_OTA_API_LEVEL="${api_level}"
     assert_patch_fails_before_execution "invalid microG source SDK: ${api_level}"
     assert_prepare_stages 'invalid SDK prevents locked artifact acquisition'
-    [[ ! -e "${WORKDIR}/locked-profiles/microg.toml" ]] ||
+    [[ ! -e "${WORKDIR}/locked-profiles/selected-modules.toml" ]] ||
       fail 'invalid source SDK produced a microG profile'
     index=$((index + 1))
   done
@@ -607,8 +677,8 @@ test_disabled_microg_does_not_require_source_sdk() {
   reset_fixture no-microg-source-sdk
   unset ROM_OTA_API_LEVEL
   local -a args=()
-  prepare_microg args "${WORKDIR}/tools/my-avbroot-setup"
-  assert_prepare_stages 'disabled microG does not acquire artifacts'
+  prepare_locked_catalog_modules args "${WORKDIR}/tools/my-avbroot-setup"
+  assert_prepare_stages 'disabled locked modules do not acquire artifacts'
   [[ "${#args[@]}" -eq 0 && ! -e "${WORKDIR}/locked-profiles" ]] ||
     fail 'disabled microG created a profile or changed patch arguments'
 }
@@ -617,19 +687,7 @@ enable_shizuku_fixture() {
   ADDITIONALS[SHIZUKU]="true"
   ROOT_MODE="rootless"
   RESOLVED_ROOT_MODE=""
-  mkdir -p "${WORKDIR}/tools/my-avbroot-setup/lib/modules"
-  cat >"${WORKDIR}/tools/my-avbroot-setup/lib/modules/__init__.py" <<'PY'
-def all_modules():
-    return legacy_cli_module_types()
-
-def legacy_cli_module_types():
-    return ()
-PY
-  cat >"${WORKDIR}/tools/my-avbroot-setup/lib/modules/registry.py" <<'PY'
-def legacy_cli_module_types():
-    result: list[type[LegacyCliModule]] = []
-    return tuple(result)
-PY
+  ROM_OTA_API_LEVEL=36
 }
 
 test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices() {
@@ -655,9 +713,23 @@ test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices() {
       "Shizuku ${ROM_FAMILY}/${DEVICE_NAME} selection"
     assert_pair "--module-shizuku-sig" "${WORKDIR}/signatures/shizuku.zip.sig" \
       "Shizuku ${ROM_FAMILY}/${DEVICE_NAME} signature"
+    assert_pair "--adapter-extension" "${WORKDIR}/adapter-extension/adapter-extension.toml" \
+      "Shizuku trusted adapter extension"
     assert_prepare_stages "Shizuku ${ROM_FAMILY}/${DEVICE_NAME} preparation" \
-      artifacts-fetch
+      lock resolve artifacts-fetch artifacts-verify
   done
+}
+
+test_shizuku_magisk_composes_rooted_catalog_profile() {
+  reset_fixture shizuku-magisk-catalog
+  enable_shizuku_fixture
+  ROOT_MODE=magisk
+  run_patch
+  grep -Fxq 'root_mode = "rooted"' "${WORKDIR}/locked-profiles/selected-modules.toml" ||
+    fail 'Magisk selection did not compose a rooted catalog profile'
+  [[ "${PIXENEOS_SHIZUKU_ROOT_MODE}" == magisk ]] ||
+    fail 'Catalog root mode translation changed the Shizuku startup mode'
+  assert_contains --patch-arg=--magisk 'Magisk selection retained the root patch route'
 }
 
 test_shizuku_rejects_shared_rootless_magisk_product_image() {
@@ -866,6 +938,62 @@ test_fdroid_extension_request_is_rejected() (
   assert_prepare_stages "retired F-Droid extension"
 )
 
+test_unlocked_modules_preserve_extraction_order() (
+  local event_log
+  local -a expected_events=(extract)
+  local -a actual_events=()
+
+  reset_fixture unlocked-extraction
+  set_default_expected_args
+  rm -f -- \
+    "${WORKDIR}/extracted/avb_pkmd.bin" \
+    "${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
+  event_log="${WORKDIR}/events"
+
+  extract_official_keys() {
+    printf '%s
+' extract >>"${event_log}"
+    mkdir -p -- "${WORKDIR}/extracted/ota/META-INF/com/android"
+    touch -- \
+      "${WORKDIR}/extracted/avb_pkmd.bin" \
+      "${WORKDIR}/extracted/ota/META-INF/com/android/otacert"
+  }
+
+  run_patch
+  mapfile -t actual_events <"${event_log}"
+  assert_array_equals \
+    expected_events actual_events "unlocked modules extraction order"
+  assert_array_equals \
+    EXPECTED_ARGS CAPTURED_ARGS "unlocked modules missing-key arguments"
+)
+
+test_shizuku_preparation_stages_fail_closed() {
+  local failure
+
+  for failure in lock resolve artifacts-fetch artifacts-verify; do
+    reset_fixture "shizuku-fail-${failure}"
+    enable_shizuku_fixture
+    PREPARE_FAILURE="${failure}"
+    assert_patch_fails_before_execution "failed ${failure}"
+    case "${failure}" in
+    lock)
+      assert_prepare_stages "failed lock verification" lock
+      ;;
+    resolve)
+      assert_prepare_stages "failed resolve" lock resolve
+      ;;
+    artifacts-fetch)
+      assert_prepare_stages \
+        "failed fetch" lock resolve artifacts-fetch
+      ;;
+    artifacts-verify)
+      assert_prepare_stages \
+        "failed verify" lock resolve artifacts-fetch artifacts-verify
+      ;;
+    esac
+  done
+}
+
 test_default_arguments
 test_each_module_can_be_disabled
 test_all_modules_can_be_disabled
@@ -880,10 +1008,13 @@ test_boot_animation_module_is_optional_and_ordered
 test_microg_locked_preparation_and_arguments
 test_microg_signer_patch_selects_the_modos_companion_lock
 test_microg_signer_mismatch_stops_before_artifact_fetch
+
+test_scheduled_microg_and_exfat_share_one_checked_profile
 test_microg_profile_uses_selected_source_sdk
 test_microg_rejects_missing_or_invalid_source_sdk
 test_disabled_microg_does_not_require_source_sdk
 test_shizuku_prepares_for_supported_rom_profiles_and_provider_devices
+test_shizuku_magisk_composes_rooted_catalog_profile
 test_shizuku_rejects_shared_rootless_magisk_product_image
 test_lineage_both_modes_clear_vbmeta_flags
 test_care_map_compatibility_scope
@@ -894,5 +1025,7 @@ test_diagnostic_failure_blocks_postflight_and_sidecars
 test_existing_grapheneos_output_cannot_bypass_diagnostics
 test_helper_uses_build_filesystem_scratch
 test_fdroid_extension_request_is_rejected
+test_unlocked_modules_preserve_extraction_order
+test_shizuku_preparation_stages_fail_closed
 
 echo "module selection tests passed"

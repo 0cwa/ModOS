@@ -1,0 +1,59 @@
+schema_version = 2
+id = 'exfatprogs-fsck'
+name = 'exfatprogs fsck replacement'
+status = 'supported'
+adapter = 'exfatprogs-fsck'
+lifecycle = 'static-image'
+acknowledgement_required = false
+artifact_kinds = ['other']
+dependencies = []
+conflicts = []
+warnings = []
+reasons = []
+
+[defaults]
+helper_enabled = false
+pixene_profile_enabled = false
+
+[verification]
+schemes = ['sha256']
+digest_required = true
+enforced_by = 'adapter'
+
+[compatibility]
+root_modes = ['rootless', 'rooted']
+architectures = ['arm64-v8a']
+
+[compatibility.roms.lineageos]
+status = 'experimental'
+reason = { code = 'exfatprogs-pdx235-runtime-pending', message = 'The locked AArch64 executable and source offer are reviewed for LineageOS pdx235; physical filesystem behavior and OTA persistence remain separate acceptance checks.' }
+
+[capabilities.requires]
+selective_signature_spoofing = false
+product_priv_app = false
+custom_init_selinux = false
+abis = ['arm64-v8a']
+# The locked ELF carries an Android API 24 minimum note; runtime behavior still
+# needs separate device acceptance and is marked experimental above.
+min_api = 24
+
+[capabilities.provides]
+root = []
+zygisk = []
+selective_signature_spoofing = false
+product_priv_app = false
+custom_init_selinux = false
+
+[legal]
+license = 'GPL-2.0'
+source_url = 'https://github.com/exfatprogs/exfatprogs'
+source_offer_required = true
+upstream_only_fetching = true
+local_only = false
+cache_policy = 'read-write'
+allowed_output_scopes = ['local-unpublished', 'published']
+
+[legal.permission_record]
+reference = 'GPL-2.0 corresponding source offer'
+source_url = 'https://github.com/exfatprogs/exfatprogs/tree/1.4.3'
+granted_scopes = ['published']

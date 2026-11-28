@@ -5,6 +5,8 @@ set -euo pipefail
 
 python3 - <<'PY'
 import ast
+import hashlib
+import json
 from pathlib import Path
 
 root = Path.cwd()
@@ -36,9 +38,20 @@ start = util.index("function prepare_boot_animation_module()")
 end = util.index("\n# Resolve and acquire", start)
 registration = util[start:end]
 assert "return 0" in registration
-assert 'registry_file="${helper_root}/lib/modules/registry.py"' in registration
-assert "def legacy_cli_module_types" in registration
-assert "result.append(BootAnimationMod)" in registration
-assert "return {" not in registration
+assert "registry.py" not in registration
+assert "legacy_cli_module_types" not in registration
+extension = json.loads((root / "tools/modules/adapter_extension.json").read_text())
+entry = next(item for item in extension["adapters"] if item["id"] == "boot-animation")
+assert entry["kind"] == "legacy-cli"
+assert entry["target"] == "_module_class"
+assert entry["source_path"] == "src/boot_animation.py"
+assert entry["source"] == "adapters/boot_animation.py"
+assert entry["sha256"] == hashlib.sha256((root / entry["source_path"]).read_bytes()).hexdigest()
+staging = util[util.index("function prepare_adapter_extension()"):
+               util.index("function prepare_boot_animation_module()")]
+patch = util[util.index("function patch_ota()"):
+             util.index("function run_patch_helper_with_diagnostics()")]
+assert "tools/modules/build_adapter_extension.py" in staging
+assert 'args+=(--adapter-extension "${ADAPTER_EXTENSION_PATH}")' in patch
 print("boot animation helper registration contract passed")
 PY

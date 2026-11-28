@@ -109,7 +109,7 @@ PIXENEOS_DEVELOPMENT_PROFILE="${PIXENEOS_DEVELOPMENT_PROFILE:-}"
 # Application version variables
 VERSION[ALTERINSTALLER]="${VERSION[ALTERINSTALLER]:-2.4}"
 VERSION[MICROG]="v0.3.17.252432" # reviewed helper lock; Renovate proposes releases
-VERSION[AVBROOT_SETUP]="902ed62e63f6d7d7d332a07619d75409d17fe514" # ModOS-signed microG Companion on top of qualified source 3.37.1 (b553f46)
+VERSION[AVBROOT_SETUP]="2e342a96f2d7dcc0e7ec805392555974797dbfc7" # Native module adapters with the deployed ModOS-signed microG Companion
 VERSION[BCR]="${VERSION[BCR]:-3.11}"
 VERSION[CUSTOTA]="${VERSION[CUSTOTA]:-6.9}"
 VERSION[GRAPHENEOS]="${VERSION[GRAPHENEOS]:-}"

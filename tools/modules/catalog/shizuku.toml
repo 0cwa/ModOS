@@ -1,0 +1,67 @@
+schema_version = 2
+id = 'shizuku'
+name = 'Shizuku'
+status = 'supported'
+adapter = 'shizuku'
+lifecycle = 'static-image'
+acknowledgement_required = false
+artifact_kinds = ['apk']
+dependencies = []
+conflicts = []
+warnings = []
+reasons = []
+
+[defaults]
+helper_enabled = false
+pixene_profile_enabled = false
+
+[verification]
+schemes = ['sha256', 'apk-signature']
+digest_required = true
+enforced_by = 'adapter'
+
+[[verification.trust_roots]]
+type = 'apk-signer-sha256'
+value = '268b5590e868fb08bae7e0ac413564cd1ff88f5ccff74af9dbd0dc918e30db30'
+
+[compatibility]
+root_modes = ['rootless', 'rooted']
+architectures = ['any']
+
+[compatibility.roms.lineageos]
+status = 'experimental'
+reason = { code = 'shizuku-lineage-runtime-pending', message = 'The image layout and locked manager are reviewed; Shizuku server startup and OTA persistence still require physical-device acceptance.' }
+
+[compatibility.roms.grapheneos]
+status = 'experimental'
+reason = { code = 'shizuku-graphene-runtime-pending', message = 'The image layout and locked manager are reviewed; Shizuku server startup and OTA persistence still require physical-device acceptance.' }
+
+[capabilities.requires]
+selective_signature_spoofing = false
+product_priv_app = false
+custom_init_selinux = false
+abis = ['any']
+# Build/install minimum from the locked v13.6.0 source tag's minSdk setting:
+# https://github.com/RikkaApps/Shizuku/blob/v13.6.0/build.gradle
+min_api = 24
+
+[capabilities.provides]
+root = []
+zygisk = []
+selective_signature_spoofing = false
+product_priv_app = false
+custom_init_selinux = false
+
+[legal]
+license = 'Apache-2.0'
+source_url = 'https://github.com/RikkaApps/Shizuku'
+source_offer_required = false
+upstream_only_fetching = true
+local_only = false
+cache_policy = 'read-write'
+allowed_output_scopes = ['local-unpublished', 'private', 'shared', 'published']
+
+[legal.permission_record]
+reference = 'Apache-2.0 redistribution grant'
+source_url = 'https://github.com/RikkaApps/Shizuku/blob/master/LICENSE'
+granted_scopes = ['shared', 'published']

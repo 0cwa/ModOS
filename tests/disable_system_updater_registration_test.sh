@@ -1,81 +1,48 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Exercise helper registration and its callable module API, rather than source layout.
-set -eo pipefail
+# Verify the updater adapter uses the external trusted extension route.
+set -euo pipefail
+: "${TMPDIR:?set TMPDIR to a task scratch directory}"
 source src/util_functions.sh
-set -u
 
-fixture_root="$(mktemp -d)"
-trap 'rm -rf "${fixture_root}"' EXIT
+fixture_root="$(mktemp -d "${TMPDIR}/updater-extension.XXXXXX")"
+trap 'rm -rf -- "${fixture_root}"' EXIT
 WORKDIR="${fixture_root}/work"
 helper_root="${fixture_root}/helper"
-
 ADDITIONALS[DISABLE_SYSTEM_UPDATER]=false
 prepare_disable_system_updater_module "${helper_root}"
 [[ ! -e "${helper_root}" && ! -e "${WORKDIR}" ]]
 
-mkdir -p "${helper_root}/lib/modules"
-cat > "${helper_root}/lib/modules/__init__.py" <<'PY'
-from dataclasses import dataclass
-class LegacyCliModule:
-    pass
-class MissingArgs(Exception):
-    pass
-@dataclass
-class ModuleRequirements:
-    boot_images: set
-    ext_images: set
-    selinux_patching: bool
-
-def all_modules():
-    from lib.modules.registry import legacy_cli_module_types
-    return legacy_cli_module_types()
-PY
-cat > "${helper_root}/lib/modules/registry.py" <<'PY'
-from lib.modules import LegacyCliModule
-
-def legacy_cli_module_types():
-    result: list[type[LegacyCliModule]] = []
-    return tuple(result)
-PY
-cat > "${helper_root}/lib/filesystem.py" <<'PY'
-class CpioFs:
-    pass
-class ExtFs:
-    pass
-PY
-
 ADDITIONALS[DISABLE_SYSTEM_UPDATER]=true
 for ROM_FAMILY in grapheneos lineageos; do
+  WORKDIR="${fixture_root}/work-${ROM_FAMILY}"
   prepare_disable_system_updater_module "${helper_root}"
-  prepare_disable_system_updater_module "${helper_root}"
-  PYTHONPATH="${helper_root}" python3 - <<'PY'
-import argparse
-import os
-from lib.modules import MissingArgs, all_modules
-
-(module_type,) = all_modules()  # Repeated registration must remain idempotent.
-assert module_type.NAME == "disable-system-updater"
-parser = argparse.ArgumentParser()
-module_type.add_args(parser)
-try:
-    module_type.from_args(parser.parse_args([]))
-except MissingArgs:
-    pass
-else:
-    raise AssertionError("disabled updater module unexpectedly selected")
-module = module_type.from_args(parser.parse_args([
-    "--module-disable-system-updater", "marker.zip",
-    "--module-disable-system-updater-sig", "marker.zip.sig",
-]))
-expected_partition = "system" if os.environ["PIXENEOS_ROM_FAMILY"] == "grapheneos" else "system_ext"
-requirements = module.requirements()
-assert requirements.ext_images == {expected_partition}
-assert requirements.boot_images == set()
-assert not requirements.selinux_patching
-PY
   [[ -f "${WORKDIR}/modules/disable-system-updater.zip" ]]
   [[ -f "${WORKDIR}/signatures/disable-system-updater.zip.sig" ]]
+  [[ ! -e "${helper_root}" ]]
+  [[ "${PIXENEOS_ROM_FAMILY}" == "${ROM_FAMILY}" ]]
 done
 
-echo "system updater helper registration behavior passed"
+python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+root = Path.cwd()
+config = json.loads((root / 'tools/modules/adapter_extension.json').read_text())
+entry = next(item for item in config['adapters'] if item['id'] == 'disable-system-updater')
+assert entry['kind'] == 'legacy-cli'
+assert entry['target'] == '_module_class'
+assert entry['source_path'] == 'src/disable_system_updater.py'
+assert entry['source'] == 'adapters/disable_system_updater.py'
+assert entry['sha256'] == hashlib.sha256((root / entry['source_path']).read_bytes()).hexdigest()
+
+util = (root / 'src/util_functions.sh').read_text()
+start = util.index('function prepare_disable_system_updater_module()')
+end = util.index('\n# Register the local Shizuku adapter', start)
+body = util[start:end]
+assert 'registry.py' not in body
+assert 'helper_root}/lib/modules' not in body
+assert 'disable-system-updater.zip.sig' in body
+print('system updater external adapter preparation contract passed')
+PY
