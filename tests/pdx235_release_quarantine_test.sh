@@ -56,7 +56,6 @@ expect_reject 'missing context is not allowed' enforce_pdx235_publication_scope 
 ROM_FAMILY=lineageos
 DEVICE_NAME=pdx235
 ADDITIONALS[DEBUG]=false
-ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]=false
 resolve_rom_profile
 
 # Cover a normal rootless request and an adversarial paired/microG forced

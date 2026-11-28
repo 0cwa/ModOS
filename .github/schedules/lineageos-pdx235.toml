@@ -16,7 +16,6 @@ MAGISK_PREINIT = "sda47"
 'ADDITIONALS[MSD]' = false
 'ADDITIONALS[OEMUNLOCKONBOOT]' = true
 'ADDITIONALS[DISABLE_SYSTEM_UPDATER]' = true
-'ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]' = false
 'ADDITIONALS[MICROG]' = true
 # Preserve the Companion signer already published in the November 10 OTA pair.
 # A signer change requires an explicit migration review before publication.

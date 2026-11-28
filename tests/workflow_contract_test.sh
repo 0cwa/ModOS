@@ -154,12 +154,15 @@ test_reusable_workflow() {
     'microg:boolean:false' \
     'microg-spoof-patch:boolean:false' \
     'shizuku:boolean:false' \
-    'disable-system-updater:boolean:false' \
-    'fdroid-privileged-extension:boolean:false'; do
+    'disable-system-updater:boolean:false'; do
     IFS=: read -r input expected_type expected_default <<<"${contract}"
     assert_workflow_input_contract \
       "${REUSABLE}" "${input}" "${expected_type}" "${expected_default}"
   done
+  assert_contains \
+    "${REUSABLE}" \
+    'if: inputs\.microg \|\| inputs\.shizuku' \
+    "Shizuku-only builds must configure Android APK verification tools"
   assert_contains \
     "${REUSABLE}" \
     'uses:[[:space:]]*actions/checkout@' \
@@ -538,7 +541,6 @@ test_release_triggers() {
   assert_dispatch_default "${RELEASE}" msd true
   assert_dispatch_default "${RELEASE}" oemunlockonboot true
   assert_dispatch_default "${RELEASE}" disable-system-updater false
-  assert_dispatch_default "${RELEASE}" fdroid-privileged-extension false
   assert_dispatch_default "${RELEASE}" shizuku false
   assert_dispatch_default "${RELEASE}" shizuku false workflow_call
   assert_dispatch_default "${RELEASE}" boot-animation true
@@ -668,8 +670,7 @@ test_module_forwarding_contract() {
     'custota:CUSTOTA:custota' \
     'msd:MSD:msd' \
     'oemunlockonboot:OEMUNLOCKONBOOT:oemunlockonboot' \
-    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater' \
-    'fdroid-privileged-extension:FDROID_PRIVILEGED_EXTENSION:fdroid_privileged_extension'; do
+    'disable-system-updater:DISABLE_SYSTEM_UPDATER:disable_system_updater'; do
     IFS=: read -r input config output <<<"${contract}"
 
     assert_contains \

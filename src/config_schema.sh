@@ -104,10 +104,11 @@ _config_schema_define boot_animation 'ADDITIONALS[BOOT_ANIMATION]' build boolean
   ADDITIONALS array BOOT_ANIMATION ADDITIONALS_BOOT_ANIMATION true true caller-or-existing-or-default
 _config_schema_define compatible_sepolicy_patching 'ADDITIONALS[MAS_COMPATIBLE_SEPOLICY]' build boolean \
   ADDITIONALS array MAS_COMPATIBLE_SEPOLICY ADDITIONALS_MAS_COMPATIBLE_SEPOLICY false true caller-or-existing-or-default
+# Read legacy false values so existing configuration files can still be built.
 _config_schema_define fdroid_privileged_extension \
   'ADDITIONALS[FDROID_PRIVILEGED_EXTENSION]' build boolean \
   ADDITIONALS array FDROID_PRIVILEGED_EXTENSION \
-  ADDITIONALS_FDROID_PRIVILEGED_EXTENSION false true caller-or-existing-or-default
+  ADDITIONALS_FDROID_PRIVILEGED_EXTENSION false false caller-or-existing-or-default
 _config_schema_define shizuku 'ADDITIONALS[SHIZUKU]' build boolean \
   ADDITIONALS array SHIZUKU ADDITIONALS_SHIZUKU false true caller-or-existing-or-default
 _config_schema_define exfatprogs_fsck 'ADDITIONALS[EXFATPROGS_FSCK]' build boolean \

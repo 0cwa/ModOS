@@ -51,22 +51,6 @@ function verify_checked_in_locked_input() {
   [[ "${working_object}" == "${committed_object}" ]]
 }
 
-function verify_fdroid_privileged_extension_inputs() {
-  local lock_path="${1}"
-  local profile_path="${2}"
-
-  if [[ -z "${lock_path}" || -z "${profile_path}" ]]; then
-    echo "Error: F-Droid locked mode requires an explicit lock and profile." >&2
-    return 1
-  fi
-
-  if ! verify_checked_in_locked_input "${lock_path}" ||
-    ! verify_checked_in_locked_input "${profile_path}"; then
-    echo "Error: F-Droid lock and profile must be clean checked-in regular files." >&2
-    return 1
-  fi
-}
-
 # Function to look after number of times a retry has been made if the auto retry flag is enabled
 function auto_retry_check() {
   if [[ "${ADDITIONALS[RETRY]}" == "true" ]]; then

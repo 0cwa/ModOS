@@ -22,7 +22,6 @@ compatibility boundaries and the upstream changes that would let us remove them.
 - [AlterInstaller](https://github.com/chenxiaolong/AlterInstaller)
 - Optional Magisk using the repository selected by the build
 - Custom boot animation enabled by default (opt-out available)
-- Optional locked F-Droid Privileged Extension integration (default-off)
 - Optional Shizuku with an init-managed rootless boot service (no wireless debugging)
 
 > [!NOTE]

@@ -45,10 +45,6 @@ on:
         required: false
         type: boolean
         default: false
-      fdroid-privileged-extension:
-        required: false
-        type: boolean
-        default: false
       shizuku:
         description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
         required: false
@@ -145,11 +141,6 @@ on:
         required: false
         type: boolean
         default: false
-      fdroid-privileged-extension:
-        description: Include the locked F-Droid Privileged Extension module
-        required: false
-        type: boolean
-        default: false
       shizuku:
         description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
         required: false
@@ -212,7 +203,6 @@ jobs:
       msd: ${{ steps.scheduled_config.outputs.msd }}
       oemunlockonboot: ${{ steps.scheduled_config.outputs.oemunlockonboot }}
       disable_system_updater: ${{ steps.scheduled_config.outputs.disable_system_updater }}
-      fdroid_privileged_extension: ${{ steps.scheduled_config.outputs.fdroid_privileged_extension }}
       boot_animation: ${{ steps.scheduled_config.outputs.boot_animation }}
       compatible_sepolicy_patching: ${{ steps.scheduled_config.outputs.compatible_sepolicy_patching }}
       expected_variant: ${{ steps.selection_identity.outputs.expected_variant }}
@@ -274,7 +264,6 @@ jobs:
           ADDITIONALS_MSD: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.msd == 'true' || inputs.msd }}
           ADDITIONALS_OEMUNLOCKONBOOT: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.oemunlockonboot == 'true' || inputs.oemunlockonboot }}
           ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.disable_system_updater == 'true' || inputs.disable-system-updater }}
-          ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.fdroid_privileged_extension == 'true' || inputs.fdroid-privileged-extension }}
           ADDITIONALS_SHIZUKU: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
           ADDITIONALS_MAS_COMPATIBLE_SEPOLICY: ${{ github.event_name == 'schedule' && steps.scheduled_config.outputs.compatible_sepolicy_patching == 'true' || github.event_name != 'schedule' && inputs.compatible-sepolicy-patching || false }}
           ADDITIONALS_DEBUG: ${{ github.event_name != 'schedule' && inputs.allow-unauthorized-adb || false }}
@@ -371,7 +360,6 @@ jobs:
       msd: ${{ github.event_name == 'schedule' && needs.preflight.outputs.msd == 'true' || (github.event_name != 'schedule' && inputs.msd) }}
       oemunlockonboot: ${{ github.event_name == 'schedule' && needs.preflight.outputs.oemunlockonboot == 'true' || (github.event_name != 'schedule' && inputs.oemunlockonboot) }}
       disable-system-updater: ${{ github.event_name == 'schedule' && needs.preflight.outputs.disable_system_updater == 'true' || (github.event_name != 'schedule' && inputs.disable-system-updater) }}
-      fdroid-privileged-extension: ${{ github.event_name == 'schedule' && needs.preflight.outputs.fdroid_privileged_extension == 'true' || (github.event_name != 'schedule' && inputs.fdroid-privileged-extension) }}
       shizuku: ${{ github.event_name != 'schedule' && inputs.shizuku || false }}
       # LineageOS pdx235-only modules; never forward them from a GrapheneOS trigger.
       exfatprogs-fsck: false

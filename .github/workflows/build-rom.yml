@@ -58,10 +58,6 @@ on:
         required: false
         type: boolean
         default: false
-      fdroid-privileged-extension:
-        required: false
-        type: boolean
-        default: false
       shizuku:
         description: Include Shizuku with a rootless boot service or Magisk startup (separate builds)
         required: false
@@ -154,7 +150,6 @@ env:
   ADDITIONALS_MICROG: ${{ inputs.microg }}
   ADDITIONALS_MICROG_SPOOF_PATCH: ${{ inputs.microg-spoof-patch }}
   ADDITIONALS_DISABLE_SYSTEM_UPDATER: ${{ inputs.disable-system-updater }}
-  ADDITIONALS_FDROID_PRIVILEGED_EXTENSION: ${{ inputs.fdroid-privileged-extension }}
   ADDITIONALS_SHIZUKU: ${{ inputs.shizuku }}
   ADDITIONALS_EXFATPROGS_FSCK: ${{ inputs.exfatprogs-fsck }}
   ADDITIONALS_FSCK_SYSFS_SEPOLICY: ${{ inputs.fsck-sysfs-sepolicy }}
@@ -267,7 +262,7 @@ jobs:
           fi
 
       - name: Configure Android APK verification tools
-        if: inputs.microg || inputs.fdroid-privileged-extension
+        if: inputs.microg || inputs.shizuku
         shell: bash
         run: bash src/ci/configure_android_apk_tools.sh
 

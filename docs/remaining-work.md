@@ -123,8 +123,6 @@ source-snippet checks as integration prerequisites.
 
 - Stock updater removal is integrated as an independent selection and exercised
   in the real complete-profile artifact pair; device acceptance remains separate.
-- F-Droid stays default-off pending a reviewed production lock/profile and source
-  delivery. Keep it separate from the helper's one locked-bundle-per-call boundary.
 - ROM-neutral naming of the remaining `GRAPHENEOS` configuration array is a
   nonblocking cleanup.
 - Reconcile #113/#115 after integration review to distinguish implemented fixes
