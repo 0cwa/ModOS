@@ -1,5 +1,20 @@
 # Executable tool trust lock
 
+## Pinned helper source and Python runtime
+
+The helper source is checked by the single native contract in
+[`tools/compat/avbroot_setup_compat.json`](../tools/compat/avbroot_setup_compat.json).
+The validator binds the exact repository origin, helper commit and `patch.py`
+blob, then requires the checkout to be clean, including ignored files. It never
+rewrites helper source. The pinned helper must expose native `--release-url` and
+`--adapter-extension` options in its own help output.
+
+ModOS creates the helper Python environment at
+`WORKDIR/venvs/my-avbroot-setup`, outside the pinned source tree. Helper Python
+commands set `PYTHONDONTWRITEBYTECODE=1`, so repeated setup does not create
+ignored `__pycache__` content in the checkout. These runtime artifacts do not
+weaken the pristine-source check.
+
 `locks/executable-tools-v1.json` records the immutable release archives and
 authenticated layouts for the three executable tools currently pinned by
 PixeneOS on `x86_64-unknown-linux-gnu`. The lock is repository data only. It is

@@ -162,10 +162,15 @@ class ShizukuAdapterTest(unittest.TestCase):
                 if mode == "rootless":
                     filesystems["system"] = FakeSystemFs(Path(temporary))
                 with patch.object(shizuku, "_read_payload", return_value=(b"locked APK", payload)):
-                    shizuku.inject_payload(
+                    installed_paths = shizuku.inject_payload(
                         "lineageos", mode, Path("manager.apk"), filesystems, InstallRequest
                     )
                 files = {entry.path: entry for entry in product.requests}
+                self.assertEqual(
+                    installed_paths,
+                    tuple(str(entry.path) for entry in product.requests),
+                    "Shizuku must report every installed image-relative path",
+                )
                 self.assertEqual(b"locked APK", files["/app/Shizuku/Shizuku.apk"].contents)
                 for abi, libraries in payload.items():
                     for name, contents in libraries.items():

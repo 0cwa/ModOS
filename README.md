@@ -487,8 +487,7 @@ is implied by the extracted-file test.
 ### Shizuku module
 
 To patch Shizuku into the system image with automatic startup and no USB or
-wireless debugging requirement, select it in the existing `[build]` section
-of `env.toml`:
+wireless debugging requirement, use the checked-in `env.toml` selection with rootless mode:
 
 ```toml
 [build]
@@ -498,7 +497,11 @@ ROOT_MODE = "rootless"
 
 The GrapheneOS single-device/multi-device and LineageOS manual workflows also
 expose the `shizuku` input. Select `root-mode: rootless` for the system-managed
-service. Shizuku remains default-off, including in scheduled builds.
+service. The checked-in local configuration enables Shizuku. Scheduled paired
+builds and manual workflow inputs still default to disabled.
+
+For local Shizuku builds, put Android SDK `apksigner` and `apkanalyzer` on
+`PATH` so the pinned helper can verify the APK.
 
 #### Startup and permissions
 

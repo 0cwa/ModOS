@@ -108,7 +108,7 @@ grep -Fq 'root-mode:' .github/workflows/release-lineage.yml ||
 grep -Fq 'root-mode:' .github/workflows/multi-release.yml ||
   fail "multi-device release workflow does not expose root-mode"
 
-expected_helper='902ed62e63f6d7d7d332a07619d75409d17fe514'
+expected_helper='2e342a96f2d7dcc0e7ec805392555974797dbfc7'
 grep -Fq "VERSION[AVBROOT_SETUP]=\"${expected_helper}\"" src/declarations.sh ||
   fail "PixeneOS is not pinned to the reviewed microG native-library helper"
 python3 - "${expected_helper}" <<'PY'

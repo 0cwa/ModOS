@@ -260,6 +260,7 @@ function module_selection_fingerprint() {
   local microg_spoof_patch_adapter_digest="disabled"
   local microg_spoof_patch_cert_digest="disabled"
   local microg_spoof_patch_cert_path=""
+  local adapter_extension_digest="disabled"
   local entry module
   local -A legacy_module_versions=(
     [ALTERINSTALLER]=disabled
@@ -392,6 +393,30 @@ function module_selection_fingerprint() {
     }
   fi
 
+  if [[ "${ADDITIONALS[BOOT_ANIMATION]}" == 'true' ||
+    "${ADDITIONALS[DISABLE_SYSTEM_UPDATER]}" == 'true' ||
+    "${ADDITIONALS[MICROG_SPOOF_PATCH]}" == 'true' ||
+    "${ADDITIONALS[SHIZUKU]}" == 'true' ||
+    "${ADDITIONALS[FSCK_SYSFS_SEPOLICY]}" == 'true' ||
+    "${ADDITIONALS[EXFATPROGS_FSCK]}" == 'true' ||
+    "${ADDITIONALS[MICROG]}" == 'true' ]]; then
+    local builder_digest extension_index_digest composer_digest
+    builder_digest="$(_locked_input_digest tools/modules/build_adapter_extension.py)" || {
+      echo "Error: the adapter extension builder is not clean and checked in." >&2
+      return 1
+    }
+    extension_index_digest="$(_locked_input_digest tools/modules/adapter_extension.json)" || {
+      echo "Error: the adapter extension index is not clean and checked in." >&2
+      return 1
+    }
+    composer_digest="$(_locked_input_digest tools/modules/compose_locked_inputs.py)" || {
+      echo "Error: the locked catalog composer is not clean and checked in." >&2
+      return 1
+    }
+    adapter_extension_digest="$(printf 'builder=%s\nindex=%s\ncomposer=%s\n' \
+      "${builder_digest}" "${extension_index_digest}" "${composer_digest}" | sha256sum | awk '{print $1}')" || return 1
+  fi
+
   if [[ "${ADDITIONALS[ROOT]}" == 'true' ]]; then
     magisk_preinit="${MAGISK[PREINIT]}"
     magisk_repository="${MAGISK[REPOSITORY]}"
@@ -459,6 +484,7 @@ function module_selection_fingerprint() {
   SELECTION_FSCK_SYSFS_SEPOLICY_ADAPTER_SHA256="${fsck_sysfs_sepolicy_adapter_digest}"
   SELECTION_BOOT_ANIMATION="${ADDITIONALS[BOOT_ANIMATION]}"
   SELECTION_BOOT_ANIMATION_SHA256="${boot_animation_digest}"
+  SELECTION_ADAPTER_EXTENSION_SHA256="${adapter_extension_digest}"
 
   MODULE_SELECTION_FINGERPRINT="$(selection_variant_fingerprint)"
 
